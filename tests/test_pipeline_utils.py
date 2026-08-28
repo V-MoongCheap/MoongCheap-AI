@@ -5,6 +5,7 @@ import pandas as pd
 
 from moongcheap_ai.facet import repeated_terms, taxonomy_v0
 from moongcheap_ai.catalog import normalize_barcode, normalize_name, resolve_identity
+from moongcheap_ai.labeling import label_demand
 from moongcheap_ai.preprocess import category_path, clean_title
 
 
@@ -45,3 +46,9 @@ def test_taxonomy_is_deterministic_and_all_is_zero():
     second = taxonomy_v0("SEED", "x", terms)
     assert first == second
     assert first["facets"][0]["values"][0]["code"] == 0
+
+
+def test_demand_labeling_defaults_to_all_and_does_not_write_db():
+    taxonomy = {"facets": [{"name": "form", "values": [{"code": 0, "value": "ALL", "aliases": []}, {"code": 1, "value": "powder", "aliases": ["분말"]}]}]}
+    assert label_demand(1, 2, "분말", taxonomy)["label"] == "1"
+    assert label_demand(1, 2, "", taxonomy)["label"] == "0"
