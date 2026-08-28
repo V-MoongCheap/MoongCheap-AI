@@ -1,42 +1,38 @@
-# A 담당 Data / Facet Discovery V0
+# A 담당 Data / Facet Discovery V1
 
-이 파이프라인은 다음 두 데이터 흐름을 분리합니다.
+## Sources
 
-- Naver Shopping Search API: 전체 전자상거래 Category/Product Catalog seed
-- 식품안전나라 MFDS I0030/I2710: 건강기능식품 Product Fact와 Category/Reference
+- AI-Hub: 국내 상품 데이터. 로그인/신청/다운로드는 사용자가 직접 수행합니다.
+- KAN: 공식 Codebook이 있으면 우선 사용하고, 없으면 AI-Hub에서 실제 관찰된 코드만 `observed_only=true`로 다룹니다.
+- 식품안전나라 MFDS I0030/I2710: 건강기능식품 Product Fact와 Reference입니다.
 
-Naver 상품과 MFDS 상품을 Product ID로 직접 Join하지 않습니다. V0에서는 Category 수준 연결만 후속 단계에서 검토합니다.
+Naver Shopping, GobizKorea, Open Icecat, K-FIND, Domeggook은 현재 방향에서 사용하지 않습니다.
 
 ## 실행
 
 ```powershell
 Copy-Item .env.example .env
-$env:NAVER_CLIENT_ID = "..."
-$env:NAVER_CLIENT_SECRET = "..."
 $env:MFDS_API_KEY = "..."
-./run_today_pipeline.ps1
+./run_data_pipeline.ps1
 ```
 
-API Key가 없으면 수집 단계는 명확한 오류로 중단하며, 가짜 데이터로 성공 처리하지 않습니다. 외부 API 없이 기존 raw 파일만 처리하려면:
+AI-Hub 원본은 다음 위치에 직접 넣습니다.
 
-```powershell
-$env:PYTHONPATH = "$PWD/src"
-python -m moongcheap_ai.pipeline --root $PWD --no-collect
+```text
+data/raw/aihub/logistics_product/
+data/raw/aihub/product_image/
+data/raw/kan/                 # 선택: 공식 KAN 파일
+data/raw/mfds/I0030/
+data/raw/mfds/I2710/
 ```
 
-Raw 응답은 `data/raw`에 보존하고, CSV는 Excel 호환을 위해 UTF-8-SIG로 출력합니다. `product_catalog`의 `list_price`는 Naver 최저가와 의미가 다르므로 기본적으로 비워 둡니다.
+AI-Hub 원본이 없으면 Catalog Stage는 `SKIPPED`입니다. MFDS API Key가 없으면 MFDS Stage는 실행하지 않습니다. 어느 경우에도 Mock 데이터로 성공을 위조하지 않습니다.
 
-## 주요 산출물
+## 출력 원칙
 
-- `data/interim/catalog/naver_products_staging.csv`
-- `data/processed/db_seed/category_seed.csv`
-- `data/processed/db_seed/product_catalog_seed.csv`
-- `data/interim/facet_discovery/i0030_products_clean.csv`
-- `data/interim/facet_discovery/i2710_reference.csv`
-- `data/interim/facet_discovery/repeated_terms.csv`
-- `data/interim/facet_discovery/structured_value_distribution.csv`
-- `data/processed/facet_discovery/facet_review_queue.csv`
-- `data/processed/facet_discovery/facet_taxonomy_v0.json`
-- `data/reports/*.json`
+- `raw`: 원본 보존, 수정 금지
+- `interim`: 표준화·검사 중간 산출물
+- `processed`: 검수 가능한 seed·catalog·Facet 초안
+- `reports`: row count, null rate, conflict, coverage 및 skip 사유
 
-Taxonomy는 Human Review 전 초안이며 `category.facet` DB 반영은 이 파이프라인에서 수행하지 않습니다.
+상품명 숫자·용량·모델명·수량은 삭제하지 않습니다. Barcode는 문자열로 보존하고, 이름만 같은 상품은 자동 병합하지 않습니다. Facet Taxonomy는 Human Review 전 초안이며 Backend DB에 자동 반영하지 않습니다.

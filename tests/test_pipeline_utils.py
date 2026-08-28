@@ -4,11 +4,29 @@ from pathlib import Path
 import pandas as pd
 
 from moongcheap_ai.facet import repeated_terms, taxonomy_v0
+from moongcheap_ai.catalog import normalize_barcode, normalize_name, resolve_identity
 from moongcheap_ai.preprocess import category_path, clean_title
 
 
 def test_clean_title_removes_html_and_normalizes():
     assert clean_title(" <b>비타민&nbsp;C</b>  1000㎎ ") == "비타민 C 1000mg"
+
+
+def test_product_name_normalization_keeps_quantity_and_model():
+    assert normalize_name("상품 X-500 500ml x 24개") == "상품 X-500 500ml x 24개"
+
+
+def test_barcode_keeps_leading_zero_and_normalizes_formatting():
+    assert normalize_barcode(" 0123-4567 ") == "01234567"
+
+
+def test_same_name_different_barcode_is_not_merged():
+    frame = pd.DataFrame([
+        {"barcode": "01234567", "barcode_valid": True, "product_name_normalized": "같은 상품", "kan_code": "A"},
+        {"barcode": "01234568", "barcode_valid": True, "product_name_normalized": "같은 상품", "kan_code": "A"},
+    ])
+    resolved, _ = resolve_identity(frame)
+    assert resolved["catalog_seed_id"].nunique() == 2
 
 
 def test_category_path_ignores_empty_levels():
