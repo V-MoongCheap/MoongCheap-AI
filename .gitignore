@@ -45,3 +45,13 @@ reports/
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
+
+# Local data: raw and generated artifacts are never committed
+data/raw/*
+!data/raw/**/.gitkeep
+data/interim/*
+!data/interim/**/.gitkeep
+data/processed/*
+!data/processed/**/.gitkeep
+data/reports/*
+!data/reports/.gitkeep

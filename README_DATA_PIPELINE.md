@@ -8,13 +8,18 @@
 
 Naver Shopping, GobizKorea, Open Icecat, K-FIND, Domeggook은 현재 방향에서 사용하지 않습니다.
 
-## 실행
+## 빈 환경에서 실행
 
 ```powershell
-Copy-Item .env.example .env
-$env:MFDS_API_KEY = "..."
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+
+$env:MFDS_API_KEY = "실제 키"
 ./run_data_pipeline.ps1
 ```
+
+이 저장소는 기존 로컬 데이터나 이전 실행 결과를 사용하지 않습니다. 새 clone 직후 아래 원본만 직접 배치하면 됩니다.
 
 AI-Hub 원본은 다음 위치에 직접 넣습니다.
 
@@ -26,7 +31,15 @@ data/raw/mfds/I0030/
 data/raw/mfds/I2710/
 ```
 
-AI-Hub 원본이 없으면 Catalog Stage는 `SKIPPED`입니다. MFDS API Key가 없으면 MFDS Stage는 실행하지 않습니다. 어느 경우에도 Mock 데이터로 성공을 위조하지 않습니다.
+AI-Hub 원본이 없으면 Catalog Stage는 `SKIPPED`입니다. MFDS API Key가 없고 기존 MFDS raw page도 없으면 MFDS/Facet Stage는 `SKIPPED`입니다. 어느 경우에도 Mock 데이터로 성공을 위조하지 않습니다.
+
+외부 API 없이 파일 구조와 코드만 확인하려면:
+
+```powershell
+./run_data_pipeline.ps1 -Stage all
+```
+
+실행 결과는 원본 데이터가 없다는 이유와 필요한 입력 경로를 리포트에 남기고 종료합니다.
 
 ## 출력 원칙
 
