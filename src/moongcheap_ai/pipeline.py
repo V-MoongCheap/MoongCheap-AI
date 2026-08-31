@@ -66,6 +66,7 @@ def run(root: Path, stage: str = "all") -> None:
     conflict_count = 0
     mfds_status = None
     facet_status = None
+    completed_mfds_services: set[str] = set()
     aihub = root / "data/raw/aihub"
     image_root = aihub / "product_image"
     if not image_root.exists() or not any(path.is_file() for path in image_root.rglob("*")):
@@ -135,6 +136,7 @@ def run(root: Path, stage: str = "all") -> None:
                     max_pages = int(max_pages_raw) if max_pages_raw else None
                     result = collect(service, api_key, p["raw_mfds"] / service, max_pages=max_pages)
                     report(p["reports"] / f"mfds_{service.lower()}_collection.json", result)
+                    completed_mfds_services.add(service)
                     mfds_status = {"status": "COMPLETED", "last_service": service}
                 except MFDSCollectionError as exc:
                     mfds_status = {"status": "FAILED", "service": service, "reason": str(exc)}
@@ -158,7 +160,7 @@ def run(root: Path, stage: str = "all") -> None:
             terms = repeated_terms(source, ["name", "main_functionality", "functional_ingredients", "other_ingredients"], 3, 0.05)
             terms.to_csv(p["interim_facet"] / "repeated_terms.csv", index=False, encoding="utf-8-sig")
             structured_distribution(source, ["product_form", "product_type", "intake_method", "storage_method", "functional_ingredients", "main_functionality"]).to_csv(p["interim_facet"] / "structured_value_distribution.csv", index=False, encoding="utf-8-sig")
-            if mfds_i0030_has_raw and mfds_i2710_has_raw:
+            if completed_mfds_services == {"I0030", "I2710"}:
                 taxonomy = taxonomy_v0("SEED", "pilot", terms)
                 p["processed_facet"].mkdir(parents=True, exist_ok=True)
                 (p["processed_facet"] / "facet_taxonomy_v0.json").write_text(json.dumps(taxonomy, ensure_ascii=False, indent=2), encoding="utf-8")
