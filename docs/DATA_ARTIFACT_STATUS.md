@@ -10,6 +10,7 @@
 | `data/synthetic/demands/synthetic_demands_v0.csv` | Test-only | Clearly marked synthetic Demand input bound to observed catalog IDs |
 | `data/processed/demands/demand_labeled_v0.csv` | Test-only | Synthetic mechanics output; not a user Demand or health result |
 | `data/processed/category/health_category_seed_v0.csv` | Pending | MFDS-only health taxonomy seed; not needed for the AI-Hub full catalog hierarchy |
+| `data/interim/facet_discovery/i0030_products_clean.csv` | Partial | 19,700 MFDS I0030 rows; facts/distributions only, not an approved taxonomy |
 | `data/reports/mfds_status.json` | Failed/Pending | Must reflect the latest MFDS collection attempt |
 
 Generated data and raw files are ignored by Git. Only code, tests, and documentation should be committed to the repository.

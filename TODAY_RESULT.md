@@ -15,10 +15,10 @@
 - AI-Hub repeated terms, structured distributions, and exploratory Facet taxonomy.
 - These outputs are not the health-functional-food taxonomy and must not be used for health Demand Labeling.
 
-## Blocked / Pending
+## Partial / Blocked
 
-- MFDS I0030/I2710 raw data: collection failed with ERROR-503 during the restricted service window.
-- MFDS-verified health-functional-food Category Seed and Facet Taxonomy: not generated because valid MFDS data is absent.
+- MFDS I0030: 197 pages and 19,700 rows collected and preprocessed; the API rate limit stopped continuation.
+- MFDS I2710: not collected yet; health-functional-food Category Seed and Facet Taxonomy remain pending.
 - Product image coverage: 0%; source image directory is empty.
 
 ## Rules
