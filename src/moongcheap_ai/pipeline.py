@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -126,11 +127,13 @@ def run(root: Path, stage: str = "all") -> None:
             build_observed_kan(staging, p["processed_category"] / "category_master_v1.csv")
             report(p["reports"] / "pipeline_status.json", {"status": "COMPLETED", "stages": "01-07", "raw_files": len(files), "raw_product_rows": len(staging), "canonical_product_count": len(catalog)})
     if stage in {"all", "mfds", "facet"}:
-        api_key = __import__("os").getenv("MFDS_API_KEY")
+        api_key = os.getenv("MFDS_API_KEY")
         if api_key:
             for service in ("I0030", "I2710"):
                 try:
-                    result = collect(service, api_key, p["raw_mfds"] / service, max_pages=__import__("os").getenv("MFDS_MAX_PAGES") and int(__import__("os").getenv("MFDS_MAX_PAGES")))
+                    max_pages_raw = os.getenv("MFDS_MAX_PAGES", "").strip()
+                    max_pages = int(max_pages_raw) if max_pages_raw else None
+                    result = collect(service, api_key, p["raw_mfds"] / service, max_pages=max_pages)
                     report(p["reports"] / f"mfds_{service.lower()}_collection.json", result)
                     mfds_status = {"status": "COMPLETED", "last_service": service}
                 except MFDSCollectionError as exc:
@@ -143,8 +146,10 @@ def run(root: Path, stage: str = "all") -> None:
             mfds_status = {"status": "SKIPPED", "reason": "MFDS_API_KEY is not set"}
             report(p["reports"] / "mfds_status.json", mfds_status)
             LOGGER.warning("MFDS stages skipped: MFDS_API_KEY is not set.")
-        mfds_has_raw = any(any((p["raw_mfds"] / service).glob("page_*.json")) for service in ("I0030", "I2710"))
-        if stage in {"all", "facet"} and mfds_has_raw:
+        mfds_i0030_has_raw = any((p["raw_mfds"] / "I0030").glob("page_*.json"))
+        mfds_i2710_has_raw = any((p["raw_mfds"] / "I2710").glob("page_*.json"))
+        mfds_has_raw = mfds_i0030_has_raw or mfds_i2710_has_raw
+        if stage in {"all", "mfds", "facet"} and mfds_has_raw:
             i0030 = preprocess_i0030(p["raw_mfds"] / "I0030", p["interim_facet"] / "i0030_products_clean.csv")
             i2710 = preprocess_i2710(p["raw_mfds"] / "I2710", p["interim_facet"] / "i2710_reference.csv")
             report(p["reports"] / "mfds_i0030_preprocessing.json", i0030); report(p["reports"] / "mfds_i2710_preprocessing.json", i2710)
@@ -153,9 +158,14 @@ def run(root: Path, stage: str = "all") -> None:
             terms = repeated_terms(source, ["name", "main_functionality", "functional_ingredients", "other_ingredients"], 3, 0.05)
             terms.to_csv(p["interim_facet"] / "repeated_terms.csv", index=False, encoding="utf-8-sig")
             structured_distribution(source, ["product_form", "product_type", "intake_method", "storage_method", "functional_ingredients", "main_functionality"]).to_csv(p["interim_facet"] / "structured_value_distribution.csv", index=False, encoding="utf-8-sig")
-            taxonomy = taxonomy_v0("SEED", "pilot", terms)
-            p["processed_facet"].mkdir(parents=True, exist_ok=True)
-            (p["processed_facet"] / "facet_taxonomy_v0.json").write_text(json.dumps(taxonomy, ensure_ascii=False, indent=2), encoding="utf-8")
+            if mfds_i0030_has_raw and mfds_i2710_has_raw:
+                taxonomy = taxonomy_v0("SEED", "pilot", terms)
+                p["processed_facet"].mkdir(parents=True, exist_ok=True)
+                (p["processed_facet"] / "facet_taxonomy_v0.json").write_text(json.dumps(taxonomy, ensure_ascii=False, indent=2), encoding="utf-8")
+                facet_status = {"status": "COMPLETED", "i0030_rows": i0030["processed_rows"], "i2710_rows": i2710["processed_rows"]}
+            else:
+                facet_status = {"status": "PARTIAL", "reason": "Only one MFDS service has raw pages; approved taxonomy was not generated.", "i0030_rows": i0030["processed_rows"], "i2710_rows": i2710["processed_rows"]}
+            report(p["reports"] / "facet_status.json", facet_status)
         elif stage in {"all", "facet"}:
             facet_status = {"status": "SKIPPED", "reason": "MFDS raw data not found"}
             report(p["reports"] / "facet_status.json", facet_status)

@@ -33,7 +33,10 @@ def collect(service: str, api_key: str | None, output_dir: Path, max_pages: int 
             start = (page - 1) * rows_per_page + 1
             url = f"https://openapi.foodsafetykorea.go.kr/api/{api_key}/{service}/json/{start}/{start + rows_per_page - 1}"
             for attempt in range(3):
-                response = session.get(url, timeout=30)
+                try:
+                    response = session.get(url, timeout=30)
+                except requests.RequestException as exc:
+                    raise MFDSCollectionError(f"MFDS {service} request failed: {exc}") from exc
                 if response.status_code in {401, 403}: raise MFDSCollectionError(f"MFDS authentication failed: HTTP {response.status_code}")
                 if response.status_code == 429 or response.status_code >= 500:
                     if attempt == 2: response.raise_for_status()
