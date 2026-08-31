@@ -9,7 +9,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from .catalog import build_catalog, resolve_identity, source_rows_to_staging
-from .category import build_observed_kan
+from .category import build_aihub_category_hierarchy, build_observed_kan
 from .config import ensure_dirs, paths
 from .audit import audit_aihub, build_category_source_mapping, product_catalog_coverage, write_today_result
 from .facet import preprocess_i0030, preprocess_i2710, repeated_terms, structured_distribution, taxonomy_v0
@@ -114,6 +114,7 @@ def run(root: Path, stage: str = "all") -> None:
             coverage_summary = product_catalog_coverage(staging, catalog)
             report(p["reports"] / "product_catalog_coverage.json", coverage_summary)
             build_category_source_mapping(staging).to_csv(p["processed_category"] / "category_source_mapping.csv", index=False, encoding="utf-8-sig")
+            build_aihub_category_hierarchy(staging, p["processed_category"] / "aihub_category_hierarchy_v0.csv")
             exploratory = build_exploratory_facets(
                 staging,
                 p["interim_facet"] / "aihub_repeated_terms.csv",

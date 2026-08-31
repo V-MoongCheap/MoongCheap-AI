@@ -4,7 +4,8 @@ from pathlib import Path
 import pandas as pd
 
 from moongcheap_ai.facet import repeated_terms, taxonomy_v0
-from moongcheap_ai.catalog import normalize_barcode, normalize_name, resolve_identity
+from moongcheap_ai.catalog import normalize_barcode, normalize_name, resolve_identity, source_category_path_from_file
+from moongcheap_ai.category import build_aihub_category_hierarchy
 from moongcheap_ai.labeling import label_demand
 from moongcheap_ai.preprocess import category_path, clean_title
 
@@ -19,6 +20,19 @@ def test_product_name_normalization_keeps_quantity_and_model():
 
 def test_barcode_keeps_leading_zero_and_normalizes_formatting():
     assert normalize_barcode(" 0123-4567 ") == "01234567"
+
+
+def test_aihub_source_path_recovers_nested_category():
+    path = r"F:\data\logistics_product\01_가공식품\15_건강식품\01150101_x\item.json"
+    assert source_category_path_from_file(path) == "01_가공식품 > 15_건강식품"
+
+
+def test_aihub_category_hierarchy_preserves_parent_path(tmp_path):
+    frame = pd.DataFrame({"source_category_path": ["01_가공식품 > 15_건강식품"], "kan_code": ["01150101"]})
+    build_aihub_category_hierarchy(frame, tmp_path / "category.csv")
+    result = pd.read_csv(tmp_path / "category.csv")
+    assert list(result["depth"]) == [1, 2]
+    assert result.iloc[1]["parent_category_key"] == "AIHUB:01_가공식품"
 
 
 def test_same_name_different_barcode_is_not_merged():

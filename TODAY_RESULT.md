@@ -6,6 +6,7 @@
 - Product staging: 97,910 rows, 16,223 unique observed barcodes.
 - Product Catalog V1: 21,537 canonical rows with source provenance.
 - KAN category coverage: 1,106 observed codes. This is not an official KAN codebook.
+- AI-Hub category hierarchy: 117 observed source-path nodes, including the health-food candidate subset.
 - Barcode validity: 91,528 valid and 6,382 invalid-format observations; invalid values are not used for barcode identity grouping.
 - Barcode conflict review: 154 groups with different names and 34 groups with different KAN codes.
 
@@ -17,7 +18,7 @@
 ## Blocked / Pending
 
 - MFDS I0030/I2710 raw data: collection failed with ERROR-503 during the restricted service window.
-- Health-functional-food Category Seed and Facet Taxonomy: not generated because valid MFDS data is absent.
+- MFDS-verified health-functional-food Category Seed and Facet Taxonomy: not generated because valid MFDS data is absent.
 - Product image coverage: 0%; source image directory is empty.
 
 ## Rules
