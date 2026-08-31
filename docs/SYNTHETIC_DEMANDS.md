@@ -8,7 +8,7 @@ ERD lookup path can be exercised without inventing product facts.
 $env:PYTHONPATH = "src"
 python scripts/demand/generate_synthetic_demands.py `
   --catalog data/processed/product_catalog/product_catalog_health_food_subset_v0.parquet `
-  --output data/interim/demands/synthetic_demands_v0.csv `
+  --output data/synthetic/demands/synthetic_demands_v0.csv `
   --count 30 `
   --seed 42
 ```
@@ -23,7 +23,7 @@ To label the input after an approved taxonomy is available:
 ```powershell
 $env:PYTHONPATH = "src"
 python scripts/labeling/label_demands.py `
-  --input data/interim/demands/synthetic_demands_v0.csv `
+  --input data/synthetic/demands/synthetic_demands_v0.csv `
   --taxonomy data/processed/facet_discovery/facet_taxonomy_v0.json `
   --output data/processed/demands/demand_labeled_v0.csv
 ```

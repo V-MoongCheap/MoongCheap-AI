@@ -52,6 +52,8 @@ data/raw/*
 !data/raw/**/.gitkeep
 data/interim/*
 !data/interim/**/.gitkeep
+data/synthetic/*
+!data/synthetic/**/.gitkeep
 data/processed/*
 !data/processed/**/.gitkeep
 data/reports/*

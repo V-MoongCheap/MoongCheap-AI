@@ -10,7 +10,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate clearly marked synthetic Demand input rows")
     parser.add_argument("--catalog", type=Path, default=Path("data/processed/product_catalog/product_catalog_health_food_subset_v0.parquet"))
     parser.add_argument("--taxonomy", type=Path)
-    parser.add_argument("--output", type=Path, default=Path("data/interim/demands/synthetic_demands_v0.csv"))
+    parser.add_argument("--output", type=Path, default=Path("data/synthetic/demands/synthetic_demands_v0.csv"))
     parser.add_argument("--count", type=int, default=30)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
