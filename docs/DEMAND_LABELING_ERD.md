@@ -13,4 +13,6 @@ $env:PYTHONPATH = "src"
 python scripts/labeling/label_demands.py --catalog path/to/product_catalog.csv
 ```
 
+기본 Taxonomy 경로는 건강기능식품용 `facet_taxonomy_v0.json`입니다. AI-Hub exploratory Taxonomy는 파이프라인 동작 확인이 필요할 때만 `--taxonomy`로 명시합니다.
+
 미매칭, category 누락, 애매한 Alias는 `demand_label_review_queue_v0.csv`에 별도로 저장합니다. DB 반영은 Backend가 담당합니다.

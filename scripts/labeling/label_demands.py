@@ -11,7 +11,7 @@ from moongcheap_ai.labeling import label_demands, load_taxonomy
 def main() -> None:
     parser = argparse.ArgumentParser(description="Batch label Mock Demand with Facet Taxonomy V0")
     parser.add_argument("--input", type=Path, default=Path("data/interim/demands/mock_demands_v0.csv"))
-    parser.add_argument("--taxonomy", type=Path, default=Path("data/processed/facet_discovery/aihub_exploratory_facet_taxonomy_v0.json"))
+    parser.add_argument("--taxonomy", type=Path, default=Path("data/processed/facet_discovery/facet_taxonomy_v0.json"))
     parser.add_argument("--output", type=Path, default=Path("data/processed/demands/demand_labeled_v0.csv"))
     parser.add_argument("--catalog", type=Path, help="Backend product_catalog export with id and category_id")
     parser.add_argument("--review-output", type=Path, default=Path("data/processed/demands/demand_label_review_queue_v0.csv"))
