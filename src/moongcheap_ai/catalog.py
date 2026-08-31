@@ -4,6 +4,7 @@ import html
 import re
 import unicodedata
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -24,10 +25,27 @@ def barcode_valid(value: str) -> bool:
     return bool(re.fullmatch(r"\d{8,14}", value))
 
 
+def source_category_path_from_file(source_file: str) -> str:
+    """Recover AI-Hub hierarchy lost by the COCO category name."""
+    parts = list(Path(str(source_file)).parts)
+    try:
+        start = next(index for index, part in enumerate(parts) if part.lower() == "logistics_product") + 1
+    except StopIteration:
+        return ""
+    folders = parts[start:-2]
+    if folders and re.match(r"^02_", folders[0]) and len(folders) > 1:
+        folders = folders[1:]
+    category_parts = [part for part in folders if re.match(r"^\d{2}_", part)][:2]
+    return " > ".join(category_parts)
+
+
 ALIASES = {
     "product_name_raw": ["product_name", "productname", "상품명", "품명", "name", "제품명"],
     "barcode": ["barcode", "바코드", "ean", "upc"],
     "kan_code": ["kan_code", "kancode", "kan", "분류코드", "상품분류코드"],
+    "source_category_id": ["source_category_id", "category_id", "카테고리id"],
+    "source_category_name": ["source_category_name", "product_category", "category_name", "카테고리명"],
+    "source_category_path": ["source_category_path", "category_path", "카테고리경로"],
     "manufacturer": ["manufacturer", "제조사", "제조업체"],
     "brand": ["brand", "브랜드"],
     "image_url": ["image", "image_url", "이미지", "상품이미지", "사진"],
@@ -47,6 +65,7 @@ def source_rows_to_staging(frame: pd.DataFrame, source: str, source_file: str) -
     columns = [str(c) for c in frame.columns]
     selected = {field: pick_column(columns, candidates) for field, candidates in ALIASES.items()}
     rows = []
+    file_category_path = source_category_path_from_file(source_file)
     for index, row in frame.iterrows():
         name = str(row.get(selected["product_name_raw"], "") or "") if selected["product_name_raw"] else ""
         barcode_raw = str(row.get(selected["barcode"], "") or "") if selected["barcode"] else ""
@@ -57,11 +76,19 @@ def source_rows_to_staging(frame: pd.DataFrame, source: str, source_file: str) -
             "manufacturer": str(row.get(selected["manufacturer"], "") or "") if selected["manufacturer"] else "",
             "brand": str(row.get(selected["brand"], "") or "") if selected["brand"] else "",
             "model_code": "", "quantity_text": "", "capacity_text": "", "package_text": "",
-            "source_category_id": "", "source_category_name": "", "source_category_path": "",
+            "source_category_id": str(row.get(selected["source_category_id"], "") or "") if selected["source_category_id"] else "",
+            "source_category_name": str(row.get(selected["source_category_name"], "") or "") if selected["source_category_name"] else "",
+            "source_category_path": file_category_path or (str(row.get(selected["source_category_path"], "") or "") if selected["source_category_path"] else ""),
             "kan_code": str(row.get(selected["kan_code"], "") or "") if selected["kan_code"] else "",
             "description_raw": "", "spec_raw": "",
             "image_url": str(row.get(selected["image_url"], "") or "") if selected["image_url"] else "",
             "price_raw": "", "source_file": source_file, "source_row": int(index) + 2,
+            "length": str(row.get("length", "") or "") if "length" in frame.columns else "",
+            "width": str(row.get("width", "") or "") if "width" in frame.columns else "",
+            "height": str(row.get("height", "") or "") if "height" in frame.columns else "",
+            "weight": str(row.get("weight", "") or "") if "weight" in frame.columns else "",
+            "fragile": str(row.get("fragile", "") or "") if "fragile" in frame.columns else "",
+            "refrigerate": str(row.get("refrigerate", "") or "") if "refrigerate" in frame.columns else "",
         })
     return pd.DataFrame(rows)
 
