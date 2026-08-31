@@ -11,3 +11,5 @@
 | `data/reports/mfds_status.json` | Failed/Pending | Must reflect the latest MFDS collection attempt |
 
 Generated data and raw files are ignored by Git. Only code, tests, and documentation should be committed to the repository.
+
+The AI-Hub source has 6,382 barcode-format-invalid observations. They remain in staging for auditability, but are excluded from barcode identity grouping.

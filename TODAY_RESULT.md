@@ -6,6 +6,7 @@
 - Product staging: 97,910 rows, 16,223 unique observed barcodes.
 - Product Catalog V1: 21,537 canonical rows with source provenance.
 - KAN category coverage: 1,106 observed codes. This is not an official KAN codebook.
+- Barcode validity: 91,528 valid and 6,382 invalid-format observations; invalid values are not used for barcode identity grouping.
 - Barcode conflict review: 154 groups with different names and 34 groups with different KAN codes.
 
 ## Exploratory Only
