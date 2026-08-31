@@ -30,3 +30,9 @@ def test_duplicate_value_codes_are_rejected() -> None:
     invalid = {"categories": [{"category_id": "C1", "facets": [{"name": "f", "values": [{"code": 0}, {"code": 0}]}]}]}
     with pytest.raises(TaxonomyValidationError):
         TaxonomyLoader(invalid)
+
+
+def test_batch_can_resolve_category_through_catalog_id() -> None:
+    loader = TaxonomyLoader(TAXONOMY)
+    result = label_demands(pd.DataFrame([{"demand_id": "D2", "catalog_id": "P2", "extra_requirement": "무설탕"}]), loader, {"P2": "C1"})
+    assert result.iloc[0]["label"] == "2"
