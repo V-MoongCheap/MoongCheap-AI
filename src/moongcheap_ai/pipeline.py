@@ -6,13 +6,17 @@ import logging
 from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
 
 from .catalog import build_catalog, resolve_identity, source_rows_to_staging
 from .category import build_observed_kan
 from .config import ensure_dirs, paths
+from .audit import audit_aihub, build_category_source_mapping, product_catalog_coverage, write_today_result
 from .facet import preprocess_i0030, preprocess_i2710, repeated_terms, structured_distribution, taxonomy_v0
 from .inspect_data import inspect
 from .mfds import MFDSCollectionError, collect
+from .parts.aihub import read_coco_json
+from .parts.aihub.exploratory_facet import build_exploratory_facets
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 LOGGER = logging.getLogger(__name__)
@@ -21,6 +25,16 @@ LOGGER = logging.getLogger(__name__)
 def report(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+
+
+def read_report(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else None
+    except (OSError, json.JSONDecodeError):
+        return None
 
 
 def read_frames(root: Path) -> list[tuple[str, pd.DataFrame]]:
@@ -34,7 +48,8 @@ def read_frames(root: Path) -> list[tuple[str, pd.DataFrame]]:
             elif suffix == ".parquet": frame = pd.read_parquet(path)
             elif suffix == ".jsonl": frame = pd.read_json(path, lines=True)
             elif suffix == ".json":
-                value = json.loads(path.read_text(encoding="utf-8-sig")); frame = pd.DataFrame(value if isinstance(value, list) else value.get("data", value.get("rows", [])))
+                value = json.loads(path.read_text(encoding="utf-8-sig"))
+                frame = read_coco_json(path) if isinstance(value, dict) and {"images", "annotations"}.issubset(value) else pd.DataFrame(value if isinstance(value, list) else value.get("data", value.get("rows", [])))
             else: continue
             if not frame.empty: result.append((str(path), frame))
         except Exception as exc:
@@ -43,10 +58,19 @@ def read_frames(root: Path) -> list[tuple[str, pd.DataFrame]]:
 
 
 def run(root: Path, stage: str = "all") -> None:
+    load_dotenv(root / ".env")
     ensure_dirs(root); p = paths(root)
+    aihub_audit_summary = None
+    coverage_summary = None
+    conflict_count = 0
+    mfds_status = None
+    facet_status = None
     aihub = root / "data/raw/aihub"
+    image_root = aihub / "product_image"
+    if not image_root.exists() or not any(path.is_file() for path in image_root.rglob("*")):
+        report(p["reports"] / "aihub_product_image_audit.json", {"status": "SKIPPED", "reason": "AI-Hub product image raw data not found", "required_directory": "data/raw/aihub/product_image"})
     if stage in {"all", "inspect", "catalog"}:
-        if not aihub.exists() or not any(aihub.rglob("*")):
+        if not aihub.exists() or not any(path.is_file() for path in aihub.rglob("*")):
             report(p["reports"] / "pipeline_status.json", {"status": "SKIPPED", "stages": "01-07", "reason": "AI-Hub raw data not found", "required_directories": ["data/raw/aihub/logistics_product", "data/raw/aihub/product_image"]})
             LOGGER.warning("AI-Hub raw data not found; catalog stages skipped.")
         else:
@@ -60,14 +84,30 @@ def run(root: Path, stage: str = "all") -> None:
                 staging.to_parquet(out / "product_staging.parquet", index=False)
                 staging.to_csv(out / "product_staging_preview.csv", index=False, encoding="utf-8-sig")
             resolved, conflicts = resolve_identity(staging)
+            aihub_audit_summary, audit_conflicts = audit_aihub(staging)
+            aihub_audit_summary["raw_file_count"] = len(files)
+            conflict_count = len(audit_conflicts)
+            report(p["reports"] / "aihub_logistics_audit.json", aihub_audit_summary)
+            audit_conflicts.to_csv(p["reports"] / "aihub_barcode_conflicts.csv", index=False, encoding="utf-8-sig")
             if not conflicts.empty: conflicts.to_csv(p["reports"] / "product_identity_conflicts.csv", index=False, encoding="utf-8-sig")
             catalog, provenance = build_catalog(resolved)
             catalog_dir = root / "data/processed/product_catalog"; catalog_dir.mkdir(parents=True, exist_ok=True)
             catalog.to_parquet(catalog_dir / "product_catalog_v1.parquet", index=False)
             catalog.to_csv(catalog_dir / "product_catalog_v1.csv", index=False, encoding="utf-8-sig")
             provenance.to_csv(catalog_dir / "product_catalog_source.csv", index=False, encoding="utf-8-sig")
-            report(p["reports"] / "product_catalog_coverage.json", {"raw_product_rows": len(staging), "unique_barcode_count": int(staging["barcode"].replace("", pd.NA).nunique()) if not staging.empty else 0, "canonical_product_count": len(catalog), "source_counts": staging["source"].value_counts().to_dict() if not staging.empty else {}})
+            coverage_summary = product_catalog_coverage(staging, catalog)
+            report(p["reports"] / "product_catalog_coverage.json", coverage_summary)
+            build_category_source_mapping(staging).to_csv(p["processed_category"] / "category_source_mapping.csv", index=False, encoding="utf-8-sig")
+            exploratory = build_exploratory_facets(
+                staging,
+                p["interim_facet"] / "aihub_repeated_terms.csv",
+                p["interim_facet"] / "aihub_structured_value_distribution.csv",
+                p["processed_facet"] / "aihub_facet_review_queue.csv",
+                p["processed_facet"] / "aihub_exploratory_facet_taxonomy_v0.json",
+            )
+            report(p["reports"] / "aihub_exploratory_facet_status.json", exploratory)
             build_observed_kan(staging, p["processed_category"] / "category_master_v1.csv")
+            report(p["reports"] / "pipeline_status.json", {"status": "COMPLETED", "stages": "01-07", "raw_files": len(files), "raw_product_rows": len(staging), "canonical_product_count": len(catalog)})
     if stage in {"all", "mfds", "facet"}:
         api_key = __import__("os").getenv("MFDS_API_KEY")
         if api_key:
@@ -75,11 +115,16 @@ def run(root: Path, stage: str = "all") -> None:
                 try:
                     result = collect(service, api_key, p["raw_mfds"] / service, max_pages=__import__("os").getenv("MFDS_MAX_PAGES") and int(__import__("os").getenv("MFDS_MAX_PAGES")))
                     report(p["reports"] / f"mfds_{service.lower()}_collection.json", result)
+                    mfds_status = {"status": "COMPLETED", "last_service": service}
                 except MFDSCollectionError as exc:
+                    mfds_status = {"status": "FAILED", "service": service, "reason": str(exc)}
+                    report(p["reports"] / "mfds_status.json", mfds_status)
                     report(p["reports"] / f"mfds_{service.lower()}_collection.json", {"status": "FAILED", "reason": str(exc)})
-                    raise
+                    LOGGER.warning("MFDS %s failed; continuing to write stage reports.", service)
+                    break
         else:
-            report(p["reports"] / "mfds_status.json", {"status": "SKIPPED", "reason": "MFDS_API_KEY is not set"})
+            mfds_status = {"status": "SKIPPED", "reason": "MFDS_API_KEY is not set"}
+            report(p["reports"] / "mfds_status.json", mfds_status)
             LOGGER.warning("MFDS stages skipped: MFDS_API_KEY is not set.")
         mfds_has_raw = any(any((p["raw_mfds"] / service).glob("page_*.json")) for service in ("I0030", "I2710"))
         if stage in {"all", "facet"} and mfds_has_raw:
@@ -95,8 +140,25 @@ def run(root: Path, stage: str = "all") -> None:
             p["processed_facet"].mkdir(parents=True, exist_ok=True)
             (p["processed_facet"] / "facet_taxonomy_v0.json").write_text(json.dumps(taxonomy, ensure_ascii=False, indent=2), encoding="utf-8")
         elif stage in {"all", "facet"}:
-            report(p["reports"] / "facet_status.json", {"status": "SKIPPED", "reason": "MFDS raw data not found"})
+            facet_status = {"status": "SKIPPED", "reason": "MFDS raw data not found"}
+            report(p["reports"] / "facet_status.json", facet_status)
     report(p["reports"] / "backend_schema_recommendations.json", {"migration_applied": False, "recommendations": ["thumbnail_url nullable 또는 placeholder 정책", "product_catalog_source에 external_product_id/barcode/source 저장", "category_source_mapping에 KAN 매핑 저장"]})
+    # A collection failure is more informative than a stale prior SKIP report.
+    collection_report = read_report(p["reports"] / "mfds_i0030_collection.json")
+    if collection_report.get("status") == "FAILED":
+        mfds_status = {"status": "FAILED", "reason": collection_report.get("reason", "MFDS collection failed")}
+        report(p["reports"] / "mfds_status.json", mfds_status)
+    else:
+        mfds_status = mfds_status or read_report(p["reports"] / "mfds_status.json")
+    facet_status = facet_status or read_report(p["reports"] / "facet_status.json")
+    if stage in {"all", "mfds", "facet"} and mfds_status.get("status") != "COMPLETED":
+        pipeline_report = read_report(p["reports"] / "pipeline_status.json")
+        if pipeline_report:
+            pipeline_report["status"] = "COMPLETED_WITH_WARNINGS"
+            pipeline_report["mfds_status"] = mfds_status.get("status", "NOT_RUN")
+            pipeline_report["facet_status"] = facet_status.get("status", "NOT_RUN")
+            report(p["reports"] / "pipeline_status.json", pipeline_report)
+    write_today_result(p["reports"] / "TODAY_RESULT.md", aihub_audit_summary, coverage_summary, mfds_status, facet_status, conflict_count)
 
 
 def main() -> None:
