@@ -4,7 +4,6 @@ import html
 import re
 import unicodedata
 from collections import defaultdict
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -27,7 +26,7 @@ def barcode_valid(value: str) -> bool:
 
 def source_category_path_from_file(source_file: str) -> str:
     """Recover AI-Hub hierarchy lost by the COCO category name."""
-    parts = list(Path(str(source_file)).parts)
+    parts = [part for part in re.split(r"[\\\\/]", str(source_file)) if part]
     try:
         start = next(index for index, part in enumerate(parts) if part.lower() == "logistics_product") + 1
     except StopIteration:
