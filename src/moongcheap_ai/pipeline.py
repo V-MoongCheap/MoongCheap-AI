@@ -180,6 +180,8 @@ def run(root: Path, stage: str = "all") -> None:
     else:
         mfds_status = mfds_status or read_report(p["reports"] / "mfds_status.json")
     facet_status = facet_status or read_report(p["reports"] / "facet_status.json")
+    if mfds_status:
+        report(p["reports"] / "mfds_status.json", mfds_status)
     if stage in {"all", "mfds", "facet"} and mfds_status.get("status") != "COMPLETED":
         pipeline_report = read_report(p["reports"] / "pipeline_status.json")
         if pipeline_report:
