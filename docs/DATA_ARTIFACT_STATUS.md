@@ -7,7 +7,8 @@
 | `data/processed/category/category_master_v1.csv` | Usable with caveats | KAN-level observed category candidates for the full AI-Hub catalog |
 | `data/processed/category/aihub_category_hierarchy_v0.csv` | Usable with caveats | AI-Hub source-path hierarchy; draft category candidates |
 | `data/processed/facet_discovery/aihub_exploratory_facet_taxonomy_v0.json` | Exploratory only | AI-Hub logistics analysis; not health taxonomy |
-| `data/processed/demands/demand_labeled_v0.csv` | Test-only | Temporary mechanics test; not a health result |
+| `data/interim/demands/synthetic_demands_v0.csv` | Test-only | Clearly marked synthetic Demand input bound to observed catalog IDs |
+| `data/processed/demands/demand_labeled_v0.csv` | Test-only | Synthetic mechanics output; not a user Demand or health result |
 | `data/processed/category/health_category_seed_v0.csv` | Pending | MFDS-only health taxonomy seed; not needed for the AI-Hub full catalog hierarchy |
 | `data/reports/mfds_status.json` | Failed/Pending | Must reflect the latest MFDS collection attempt |
 
