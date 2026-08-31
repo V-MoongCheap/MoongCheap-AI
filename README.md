@@ -30,7 +30,7 @@
 
 ## Repository structure
 
-- `apps/ai`: AI 서비스 구현
+- `src/moongcheap_ai`: AI 서비스 및 데이터 파이프라인 구현
 - `docs`: AI 설계, Facet taxonomy, API contract, 평가 및 실험 문서
 - `.github`: PR/이슈 템플릿 및 협업 설정
 
