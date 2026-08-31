@@ -83,6 +83,20 @@ def run(root: Path, stage: str = "all") -> None:
             if not staging.empty:
                 staging.to_parquet(out / "product_staging.parquet", index=False)
                 staging.to_csv(out / "product_staging_preview.csv", index=False, encoding="utf-8-sig")
+                health_mask = staging["source_category_path"].fillna("").astype(str).str.contains(r"(?:^| > )15_", regex=True, na=False)
+                health_subset = staging.loc[health_mask].copy()
+                health_subset.to_parquet(out / "aihub_health_food_subset_v0.parquet", index=False)
+                health_subset.to_csv(out / "aihub_health_food_subset_v0.csv", index=False, encoding="utf-8-sig")
+                report(p["reports"] / "aihub_health_food_subset.json", {
+                    "status": "COMPLETED",
+                    "scope": "AI_HUB_HEALTH_FOOD_SUBSET",
+                    "warning": "This is an AI-Hub category subset, not proof of MFDS health-functional-food registration.",
+                    "raw_rows": int(len(health_subset)),
+                    "unique_barcode_count": int(health_subset["barcode"].nunique()),
+                    "unique_valid_barcode_count": int(health_subset.loc[health_subset["barcode_valid"], "barcode"].nunique()),
+                    "unique_product_name_count": int(health_subset["product_name_normalized"].nunique()),
+                    "observed_kan_codes": sorted(health_subset["kan_code"].dropna().astype(str).loc[lambda values: values.ne("")].unique().tolist()),
+                })
             resolved, conflicts = resolve_identity(staging)
             aihub_audit_summary, audit_conflicts = audit_aihub(staging)
             aihub_audit_summary["raw_file_count"] = len(files)
@@ -94,6 +108,8 @@ def run(root: Path, stage: str = "all") -> None:
             catalog_dir = root / "data/processed/product_catalog"; catalog_dir.mkdir(parents=True, exist_ok=True)
             catalog.to_parquet(catalog_dir / "product_catalog_v1.parquet", index=False)
             catalog.to_csv(catalog_dir / "product_catalog_v1.csv", index=False, encoding="utf-8-sig")
+            health_codes = set(staging.loc[staging["source_category_path"].fillna("").astype(str).str.contains(r"(?:^| > )15_", regex=True, na=False), "kan_code"].astype(str))
+            catalog[catalog["kan_code"].astype(str).isin(health_codes)].to_parquet(catalog_dir / "product_catalog_health_food_subset_v0.parquet", index=False)
             provenance.to_csv(catalog_dir / "product_catalog_source.csv", index=False, encoding="utf-8-sig")
             coverage_summary = product_catalog_coverage(staging, catalog)
             report(p["reports"] / "product_catalog_coverage.json", coverage_summary)
