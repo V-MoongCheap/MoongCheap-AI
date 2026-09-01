@@ -1,6 +1,7 @@
 import pandas as pd
 
 from moongcheap_ai.model1 import MockModelAdapter, OllamaAdapter, parse_model_output, sample_products
+from moongcheap_ai.model1_postprocess import map_products, normalize_candidates
 
 
 def _frame():
@@ -36,3 +37,13 @@ def test_ollama_adapter_keeps_provider_swappable():
     assert adapter.provider == "ollama"
     assert adapter.model == "actual-model-name"
     assert adapter.endpoint.endswith("11434")
+
+def test_postprocess_normalizes_form_names_and_values():
+    review = pd.DataFrame([{"category_key": "C", "facet_id_candidate": "form", "name": "Product Form", "definition": "", "value": " powder ", "alias": "", "source_product_id": "1", "source_field": "product_form"}, {"category_key": "C", "facet_id_candidate": "form", "name": "제품 형태", "definition": "", "value": "분말", "alias": "", "source_product_id": "2", "source_field": "product_form"}])
+    result = normalize_candidates(review)
+    assert len(result) == 1 and result.iloc[0]["value"] == "분말"
+
+def test_postprocess_mapping_is_evidence_backed():
+    products = pd.DataFrame([{"source_product_id": "1", "name": "상품", "product_type": "프로바이오틱스", "product_form": "분말", "functional_ingredients": "", "main_functionality": ""}])
+    candidates = pd.DataFrame([{"category_key": "health-functional-food:probiotics", "facet_id": "product_form", "facet_name": "제품 형태", "value": "분말"}])
+    assert map_products(products, candidates).iloc[0]["mapping_status"] == "MAPPED"
