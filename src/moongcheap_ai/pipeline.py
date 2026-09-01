@@ -14,6 +14,7 @@ from .category import build_aihub_category_hierarchy, build_observed_kan
 from .config import ensure_dirs, paths
 from .audit import audit_aihub, build_category_source_mapping, product_catalog_coverage, write_today_result
 from .facet import preprocess_i0030, preprocess_i2710, repeated_terms, structured_distribution, taxonomy_v0
+from .category_seed import CategorySeedError, build_health_category_seed
 from .inspect_data import inspect
 from .mfds import MFDSCollectionError, collect
 from .parts.aihub import read_coco_json
@@ -66,6 +67,7 @@ def run(root: Path, stage: str = "all") -> None:
     conflict_count = 0
     mfds_status = None
     facet_status = None
+    category_seed_status = None
     completed_mfds_services: set[str] = set()
     aihub = root / "data/raw/aihub"
     image_root = aihub / "product_image"
@@ -148,6 +150,15 @@ def run(root: Path, stage: str = "all") -> None:
             mfds_status = {"status": "SKIPPED", "reason": "MFDS_API_KEY is not set"}
             report(p["reports"] / "mfds_status.json", mfds_status)
             LOGGER.warning("MFDS stages skipped: MFDS_API_KEY is not set.")
+        # Reuse verified local collection reports when the API rate limit blocks
+        # a harmless rerun. The raw pages and their row counts are the artifact.
+        for service in ("I0030", "I2710"):
+            collection = read_report(p["reports"] / f"mfds_{service.lower()}_collection.json")
+            if collection and collection.get("status") != "FAILED" and collection.get("rows", 0) > 0:
+                completed_mfds_services.add(service)
+        if completed_mfds_services == {"I0030", "I2710"}:
+            mfds_status = {"status": "COMPLETED", "source": "LOCAL_RAW_PAGES"}
+            report(p["reports"] / "mfds_status.json", mfds_status)
         mfds_i0030_has_raw = any((p["raw_mfds"] / "I0030").glob("page_*.json"))
         mfds_i2710_has_raw = any((p["raw_mfds"] / "I2710").glob("page_*.json"))
         mfds_has_raw = mfds_i0030_has_raw or mfds_i2710_has_raw
@@ -157,6 +168,15 @@ def run(root: Path, stage: str = "all") -> None:
             report(p["reports"] / "mfds_i0030_preprocessing.json", i0030); report(p["reports"] / "mfds_i2710_preprocessing.json", i2710)
             source_path = p["interim_facet"] / "i0030_products_clean.csv"
             source = pd.read_csv(source_path, dtype=str).fillna("") if source_path.exists() and source_path.stat().st_size else pd.DataFrame()
+            try:
+                category_seed = build_health_category_seed(source)
+                category_seed_path = p["processed_category"] / "health_category_seed_v0.csv"
+                category_seed_path.parent.mkdir(parents=True, exist_ok=True)
+                category_seed.to_csv(category_seed_path, index=False, encoding="utf-8-sig")
+                category_seed_status = {"status": "DRAFT_PENDING_HUMAN_REVIEW", "rows": len(category_seed), "output": str(category_seed_path)}
+            except CategorySeedError as exc:
+                category_seed_status = {"status": "PENDING_SOURCE_MAPPING", "reason": str(exc)}
+            report(p["reports"] / "health_category_seed_status.json", category_seed_status)
             terms = repeated_terms(source, ["name", "main_functionality", "functional_ingredients", "other_ingredients"], 3, 0.05)
             terms.to_csv(p["interim_facet"] / "repeated_terms.csv", index=False, encoding="utf-8-sig")
             structured_distribution(source, ["product_form", "product_type", "intake_method", "storage_method", "functional_ingredients", "main_functionality"]).to_csv(p["interim_facet"] / "structured_value_distribution.csv", index=False, encoding="utf-8-sig")
@@ -174,7 +194,7 @@ def run(root: Path, stage: str = "all") -> None:
     report(p["reports"] / "backend_schema_recommendations.json", {"migration_applied": False, "recommendations": ["thumbnail_url nullable 또는 placeholder 정책", "product_catalog_source에 external_product_id/barcode/source 저장", "category_source_mapping에 KAN 매핑 저장"]})
     # A collection failure is more informative than a stale prior SKIP report.
     collection_report = read_report(p["reports"] / "mfds_i0030_collection.json")
-    if collection_report.get("status") == "FAILED":
+    if not completed_mfds_services and collection_report and collection_report.get("status") == "FAILED":
         mfds_status = {"status": "FAILED", "reason": collection_report.get("reason", "MFDS collection failed")}
         report(p["reports"] / "mfds_status.json", mfds_status)
     else:
@@ -182,12 +202,17 @@ def run(root: Path, stage: str = "all") -> None:
     facet_status = facet_status or read_report(p["reports"] / "facet_status.json")
     if mfds_status:
         report(p["reports"] / "mfds_status.json", mfds_status)
-    if stage in {"all", "mfds", "facet"} and mfds_status.get("status") != "COMPLETED":
+    if stage in {"all", "mfds", "facet"}:
         pipeline_report = read_report(p["reports"] / "pipeline_status.json")
         if pipeline_report:
-            pipeline_report["status"] = "COMPLETED_WITH_WARNINGS"
             pipeline_report["mfds_status"] = mfds_status.get("status", "NOT_RUN")
             pipeline_report["facet_status"] = facet_status.get("status", "NOT_RUN")
+            pipeline_report["health_category_seed_status"] = category_seed_status or read_report(p["reports"] / "health_category_seed_status.json")
+            pipeline_report["status"] = (
+                "COMPLETED"
+                if mfds_status.get("status") == "COMPLETED" and facet_status.get("status") == "COMPLETED"
+                else "COMPLETED_WITH_WARNINGS"
+            )
             report(p["reports"] / "pipeline_status.json", pipeline_report)
     write_today_result(p["reports"] / "TODAY_RESULT.md", aihub_audit_summary, coverage_summary, mfds_status, facet_status, conflict_count)
 

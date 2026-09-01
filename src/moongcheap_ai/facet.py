@@ -40,18 +40,18 @@ def preprocess_i0030(raw_dir: Path, output_csv: Path) -> dict[str, int]:
         output.append({
             "source_product_id": _pick(row, "PRDLST_REPORT_NO", "prdlstReportNo", "제품신고번호"),
             "name": _pick(row, "PRDLST_NM", "prdlstNm", "제품명"),
-            "product_type": _pick(row, "PRDLST_TYPE", "제품유형"),
-            "product_form": _pick(row, "PRDT_SHAP", "제품형태"),
+            "product_type": _pick(row, "PRDLST_CDNM", "PRDLST_TYPE", "제품유형"),
+            "product_form": _pick(row, "PRDT_SHAP_CD_NM", "PRDT_SHAP", "제품형태"),
             "main_functionality": _pick(row, "PRIMARY_FNCLTY", "주된기능성"),
             "intake_method": _pick(row, "NTK_MTHD", "섭취방법"),
-            "caution": _pick(row, "IFTKN_ATNT_MATTER", "섭취시주의사항"),
+            "caution": _pick(row, "IFTKN_ATNT_MATR_CN", "IFTKN_ATNT_MATTER", "섭취시주의사항"),
             "storage_method": _pick(row, "CSTDY_MTHD", "보관방법"),
             "standard_spec": _pick(row, "STDR_STND", "기준규격"),
             "functional_ingredients": _pick(row, "RAWMTRL_NM", "기능성원재료"),
             "other_ingredients": _pick(row, "ETC_RAWMTRL_NM", "기타원재료"),
             "capsule_ingredients": _pick(row, "CAPSULE_RAWMTRL_NM", "캡슐원재료"),
             "manufacturer": _pick(row, "BSSH_NM", "제조업체"),
-            "raw_category_name": _pick(row, "PRDLST_REPORT_NO", "제품유형"),
+            "raw_category_name": _pick(row, "PRDLST_CDNM", "PRDLST_TYPE", "제품유형"),
         })
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(output).to_csv(output_csv, index=False, encoding="utf-8-sig")
