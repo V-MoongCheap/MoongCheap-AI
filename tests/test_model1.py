@@ -51,3 +51,6 @@ def test_postprocess_mapping_is_evidence_backed():
     products = pd.DataFrame([{"source_product_id": "1", "name": "상품", "product_type": "프로바이오틱스", "product_form": "분말", "functional_ingredients": "", "main_functionality": ""}])
     candidates = pd.DataFrame([{"category_key": "health-functional-food:probiotics", "facet_id": "product_form", "facet_name": "제품 형태", "value": "분말"}])
     assert map_products(products, candidates).iloc[0]["mapping_status"] == "MAPPED"
+def test_metadata_parentheses_do_not_split_semantic_values():
+    assert atomic_values("functional_ingredients", "selenium(또는 셀렌), biotin") == ["selenium", "biotin"]
+    assert atomic_values("regulated_function", "피부상태 개선에 도움을 줄 수 있음 (생리활성기능 2등급)") == ["피부상태 개선에 도움을 줄 수 있음"]

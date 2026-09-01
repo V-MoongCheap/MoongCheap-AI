@@ -17,7 +17,14 @@ def canonical_facet(facet_id: Any, name: Any) -> tuple[str, str]:
 
 def canonical_value(facet_id: str, value: Any) -> str:
     value = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or ""))).strip()
-    return FORM_VALUES.get(value.casefold(), value) if facet_id == "product_form" else value
+    if facet_id == "product_form":
+        return FORM_VALUES.get(value.casefold(), value)
+    if facet_id == "functional_ingredients":
+        value = re.sub(r"\s*\((?:또는|or)\s*[^)]*\)", "", value, flags=re.IGNORECASE)
+        value = re.sub(r"\s*\([^)]*(?:기능성|인정|기능[_-]?\s*\d{4}|제\s*\d{4})[^)]*\)", "", value, flags=re.IGNORECASE)
+    if facet_id == "regulated_function":
+        value = re.sub(r"\s*\([^)]*\)", "", value)
+    return value
 
 def atomic_values(facet_id: str, value: Any) -> list[str]:
     cleaned = canonical_value(facet_id, value)
