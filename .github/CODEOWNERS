@@ -1,5 +1,9 @@
-# Default owner for repository-wide changes
+# 기본 소유자. 역할 담당자 계정 확정 전까지 Admin이 검토한다.
 * @Skullking2520
 
-# Domain ownership
-/src/moongcheap_ai/ @Skullking2520
+# 역할별 경로. 담당자 확정 후 각 줄의 계정을 교체한다.
+/src/moongcheap_ai/parts/aihub/ @Skullking2520
+/src/moongcheap_ai/parts/demand_clustering/ @Skullking2520
+/src/moongcheap_ai/parts/seller_matching/ @Skullking2520
+/src/moongcheap_ai/parts/seller_analysis/ @Skullking2520
+/tests/ @Skullking2520
