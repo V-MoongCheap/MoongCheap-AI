@@ -1,8 +1,8 @@
-# AI Scope and Handoff
+# AI 범위 및 인수인계
 
 이 문서는 현재 AI MVP의 기준 문서입니다.
 
-## MVP functions
+## MVP 기능
 
 1. **Facet Discovery and Demand Labeling**
    - 상품 원문에서 Facet/Value/Alias 후보를 생성하고 Human Review 후 승인합니다.
@@ -19,7 +19,7 @@
    - Matching은 Rule/Score 기반으로 재현 가능해야 합니다.
    - 분석 수치는 SQL/Python 집계가 원천이고, LLM은 필요 시 설명만 생성합니다.
 
-## Boundaries
+## 담당 범위
 
 - AI와 Backend는 동일 PostgreSQL을 사용합니다.
 - AI는 허용된 원본을 조회하고 AI 파생 결과만 기록합니다.
@@ -27,7 +27,7 @@
 - AI는 수요·응찰·낙찰 상태를 변경하지 않습니다.
 - Consumer RAG 챗봇은 MVP에서 제외합니다.
 
-## Explicitly not fixed
+## 아직 확정하지 않은 항목
 
 - Embedding 사용 여부와 모델
 - Vector DB 및 모델 서버 구성
