@@ -19,6 +19,9 @@ def _normalise(value: Any) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or "")).casefold()).strip()
 
 
+NO_REQUIREMENT_PHRASES = {"조건 없음", "조건없음", "상관 없음", "상관없음", "아무 조건 없음", "무관"}
+
+
 class TaxonomyLoader:
     def __init__(self, taxonomy: dict[str, Any]) -> None:
         self.taxonomy = taxonomy
@@ -48,14 +51,28 @@ class TaxonomyLoader:
 
     def _validate_category(self, category: dict[str, Any]) -> None:
         seen_facets: set[str] = set()
-        for facet in category.get("facets", []):
+        seen_orders: set[int] = set()
+        facets = category.get("facets")
+        if not isinstance(facets, list):
+            raise TaxonomyValidationError("category facets must be a list")
+        for index, facet in enumerate(facets, 1):
             name = str(facet.get("name", "")).strip()
             if not name or name in seen_facets:
                 raise TaxonomyValidationError(f"invalid or duplicate facet: {name}")
             seen_facets.add(name)
+            try:
+                order = int(facet.get("order", index))
+            except (KeyError, TypeError, ValueError) as exc:
+                raise TaxonomyValidationError(f"invalid facet order: {name}") from exc
+            if order in seen_orders:
+                raise TaxonomyValidationError(f"duplicate facet order: {order}")
+            seen_orders.add(order)
             codes: set[int] = set()
             has_all = False
-            for value in facet.get("values", []):
+            values = facet.get("values")
+            if not isinstance(values, list) or not values:
+                raise TaxonomyValidationError(f"facet has no values: {name}")
+            for value in values:
                 try:
                     code = int(value["code"])
                 except (KeyError, TypeError, ValueError) as exc:
@@ -66,6 +83,8 @@ class TaxonomyLoader:
                 has_all = has_all or code == 0
             if not has_all:
                 raise TaxonomyValidationError(f"facet has no ALL(code=0): {name}")
+        if seen_orders and seen_orders != set(range(1, len(seen_orders) + 1)):
+            raise TaxonomyValidationError("facet orders must be contiguous from 1")
 
     def category(self, category_id: Any) -> dict[str, Any] | None:
         return self.categories.get(str(category_id or "").strip()) or self.root_category
@@ -98,7 +117,7 @@ class TaxonomyLoader:
             else:
                 all_value = next(value for value in facet.get("values", []) if int(value["code"]) == 0)
                 result[str(facet["name"])] = {"code": 0, "value": all_value.get("value", "ALL"), "matched_alias": None}
-        if text and result and all(item["code"] == 0 for item in result.values()):
+        if text and text not in NO_REQUIREMENT_PHRASES and result and all(item["code"] == 0 for item in result.values()):
             warnings.append("requirement did not match any taxonomy value")
         return result, warnings
 
@@ -127,6 +146,10 @@ def label_demands(frame: pd.DataFrame, loader: TaxonomyLoader,
         if not category_id and catalog_category_map:
             category_id = catalog_category_map.get(str(demand.get("catalog_id", "")), "")
         facet_values, warnings = loader.resolve(category_id, demand.get("extra_requirement", ""))
+        requirement = str(demand.get("extra_requirement", "") or "").strip()
+        unresolved_items = []
+        if requirement and any("did not match" in warning for warning in warnings):
+            unresolved_items.append(requirement)
         row = demand.to_dict()
         row.update({
             "category_id": str(category_id or ""),
@@ -138,6 +161,7 @@ def label_demands(frame: pd.DataFrame, loader: TaxonomyLoader,
             "is_substitutable": demand.get("is_substitutable", True),
             "label_status": "LABELED" if not warnings else "LABELED_WITH_REVIEW",
             "label_warnings": json.dumps(warnings, ensure_ascii=False),
+            "unresolved_items": json.dumps(unresolved_items, ensure_ascii=False),
         })
         rows.append(row)
     return pd.DataFrame(rows)

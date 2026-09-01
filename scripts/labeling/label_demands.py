@@ -10,11 +10,12 @@ from moongcheap_ai.labeling import label_demands, load_taxonomy
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Batch label synthetic or Backend-exported Demand with Facet Taxonomy V0")
-    parser.add_argument("--input", type=Path, default=Path("data/interim/demands/synthetic_demands_v0.csv"))
+    parser.add_argument("--input", type=Path, default=Path("data/synthetic/demands/synthetic_demands_v0.csv"))
     parser.add_argument("--taxonomy", type=Path, default=Path("data/processed/facet_discovery/facet_taxonomy_v0.json"))
     parser.add_argument("--output", type=Path, default=Path("data/processed/demands/demand_labeled_v0.csv"))
     parser.add_argument("--catalog", type=Path, help="Backend product_catalog export with id and category_id")
     parser.add_argument("--review-output", type=Path, default=Path("data/processed/demands/demand_label_review_queue_v0.csv"))
+    parser.add_argument("--failure-output", type=Path, default=Path("data/processed/demands/labeling_failures_v0.csv"))
     args = parser.parse_args()
     if not args.input.exists():
         raise SystemExit(f"input demand file not found: {args.input}")
@@ -37,7 +38,17 @@ def main() -> None:
     review = result[result["label_status"] != "LABELED"].copy()
     args.review_output.parent.mkdir(parents=True, exist_ok=True)
     review.to_csv(args.review_output, index=False, encoding="utf-8-sig")
-    print({"rows": len(result), "review_rows": len(review), "output": str(args.output), "review_output": str(args.review_output)})
+    failures = review.copy()
+    failures["expected"] = ""
+    failures["actual_result"] = failures["facet_values"]
+    failures["failure_type"] = failures["label_warnings"].map(
+        lambda value: "taxonomy_missing" if "did not match" in str(value) else "ambiguous_expression"
+    )
+    failures["note"] = failures["label_warnings"]
+    failure_columns = ["demand_id", "extra_requirement", "expected", "actual_result", "failure_type", "unresolved_items", "note"]
+    args.failure_output.parent.mkdir(parents=True, exist_ok=True)
+    failures.reindex(columns=failure_columns).to_csv(args.failure_output, index=False, encoding="utf-8-sig")
+    print({"rows": len(result), "review_rows": len(review), "failure_rows": len(failures), "output": str(args.output), "review_output": str(args.review_output), "failure_output": str(args.failure_output)})
 
 
 if __name__ == "__main__":
