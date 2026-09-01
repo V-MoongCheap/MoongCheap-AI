@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -41,6 +43,32 @@ class UnavailableModelAdapter:
 
     def generate_facet_candidates(self, category: str, products: list[dict[str, Any]], prompt_version: str) -> dict[str, Any]:
         raise ModelCallError("No executable Model 1 provider or local model is configured")
+
+
+class OllamaAdapter:
+    provider = "ollama"
+
+    def __init__(self, model: str, endpoint: str = "http://localhost:11434") -> None:
+        self.model = model
+        self.endpoint = endpoint.rstrip("/")
+
+    def generate_facet_candidates(self, category: str, products: list[dict[str, Any]], prompt_version: str) -> dict[str, Any]:
+        product_text = json.dumps(products, ensure_ascii=False)
+        prompt = f"Prompt version: {prompt_version}\nCategory: {category}\nProducts:\n{product_text}"
+        body = json.dumps({"model": self.model, "prompt": prompt, "format": "json", "stream": False}, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(f"{self.endpoint}/api/generate", data=body, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=180) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+            raise ModelCallError(f"Ollama call failed: {exc}") from exc
+        raw_response = payload.get("response", "")
+        if not raw_response:
+            raise ModelCallError("Ollama returned an empty response")
+        try:
+            return json.loads(raw_response)
+        except json.JSONDecodeError as exc:
+            raise ModelCallError(f"Ollama returned invalid JSON: {exc}") from exc
 
 
 class MockModelAdapter:

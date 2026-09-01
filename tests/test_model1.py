@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.model1 import MockModelAdapter, parse_model_output, sample_products
+from moongcheap_ai.model1 import MockModelAdapter, OllamaAdapter, parse_model_output, sample_products
 
 
 def _frame():
@@ -29,3 +29,10 @@ def test_hallucinated_evidence_is_rejected():
     parsed, failures = parse_model_output(payload, _frame())
     assert parsed.empty
     assert failures[0]["failure_type"] == "HALLUCINATED_EVIDENCE"
+
+
+def test_ollama_adapter_keeps_provider_swappable():
+    adapter = OllamaAdapter("actual-model-name")
+    assert adapter.provider == "ollama"
+    assert adapter.model == "actual-model-name"
+    assert adapter.endpoint.endswith("11434")
