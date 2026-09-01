@@ -1,0 +1,36 @@
+# Source and artifact labels. Do not infer an official source version.
+
+[aihub_logistics]
+source = "AI-Hub user-provided local files"
+source_version = "unknown"
+snapshot_label = "AIHUB_LOGISTICS_LOCAL_SNAPSHOT"
+artifact_version = "product_staging_v0"
+status = "local_only"
+
+[mfds_i0030]
+source = "MFDS I0030 API response pages"
+source_version = "unknown"
+snapshot_label = "MFDS_I0030_LOCAL_SNAPSHOT_2026-09-01"
+artifact_version = "mfds_i0030_clean_v0"
+status = "local_only"
+
+[mfds_i2710]
+source = "MFDS I2710 API response pages"
+source_version = "unknown"
+snapshot_label = "MFDS_I2710_LOCAL_SNAPSHOT_2026-09-01"
+artifact_version = "mfds_i2710_reference_v0"
+status = "local_only"
+
+[category_v2_1]
+source = "MFDS I0030 cleaned corpus and reviewed V2.1 rules"
+source_version = "category_rules_v2_1"
+artifact_version = "category_v2_1"
+status = "candidate_needs_review"
+
+[model1]
+source = "MFDS I0030 cleaned corpus"
+source_version = "facet_discovery_v0"
+artifact_version = "facet_candidates_normalized_v0"
+provider = "ollama"
+model = "qwen3:4b"
+status = "candidate_needs_review"

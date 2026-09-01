@@ -2,7 +2,7 @@
 
 수요 주도형 공동구매 플랫폼의 AI 파트 저장소입니다.
 
-## AI MVP
+## MVP 기능
 
 1. **상품 Facet Discovery 및 Demand Labeling**
    - 상품 원문에서 Facet/Value/Alias 후보를 도출하고 Human Review 후 taxonomy를 확정
@@ -19,7 +19,7 @@
    - 최종 매칭은 재현 가능한 Rule/Score 기반으로 처리하며 LLM의 임의 판단에 맡기지 않음
    - 수요 분석 수치는 SQL/Python 집계가 원천이며 LLM은 선택적 설명만 담당
 
-## System boundaries
+## 시스템 담당 범위
 
 - AI와 Backend는 동일한 PostgreSQL을 사용합니다.
 - AI는 Backend가 생성한 원본 Demand를 조회하고 AI 파생 결과만 기록합니다.
@@ -28,13 +28,13 @@
 - Consumer RAG 챗봇은 현재 MVP에서 제외합니다.
 - 특정 모델(Qwen3 등), Vector DB, 상시 모델 서버는 확정하지 않습니다.
 
-## Repository structure
+## 저장소 구조
 
-- `apps/ai`: AI 서비스 구현
+- `src/moongcheap_ai`: AI 서비스 및 데이터 파이프라인 구현
 - `docs`: AI 설계, Facet taxonomy, API contract, 평가 및 실험 문서
 - `.github`: PR/이슈 템플릿 및 협업 설정
 
-## Development workflow
+## 개발 작업 흐름
 
 1. `main`에서 작업 브랜치를 생성합니다.
 2. 작업 Branch에서 기존 AI Commit Convention을 따릅니다.
