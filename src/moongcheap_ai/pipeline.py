@@ -17,7 +17,7 @@ from .facet import preprocess_i0030, preprocess_i2710, repeated_terms, structure
 from .category_seed import CategorySeedError, build_health_category_seed
 from .inspect_data import inspect
 from .mfds import MFDSCollectionError, collect
-from .parts.aihub import read_coco_json
+from .data_foundation import read_coco_json
 from .parts.aihub.exploratory_facet import build_exploratory_facets
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
