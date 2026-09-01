@@ -1,7 +1,11 @@
 import pandas as pd
 
 from moongcheap_ai.model1 import MockModelAdapter, OllamaAdapter, parse_model_output, sample_products
-from moongcheap_ai.model1_postprocess import map_products, normalize_candidates
+from moongcheap_ai.model1_postprocess import atomic_values, map_products, normalize_candidates
+
+def test_composite_values_are_split_before_deduplication():
+    assert atomic_values("functional_ingredients", "vitamin C, zinc, vitamin C") == ["vitamin C", "zinc"]
+    assert atomic_values("regulated_function", "skin moisturizing (생리활성기능 2등급)") == ["skin moisturizing"]
 
 
 def _frame():

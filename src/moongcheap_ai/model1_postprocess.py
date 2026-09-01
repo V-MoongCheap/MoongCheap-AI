@@ -19,13 +19,24 @@ def canonical_value(facet_id: str, value: Any) -> str:
     value = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or ""))).strip()
     return FORM_VALUES.get(value.casefold(), value) if facet_id == "product_form" else value
 
+def atomic_values(facet_id: str, value: Any) -> list[str]:
+    cleaned = canonical_value(facet_id, value)
+    parts = re.split(r"[,;\n]+", cleaned) if facet_id == "functional_ingredients" else re.split(r"[,;·•\n]+", cleaned) if facet_id == "regulated_function" else [cleaned]
+    result = []
+    for part in parts:
+        part = re.sub(r"^\s*[\[(]?\d+[.)\]]?\s*", "", part).strip(" .")
+        if facet_id == "regulated_function":
+            part = re.sub(r"\s*\((?:생리활성기능|기능성)?\s*\d+등급\)\s*$", "", part).strip()
+        if part and part not in result:
+            result.append(part)
+    return result
+
 def normalize_candidates(review: pd.DataFrame) -> pd.DataFrame:
     columns = ["category_key", "facet_id", "facet_name", "definition", "value", "aliases", "evidence_product_count", "evidence_product_ids", "source_fields", "status"]
     rows = []
     for _, row in review.fillna("").iterrows():
         facet_id, facet_name = canonical_facet(row.get("facet_id_candidate"), row.get("name"))
-        value = canonical_value(facet_id, row.get("value"))
-        if value:
+        for value in atomic_values(facet_id, row.get("value")):
             rows.append({"category_key": str(row.get("category_key", "")).strip(), "facet_id": facet_id, "facet_name": facet_name, "definition": str(row.get("definition", "")).strip(), "value": value, "alias": str(row.get("alias", "")).strip(), "source_product_id": str(row.get("source_product_id", "")).strip(), "source_field": str(row.get("source_field", "")).strip()})
     if not rows:
         return pd.DataFrame(columns=columns)
