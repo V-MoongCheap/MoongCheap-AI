@@ -32,16 +32,19 @@ def main() -> None:
     with raw_path.open("w", encoding="utf-8") as raw_file:
         for category_key, group in sampled[sampled["category_key"].isin(target_categories)].groupby("category_key", sort=True):
             category_failures = []
+            best_parsed = pd.DataFrame()
             for attempt in range(args.max_retries + 1):
                 try:
                     response = model.generate_facet_candidates(category_key, group.to_dict("records"), "facet_discovery_v0")
                     calls += 1
                     raw_file.write(json.dumps({"category_key": category_key, "attempt": attempt + 1, "response": response}, ensure_ascii=False) + "\n")
                     parsed, parse_failures = parse_model_output(response, group)
-                    if not parse_failures:
-                        review_rows.extend(parsed.to_dict("records"))
+                    if not parsed.empty:
+                        best_parsed = parsed
+                    if not parse_failures or not parsed.empty:
+                        review_rows.extend(best_parsed.to_dict("records"))
                         merged.append(response)
-                        category_failures = []
+                        category_failures = parse_failures
                         break
                     category_failures = parse_failures
                 except ModelCallError as exc:
