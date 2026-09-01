@@ -17,6 +17,7 @@ from .category_v2_1 import classify_v2_1
 
 MODEL_COLUMNS = ["category_key", "category_name", "source_product_id", "product_name", "source_category", "product_form", "functional_ingredients", "regulated_function", "intake_method", "sampling_reason"]
 MODEL_OUTPUT_COLUMNS = ["category_key", "category_name", "facet_id_candidate", "name", "definition", "value", "alias", "source_product_id", "source_field", "source_text", "status"]
+PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "facet_discovery_v0.txt"
 
 
 class ModelCallError(RuntimeError):
@@ -54,11 +55,12 @@ class OllamaAdapter:
 
     def generate_facet_candidates(self, category: str, products: list[dict[str, Any]], prompt_version: str) -> dict[str, Any]:
         product_text = json.dumps(products, ensure_ascii=False)
-        prompt = f"Prompt version: {prompt_version}\nCategory: {category}\nProducts:\n{product_text}"
-        body = json.dumps({"model": self.model, "prompt": prompt, "format": "json", "stream": False}, ensure_ascii=False).encode("utf-8")
+        prompt_template = PROMPT_PATH.read_text(encoding="utf-8")
+        prompt = f"{prompt_template}\n\nPrompt version: {prompt_version}\nTarget category_key: {category}\nInput products (evidence only):\n{product_text}"
+        body = json.dumps({"model": self.model, "prompt": prompt, "format": "json", "stream": False, "think": False}, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(f"{self.endpoint}/api/generate", data=body, headers={"Content-Type": "application/json"}, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=180) as response:
+            with urllib.request.urlopen(request, timeout=300) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
             raise ModelCallError(f"Ollama call failed: {exc}") from exc
