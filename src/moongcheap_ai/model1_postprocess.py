@@ -8,6 +8,7 @@ from .category_v2_1 import classify_v2_1
 
 CANONICAL_FACETS = {"form": ("product_form", "제품 형태"), "product form": ("product_form", "제품 형태"), "제품 형태": ("product_form", "제품 형태"), "functional ingredients": ("functional_ingredients", "기능성 성분"), "기능성 성분": ("functional_ingredients", "기능성 성분"), "probiotic strain": ("probiotic_strain", "프로바이오틱스 균주"), "프로바이오틱스 균주": ("probiotic_strain", "프로바이오틱스 균주"), "regulated function": ("regulated_function", "규제 기능"), "규제 기능": ("regulated_function", "규제 기능")}
 FORM_VALUES = {"powder": "분말", "분말": "분말", "capsule": "캡슐", "캡슐": "캡슐", "tablet": "정", "정": "정", "liquid": "액상", "액상": "액상"}
+REGULATED_GROUPS = ((r"배변\s*활동|장\s*건강|장건강", "장 건강"), (r"유산균\s*증식.*유해균\s*억제", "유산균 증식 및 유해균 억제"), (r"혈중\s*콜레스테롤", "혈중 콜레스테롤 개선"), (r"자외선.*피부.*손상.*피부.*건강|피부.*손상.*자외선", "자외선에 의한 피부 손상으로부터 피부 건강 유지"), (r"피부\s*보습", "피부 보습"), (r"뼈\s*건강", "뼈 건강"))
 
 def normalize_text(value: Any) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or ""))).strip().casefold()
@@ -28,7 +29,11 @@ def canonical_value(facet_id: str, value: Any) -> str:
 
 def atomic_values(facet_id: str, value: Any) -> list[str]:
     cleaned = canonical_value(facet_id, value)
-    parts = re.split(r"[,;\n]+", cleaned) if facet_id == "functional_ingredients" else re.split(r"[,;·•\n]+", cleaned) if facet_id == "regulated_function" else [cleaned]
+    if facet_id == "regulated_function":
+        found = [label for pattern, label in REGULATED_GROUPS if re.search(pattern, cleaned)]
+        if found:
+            return list(dict.fromkeys(found))
+    parts = re.split(r"[,;·\n]+", cleaned) if facet_id == "functional_ingredients" else re.split(r"[,;·•\n]+", cleaned) if facet_id == "regulated_function" else [cleaned]
     result = []
     for part in parts:
         part = re.sub(r"^\s*[\[(]?\d+[.)\]]?\s*", "", part).strip(" .")

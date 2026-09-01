@@ -54,3 +54,9 @@ def test_postprocess_mapping_is_evidence_backed():
 def test_metadata_parentheses_do_not_split_semantic_values():
     assert atomic_values("functional_ingredients", "selenium(또는 셀렌), biotin") == ["selenium", "biotin"]
     assert atomic_values("regulated_function", "피부상태 개선에 도움을 줄 수 있음 (생리활성기능 2등급)") == ["피부상태 개선에 도움을 줄 수 있음"]
+def test_regulated_functions_are_grouped_by_meaning():
+    assert atomic_values("regulated_function", "장건강에 도움을 줄 수 있음") == ["장 건강"]
+    assert atomic_values("regulated_function", "자외선에 의한 피부손상으로부터 피부 건강 유지에 도움") == ["자외선에 의한 피부 손상으로부터 피부 건강 유지"]
+
+def test_one_product_can_have_multiple_ingredient_values():
+    assert atomic_values("functional_ingredients", "비타민 C, 아연") == ["비타민 C", "아연"]
