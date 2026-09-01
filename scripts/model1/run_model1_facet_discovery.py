@@ -15,6 +15,7 @@ def main() -> None:
     parser.add_argument("--input", type=Path, default=Path("data/interim/facet_discovery/i0030_products_clean_dedup.csv"))
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed/model1_v0"))
     parser.add_argument("--max-per-category", type=int, default=24)
+    parser.add_argument("--max-retries", type=int, default=1)
     parser.add_argument("--smoke-only", action="store_true")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -30,16 +31,22 @@ def main() -> None:
     calls = 0
     with raw_path.open("w", encoding="utf-8") as raw_file:
         for category_key, group in sampled[sampled["category_key"].isin(target_categories)].groupby("category_key", sort=True):
-            try:
-                response = model.generate_facet_candidates(category_key, group.to_dict("records"), "facet_discovery_v0")
-                raw_file.write(json.dumps({"category_key": category_key, "response": response}, ensure_ascii=False) + "\n")
-                parsed, parse_failures = parse_model_output(response, group)
-                review_rows.extend(parsed.to_dict("records"))
-                failures.extend({"failure_type": failure["failure_type"], "category_key": category_key, "detail": failure["detail"]} for failure in parse_failures)
-                merged.append(response)
-                calls += 1
-            except ModelCallError as exc:
-                failures.append({"failure_type": "MODEL_CALL_FAILED", "category_key": category_key, "detail": str(exc)})
+            category_failures = []
+            for attempt in range(args.max_retries + 1):
+                try:
+                    response = model.generate_facet_candidates(category_key, group.to_dict("records"), "facet_discovery_v0")
+                    calls += 1
+                    raw_file.write(json.dumps({"category_key": category_key, "attempt": attempt + 1, "response": response}, ensure_ascii=False) + "\n")
+                    parsed, parse_failures = parse_model_output(response, group)
+                    if not parse_failures:
+                        review_rows.extend(parsed.to_dict("records"))
+                        merged.append(response)
+                        category_failures = []
+                        break
+                    category_failures = parse_failures
+                except ModelCallError as exc:
+                    category_failures = [{"failure_type": "MODEL_CALL_FAILED", "detail": str(exc)}]
+            failures.extend({"failure_type": failure["failure_type"], "category_key": category_key, "detail": failure["detail"]} for failure in category_failures)
     status = "COMPLETED" if calls == len(target_categories) and not failures else "COMPLETED_WITH_WARNINGS" if calls else "BLOCKED_NO_EXECUTABLE_MODEL"
     report = {"status": status, "provider": getattr(model, "provider", None), "model": getattr(model, "model", None), "prompt_version": "facet_discovery_v0", "sampling_seed": 42, "category_sample_counts": sampled[sampled["category_key"].isin(target_categories)].groupby("category_key").size().to_dict() if not sampled.empty else {}, "category_count": len(target_categories), "model_call_count": calls, "input_token": None, "output_token": None, "runtime_seconds": round(time.perf_counter() - started, 3), "api_cost": 0 if calls and getattr(model, "provider", "") == "ollama" else None, "failure_count": len(failures)}
     if not calls:
