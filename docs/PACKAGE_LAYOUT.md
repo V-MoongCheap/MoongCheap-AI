@@ -7,10 +7,10 @@ under `moongcheap_ai` while new domain-specific code belongs in `parts/`.
 ```text
 src/moongcheap_ai/
 ├── parts/
-│   ├── aihub/              # A-part data foundation and source adapters
-│   ├── demand_clustering/  # demand grouping and board assignment
-│   ├── seller_matching/    # seller offer comparison and scoring
-│   └── seller_analysis/    # seller-facing demand aggregates and explanations
+│   ├── aihub/              # 상품 데이터·Category·Facet·Labeling
+│   ├── demand_clustering/  # Consumer Demand grouping and board assignment
+│   ├── seller_matching/    # Seller Offer comparison and scoring
+│   └── seller_analysis/    # 판매자용 수요 집계와 분석
 ├── catalog.py              # shared catalog primitives
 ├── facet.py                # shared facet primitives
 └── pipeline.py             # stage orchestration
