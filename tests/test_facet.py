@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 
-from moongcheap_ai.facet import preprocess_i0030
+from moongcheap_ai.facet import preprocess_i0030, validate_i0030
 
 
 def test_preprocess_i0030_uses_mfds_category_fields(tmp_path):
@@ -28,3 +28,18 @@ def test_preprocess_i0030_uses_mfds_category_fields(tmp_path):
     assert frame.loc[0, "raw_category_name"] == "비타민"
     assert frame.loc[0, "product_form"] == "정제"
     assert frame.loc[0, "caution"] == "주의사항"
+
+
+def test_validate_i0030_removes_only_duplicate_report_numbers():
+    frame = pd.DataFrame([
+        {"source_product_id": "1", "name": "같은 신고번호", "product_type": "비타민"},
+        {"source_product_id": "1", "name": "같은 신고번호", "product_type": "비타민"},
+        {"source_product_id": "2", "name": "같은 상품명", "product_type": "홍삼"},
+    ])
+
+    clean, duplicates, stats = validate_i0030(frame)
+
+    assert clean["source_product_id"].tolist() == ["1", "2"]
+    assert len(duplicates) == 1
+    assert stats["duplicate_rows_removed"] == 1
+    assert stats["missing_product_type"] == 0

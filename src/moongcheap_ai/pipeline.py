@@ -13,7 +13,7 @@ from .catalog import build_catalog, resolve_identity, source_rows_to_staging
 from .category import build_aihub_category_hierarchy, build_observed_kan
 from .config import ensure_dirs, paths
 from .audit import audit_aihub, build_category_source_mapping, product_catalog_coverage, write_today_result
-from .facet import preprocess_i0030, preprocess_i2710, repeated_terms, structured_distribution, taxonomy_v0
+from .facet import preprocess_i0030, preprocess_i2710, repeated_terms, structured_distribution, taxonomy_v0, validate_i0030
 from .category_seed import CategorySeedError, build_health_category_seed
 from .inspect_data import inspect
 from .mfds import MFDSCollectionError, collect
@@ -168,6 +168,10 @@ def run(root: Path, stage: str = "all") -> None:
             report(p["reports"] / "mfds_i0030_preprocessing.json", i0030); report(p["reports"] / "mfds_i2710_preprocessing.json", i2710)
             source_path = p["interim_facet"] / "i0030_products_clean.csv"
             source = pd.read_csv(source_path, dtype=str).fillna("") if source_path.exists() and source_path.stat().st_size else pd.DataFrame()
+            source, duplicate_rows, quality = validate_i0030(source)
+            source.to_csv(p["interim_facet"] / "i0030_products_clean_dedup.csv", index=False, encoding="utf-8-sig")
+            duplicate_rows.to_csv(p["interim_facet"] / "i0030_duplicate_review.csv", index=False, encoding="utf-8-sig")
+            report(p["reports"] / "mfds_i0030_quality.json", quality)
             try:
                 category_seed = build_health_category_seed(source)
                 category_seed_path = p["processed_category"] / "health_category_seed_v0.csv"

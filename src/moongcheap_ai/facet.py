@@ -58,6 +58,28 @@ def preprocess_i0030(raw_dir: Path, output_csv: Path) -> dict[str, int]:
     return {"raw_rows": len(rows), "processed_rows": len(output)}
 
 
+def validate_i0030(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, int]]:
+    """Deduplicate by MFDS report number and retain data-quality review rows."""
+    if frame.empty:
+        return frame.copy(), frame.copy(), {}
+    work = frame.copy().fillna("")
+    work = work.loc[work["source_product_id"].astype(str).str.strip() != ""].copy()
+    duplicate_mask = work.duplicated("source_product_id", keep="first")
+    duplicates = work.loc[duplicate_mask].copy()
+    clean = work.loc[~duplicate_mask].copy()
+    missing_counts = {
+        column: int((clean[column].astype(str).str.strip() == "").sum())
+        for column in clean.columns
+    }
+    stats = {
+        "input_rows": len(frame),
+        "rows_without_product_id": len(frame) - len(work),
+        "duplicate_rows_removed": len(duplicates),
+        "clean_rows": len(clean),
+    }
+    return clean, duplicates, {**stats, **{f"missing_{k}": v for k, v in missing_counts.items()}}
+
+
 def preprocess_i2710(raw_dir: Path, output_csv: Path) -> dict[str, int]:
     """Keep the MFDS reference data flexible because the public schema may vary."""
     rows = extract_mfds_rows(raw_dir, "I2710")
