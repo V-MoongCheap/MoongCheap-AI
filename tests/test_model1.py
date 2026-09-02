@@ -1,7 +1,7 @@
 import pandas as pd
 
-from moongcheap_ai.model1 import MockModelAdapter, OllamaAdapter, parse_model_output, sample_products
-from moongcheap_ai.model1_postprocess import atomic_values, map_products, normalize_candidates
+from moongcheap_ai.data_foundation.model1 import MockModelAdapter, OllamaAdapter, parse_model_output, sample_products
+from moongcheap_ai.data_foundation.model1_postprocess import atomic_values, map_products, normalize_candidates
 
 def test_composite_values_are_split_before_deduplication():
     assert atomic_values("functional_ingredients", "vitamin C, zinc, vitamin C") == ["vitamin C", "zinc"]

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.category_detail import build_category_detail_analysis
+from moongcheap_ai.data_foundation.category_detail import build_category_detail_analysis
 
 
 def test_detail_analysis_only_writes_review_artifacts(tmp_path):

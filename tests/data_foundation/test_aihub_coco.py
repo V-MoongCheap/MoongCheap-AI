@@ -1,6 +1,6 @@
 import json
 
-from moongcheap_ai.parts.aihub import read_coco_json
+from moongcheap_ai.data_foundation.coco import read_coco_json
 
 
 def test_read_coco_json_flattens_product_attributes(tmp_path):

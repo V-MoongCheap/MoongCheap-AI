@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from moongcheap_ai.labeling import TaxonomyLoader, TaxonomyValidationError, label_demands
+from moongcheap_ai.data_foundation.labeling import TaxonomyLoader, TaxonomyValidationError, label_demands
 
 
 TAXONOMY = {"categories": [{"category_id": "C1", "facets": [{"name": "sugar_type", "order": 1, "values": [

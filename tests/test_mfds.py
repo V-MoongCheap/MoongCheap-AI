@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import requests
 
-from moongcheap_ai.mfds import MFDSCollectionError, collect
+from moongcheap_ai.data_foundation.mfds import MFDSCollectionError, collect
 
 
 class FailingSession:

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.category_v2_1 import build_category_v2_1, classify_v2_1
+from moongcheap_ai.data_foundation.category_v2_1 import build_category_v2_1, classify_v2_1
 
 
 def test_v21_promotes_only_approved_other_candidates():

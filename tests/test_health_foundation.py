@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.health_foundation import build_health_artifacts
+from moongcheap_ai.data_foundation.health_foundation import build_health_artifacts
 
 
 def test_health_artifacts_keep_categories_and_ids_reviewable(tmp_path):

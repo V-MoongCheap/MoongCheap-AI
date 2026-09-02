@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from moongcheap_ai.category_seed import CategorySeedError, build_health_category_seed
+from moongcheap_ai.data_foundation.category_seed import CategorySeedError, build_health_category_seed
 
 
 def test_health_seed_uses_observed_mfds_product_types() -> None:

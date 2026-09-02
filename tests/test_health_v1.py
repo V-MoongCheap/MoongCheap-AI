@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.health_v1 import parse_intake, split_ingredient_text, split_recognition_number
+from moongcheap_ai.data_foundation.health_v1 import parse_intake, split_ingredient_text, split_recognition_number
 
 
 def test_recognition_number_is_separated_without_losing_source_text():
@@ -23,7 +23,7 @@ def test_intake_parser_extracts_frequency_and_dose():
 
 
 def test_v1_artifacts_keep_missing_category_products(tmp_path):
-    from moongcheap_ai.health_v1 import build_v1_artifacts
+    from moongcheap_ai.data_foundation.health_v1 import build_v1_artifacts
 
     frame = pd.DataFrame([{
         "source_product_id": "1", "name": "A", "product_type": "홍삼 (제2025-1호)",

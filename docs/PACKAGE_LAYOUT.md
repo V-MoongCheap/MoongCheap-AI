@@ -6,7 +6,6 @@ src/moongcheap_ai/
 ├── demand_clustering/    # Consumer Demand clustering
 ├── seller_matching/      # Seller Offer 매칭과 scoring
 ├── seller_analysis/      # 판매자용 수요 분석과 E2E 연결
-├── parts/aihub/          # AI-Hub 입력 형식 어댑터
 ├── pipeline.py           # 단계 실행 orchestration
 └── erd_contract.py       # ERD 계약 검증
 
@@ -18,4 +17,4 @@ tests/
 ```
 
 기능 구현은 해당 domain 패키지에 추가하고, 테스트는 같은 이름의 테스트 패키지에 둔다.
-루트의 기존 기능 모듈명은 하위 패키지를 가리키는 호환 facade로만 유지한다.
+기능 구현은 해당 domain 패키지에 직접 추가한다. 별도 `parts` 패키지는 사용하지 않는다.

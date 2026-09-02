@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.parts.aihub.exploratory_facet import build_exploratory_facets
+from moongcheap_ai.data_foundation.exploratory_facet import build_exploratory_facets
 
 
 def test_exploratory_facet_keeps_health_taxonomy_separate(tmp_path):

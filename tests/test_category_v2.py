@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.category_v2 import build_category_v2, classify_service_group
+from moongcheap_ai.data_foundation.category_v2 import build_category_v2, classify_service_group
 
 
 def test_category_group_uses_product_facts_not_recognition_number():

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.model1 import ModelCallError, OllamaAdapter, UnavailableModelAdapter, discover_model_config, parse_model_output, sample_products
+from moongcheap_ai.data_foundation.model1 import ModelCallError, OllamaAdapter, UnavailableModelAdapter, discover_model_config, parse_model_output, sample_products
 
 
 def main() -> None:

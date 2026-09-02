@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 
-from moongcheap_ai.facet import preprocess_i0030, validate_i0030
+from moongcheap_ai.data_foundation.facet import preprocess_i0030, validate_i0030
 
 
 def test_preprocess_i0030_uses_mfds_category_fields(tmp_path):

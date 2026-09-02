@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from moongcheap_ai.parts.aihub.model_benchmark import write_benchmark_outputs
+from moongcheap_ai.data_foundation.model_benchmark import write_benchmark_outputs
 
 
 def main() -> None:

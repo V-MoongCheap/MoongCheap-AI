@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.parts.aihub.model_benchmark import run_benchmark
+from moongcheap_ai.data_foundation.model_benchmark import run_benchmark
 
 
 def test_benchmark_returns_all_baselines() -> None:

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.health_v1 import build_v1_artifacts
+from moongcheap_ai.data_foundation.health_v1 import build_v1_artifacts
 
 
 def main() -> None:

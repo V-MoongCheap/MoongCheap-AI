@@ -9,16 +9,16 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
-from .catalog import build_catalog, resolve_identity, source_rows_to_staging
-from .category import build_aihub_category_hierarchy, build_observed_kan
+from .data_foundation.catalog import build_catalog, resolve_identity, source_rows_to_staging
+from .data_foundation.category import build_aihub_category_hierarchy, build_observed_kan
 from .config import ensure_dirs, paths
-from .audit import audit_aihub, build_category_source_mapping, product_catalog_coverage, write_today_result
-from .facet import preprocess_i0030, preprocess_i2710, repeated_terms, structured_distribution, taxonomy_v0, validate_i0030
-from .category_seed import CategorySeedError, build_health_category_seed
-from .inspect_data import inspect
-from .mfds import MFDSCollectionError, collect
+from .data_foundation.audit import audit_aihub, build_category_source_mapping, product_catalog_coverage, write_today_result
+from .data_foundation.facet import preprocess_i0030, preprocess_i2710, repeated_terms, structured_distribution, taxonomy_v0, validate_i0030
+from .data_foundation.category_seed import CategorySeedError, build_health_category_seed
+from .data_foundation.inspect_data import inspect
+from .data_foundation.mfds import MFDSCollectionError, collect
 from .data_foundation import read_coco_json
-from .parts.aihub.exploratory_facet import build_exploratory_facets
+from .data_foundation.exploratory_facet import build_exploratory_facets
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 LOGGER = logging.getLogger(__name__)

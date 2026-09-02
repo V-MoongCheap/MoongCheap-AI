@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.facet import repeated_terms, taxonomy_v0
-from moongcheap_ai.catalog import normalize_barcode, normalize_name, resolve_identity, source_category_path_from_file
-from moongcheap_ai.category import build_aihub_category_hierarchy
-from moongcheap_ai.labeling import label_demand
-from moongcheap_ai.preprocess import category_path, clean_title
+from moongcheap_ai.data_foundation.facet import repeated_terms, taxonomy_v0
+from moongcheap_ai.data_foundation.catalog import normalize_barcode, normalize_name, resolve_identity, source_category_path_from_file
+from moongcheap_ai.data_foundation.category import build_aihub_category_hierarchy
+from moongcheap_ai.data_foundation.labeling import label_demand
+from moongcheap_ai.data_foundation.preprocess import category_path, clean_title
 
 
 def test_clean_title_removes_html_and_normalizes():

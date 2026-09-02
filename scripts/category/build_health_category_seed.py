@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from moongcheap_ai.category_seed import CategorySeedError, write_health_category_seed
+from moongcheap_ai.data_foundation.category_seed import CategorySeedError, write_health_category_seed
 
 
 def main() -> None:

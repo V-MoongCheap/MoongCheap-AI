@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.audit import audit_aihub, build_category_source_mapping
+from moongcheap_ai.data_foundation.audit import audit_aihub, build_category_source_mapping
 
 
 def test_aihub_audit_reports_barcode_conflicts_without_deduplicating_rows():

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.demand_synthetic import generate_synthetic_demands, prepare_demand_input
+from moongcheap_ai.data_foundation.demand_synthetic import generate_synthetic_demands, prepare_demand_input
 
 
 def test_synthetic_demands_are_marked_and_catalog_bound() -> None:

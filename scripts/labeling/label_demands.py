@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.labeling import label_demands, load_taxonomy
+from moongcheap_ai.data_foundation.labeling import label_demands, load_taxonomy
 
 
 def main() -> None:

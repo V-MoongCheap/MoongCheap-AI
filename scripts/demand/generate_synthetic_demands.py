@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from moongcheap_ai.demand_synthetic import generate_from_catalog_file
+from moongcheap_ai.data_foundation.demand_synthetic import generate_from_catalog_file
 
 
 def main() -> None:

@@ -9,9 +9,9 @@ from typing import Any
 
 import pandas as pd
 
-from .category_v2_1 import classify_v2_1
-from .health_v1 import classify_record_type, normalize_form, parse_intake, split_ingredient_text, split_recognition_number
-from .labeling import TaxonomyLoader, label_demands
+from .data_foundation.category_v2_1 import classify_v2_1
+from .data_foundation.health_v1 import classify_record_type, normalize_form, parse_intake, split_ingredient_text, split_recognition_number
+from .data_foundation.labeling import TaxonomyLoader, label_demands
 
 
 def _text(value: Any) -> str:

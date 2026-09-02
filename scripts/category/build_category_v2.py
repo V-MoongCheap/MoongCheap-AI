@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.category_v2 import build_category_v2
+from moongcheap_ai.data_foundation.category_v2 import build_category_v2
 
 
 def main() -> None:

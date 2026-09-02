@@ -2,7 +2,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import pandas as pd
-from moongcheap_ai.model1_postprocess import map_products, normalize_candidates
+from moongcheap_ai.data_foundation.model1_postprocess import map_products, normalize_candidates
 
 def main() -> None:
     parser = argparse.ArgumentParser()

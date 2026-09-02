@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.inspect_data import inspect
+from moongcheap_ai.data_foundation.inspect_data import inspect
 
 
 def main() -> None:
