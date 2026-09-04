@@ -15,8 +15,8 @@ health_check_path: ""
 metrics_path: ""
 
 environment_variables:
-  # - name: EXAMPLE
-  #   purpose: 설명
+  - name: CLUSTER_MIN_PARTICIPANTS
+    purpose: "Demand Clustering 신규 Board 생성 최소 참여자 수 (선택, 기본값: 5)"
 
 secret_variables:
   # 이름과 용도만 작성
@@ -34,4 +34,4 @@ external_dependencies:
   # - Redis
   # - LLM API
 
-notes: ""
+notes: "이번 PR은 PostgreSQL read-only 조회 어댑터까지만 포함하며, 실제 DB 연결 환경변수와 Secret은 후속 런타임 연동 시 확정합니다."

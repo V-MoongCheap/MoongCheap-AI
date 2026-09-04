@@ -1,0 +1,76 @@
+{
+  "demands": [
+    {
+      "id": 1001,
+      "demand_board_id": null,
+      "catalog_id": 2001,
+      "desired_price_min": 10001,
+      "desired_price_max": 20000,
+      "quantity": 2,
+      "is_substitutable": false,
+      "status": "UNASSIGNED",
+      "label": "2-0",
+      "desire_end_at": "2026-09-03T12:00:00+09:00",
+      "created_at": "2026-08-27T12:00:00+09:00",
+      "updated_at": "2026-08-27T12:05:00+09:00",
+      "processed_at": "2026-08-27T12:05:00+09:00"
+    },
+    {
+      "id": 1002,
+      "demand_board_id": null,
+      "catalog_id": 2002,
+      "desired_price_min": null,
+      "desired_price_max": null,
+      "quantity": null,
+      "is_substitutable": null,
+      "status": null,
+      "label": null,
+      "desire_end_at": null,
+      "created_at": "2026-08-27T03:00:00Z",
+      "updated_at": "2026-08-27T03:00:00Z",
+      "processed_at": null
+    }
+  ],
+  "demand_boards": [
+    {
+      "id": 3001,
+      "catalog_id": 2001,
+      "participant_count": 8,
+      "price_min": 10001,
+      "price_max": 20000,
+      "status": "GB_GATHERING",
+      "sale_end_at": "2026-09-01T12:00:00+09:00",
+      "created_at": "2026-08-27T12:00:00+09:00"
+    },
+    {
+      "id": 3004,
+      "catalog_id": 2001,
+      "participant_count": 3,
+      "price_min": null,
+      "price_max": null,
+      "status": "GB_GATHERING",
+      "sale_end_at": "2026-09-01T12:00:00+09:00",
+      "created_at": "2026-08-27T13:00:00+09:00"
+    },
+    {
+      "id": 3002,
+      "catalog_id": 2001,
+      "participant_count": 10,
+      "price_min": 10001,
+      "price_max": 20000,
+      "status": "GB_CLOSED",
+      "sale_end_at": "2026-08-28T11:00:00+09:00",
+      "created_at": "2026-08-23T11:00:00+09:00"
+    },
+    {
+      "id": 3003,
+      "catalog_id": 9999,
+      "participant_count": 5,
+      "price_min": 10001,
+      "price_max": 20000,
+      "status": "GB_GATHERING",
+      "sale_end_at": "2026-09-01T12:00:00+09:00",
+      "created_at": "2026-08-27T14:00:00+09:00"
+    }
+  ]
+}

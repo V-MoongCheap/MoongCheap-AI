@@ -13,6 +13,13 @@
    - 동일 `catalog_id`를 우선하고 Facet 호환성, 가격, 수량, `is_substitutable`을 비교합니다.
    - Cluster는 `demand_board`로 표현합니다.
    - V0는 Rule 기반이며 Embedding/Hybrid는 평가 결과가 있을 때만 도입합니다.
+   - 신규 Board는 높은 Price Band의 인접 window부터 결정론적으로 판정합니다.
+   - 인접 Band는 낮은 Band 참여자가 높은 Band 참여자 이상일 때 묶고, Board 가격은 낮은 Band를 사용합니다.
+   - 기존 Board 자동 편입은 동일 `catalog_id`와 동일 Price Band에만 허용하며, 기존 Board가 없는 Demand만 신규 Board 형성 대상으로 사용합니다.
+   - 인접 Price Band 결합은 신규 Board 형성 시에만 적용합니다. 소비자의 기존 Board 직접 참여는 Backend 기능입니다.
+   - PostgreSQL 입력 조회는 `pay_method_id IS NOT NULL`인 Demand만 대상으로 하며 DB 상태를 변경하지 않습니다.
+   - 최소 참여자 수는 `CLUSTER_MIN_PARTICIPANTS`로 주입하며 기본값은 5명입니다.
+   - 미배정 Demand는 등록 후 최대 2일 동안 신규 Board 형성 대상입니다.
 
 3. **Seller Offer Matching and Seller Demand Analysis**
    - Seller Offer는 `product`, 매칭 결과는 `product_award_evaluation`을 사용합니다.
