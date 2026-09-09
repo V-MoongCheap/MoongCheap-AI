@@ -32,7 +32,10 @@ def classify_v2_1(row: pd.Series) -> tuple[str, str, float, str]:
         return base_key, base_name, base_confidence, "existing_v2_category"
     # Match the evidence scope used by the V2 detail report. Product names are
     # representative evidence, not enough on their own for a category move.
-    haystack = " ".join(_text(row.get(column)) for column in ("product_type", "functional_ingredients", "main_functionality"))
+    haystack = " ".join(_text(row.get(column)) for column in ("product_type", "functional_ingredients", "main_functionality", "name"))
+    dietary_terms = ("차전자피", "식이섬유", "가르시니아", "난소화성말토덱스트린", "프락토올리고당", "이눌린")
+    if any(term.casefold() in haystack.casefold() for term in dietary_terms):
+        return "DIETARY_FIBER", "식이섬유·체중관리", 0.75, "dietary_fiber_evidence"
     subgroup_rules = SUBGROUP_RULES["OTHER_FUNCTIONAL"][:6]
     for key, (_, keywords) in zip(SUBGROUP_KEY_ORDER, subgroup_rules):
         name = NEW_GROUPS[key][0]
@@ -56,10 +59,15 @@ def build_category_v2_1(frame: pd.DataFrame, output_dir: Path) -> dict[str, Any]
     tree = pd.DataFrame(tree_rows)
     tree.to_csv(output_dir / "service_category_tree_v2_1.csv", index=False, encoding="utf-8-sig")
 
-    mapping = data[["source_product_id", "name", "product_type", "v21_key", "v21_name", "mapping_confidence"]].rename(columns={"name": "product_name", "product_type": "source_category", "v21_key": "service_category_candidate_key", "v21_name": "service_category_name"})
+    mapping = data[["source_product_id", "name", "product_type", "v21_key", "v21_name", "mapping_confidence", "mapping_reason"]].rename(columns={"name": "product_name", "product_type": "source_category", "v21_key": "service_category_candidate_key", "v21_name": "service_category_name"})
     mapping.loc[mapping["source_category"] == "", "service_category_candidate_key"] = "UNMAPPED"
     mapping.loc[mapping["source_category"] == "", "service_category_name"] = "미분류"
     mapping.loc[mapping["source_category"] == "", "mapping_confidence"] = 0.0
+    missing_source = mapping["source_category"].eq("")
+    mapping.loc[missing_source, "service_category_candidate_key"] = data.loc[missing_source, "v21_key"]
+    mapping.loc[missing_source, "service_category_name"] = data.loc[missing_source, "v21_name"]
+    mapping.loc[missing_source, "mapping_confidence"] = data.loc[missing_source, "mapping_confidence"]
+    mapping["source_category_missing"] = missing_source
     mapping.to_csv(output_dir / "product_service_category_mapping_v2_1.csv", index=False, encoding="utf-8-sig")
 
     validation_rows = []

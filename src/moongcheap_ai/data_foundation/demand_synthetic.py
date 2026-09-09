@@ -17,11 +17,21 @@ REQUIRED_COLUMNS = (
     "extra_requirement",
     "desired_price_min",
     "desired_price_max",
+    "price_option",
     "quantity",
     "is_substitutable",
     "processed_at",
     "synthetic",
     "source_note",
+)
+
+# UI price choices are converted to the ERD's numeric bounds.
+PRICE_OPTIONS = (
+    ("UNDER_10000", 0, 10000),
+    ("10000_TO_30000", 10000, 30000),
+    ("30000_TO_50000", 30000, 50000),
+    ("50000_TO_100000", 50000, 100000),
+    ("OVER_100000", 100000, None),
 )
 
 SYNTHETIC_REQUIREMENTS = ("", "조건 없음", "예산 내 추천", "대체 가능한 상품", "세부 조건 확인 필요")
@@ -44,26 +54,31 @@ def _values_by_category(taxonomy_path: Path | None) -> dict[str, list[str]]:
     return result
 
 
-def prepare_demand_input(frame: pd.DataFrame) -> pd.DataFrame:
+def prepare_demand_input(frame: pd.DataFrame, *, allow_open_ended_price: bool = False) -> pd.DataFrame:
     """Normalize synthetic or Backend-exported Demand rows before labeling."""
     result = frame.copy()
     for column in REQUIRED_COLUMNS:
         if column not in result:
             result[column] = ""
-    text_columns = ["demand_id", "catalog_id", "category_id", "extra_requirement", "processed_at", "source_note"]
+    text_columns = ["demand_id", "catalog_id", "category_id", "extra_requirement", "processed_at", "source_note", "price_option"]
     for column in text_columns:
         result[column] = result[column].fillna("").astype(str).str.strip()
     for column in ("desired_price_min", "desired_price_max", "quantity"):
         result[column] = pd.to_numeric(result[column], errors="coerce")
     result["quantity"] = result["quantity"].fillna(1).clip(lower=1).round().astype(int)
     result["desired_price_min"] = result["desired_price_min"].fillna(0).clip(lower=0)
-    result["desired_price_max"] = result["desired_price_max"].fillna(result["desired_price_min"])
-    result["desired_price_max"] = result[["desired_price_min", "desired_price_max"]].max(axis=1)
+    if allow_open_ended_price:
+        bounded = result["desired_price_max"].notna()
+        result.loc[bounded, "desired_price_max"] = result.loc[bounded, ["desired_price_min", "desired_price_max"]].max(axis=1)
+    else:
+        result["desired_price_max"] = result["desired_price_max"].fillna(result["desired_price_min"])
+        result["desired_price_max"] = result[["desired_price_min", "desired_price_max"]].max(axis=1)
     result["is_substitutable"] = result["is_substitutable"].map(
         lambda value: str(value).strip().casefold() not in {"false", "0", "no", "n"}
     )
     result["synthetic"] = True
-    return result[list(REQUIRED_COLUMNS)]
+    extra_columns = [column for column in frame.columns if column not in REQUIRED_COLUMNS]
+    return result[list(REQUIRED_COLUMNS) + extra_columns]
 
 
 def generate_synthetic_demands(
@@ -87,8 +102,7 @@ def generate_synthetic_demands(
         category_id = str(product.get("category_id", "") or product.get("kan_code", "")).strip()
         options = values_by_category.get(category_id, [])
         requirement = rng.choice(options) if options else rng.choice(SYNTHETIC_REQUIREMENTS)
-        minimum = rng.choice([10000, 20000, 30000, 50000])
-        maximum = minimum + rng.choice([10000, 20000, 30000])
+        option_code, minimum, maximum = rng.choice(PRICE_OPTIONS)
         rows.append({
             "demand_id": f"synthetic-demand-{index + 1:05d}",
             "catalog_id": str(product[id_column]),
@@ -96,13 +110,16 @@ def generate_synthetic_demands(
             "extra_requirement": requirement,
             "desired_price_min": minimum,
             "desired_price_max": maximum,
+            "price_option": option_code,
             "quantity": rng.choice([1, 1, 1, 2, 3]),
             "is_substitutable": rng.choice([True, True, False]),
             "processed_at": "",
             "synthetic": True,
             "source_note": "synthetic mechanics fixture; not a user Demand or product fact",
         })
-    return prepare_demand_input(pd.DataFrame(rows))
+    prepared = prepare_demand_input(pd.DataFrame(rows), allow_open_ended_price=True)
+    prepared.attrs["price_options"] = {code: {"min": minimum, "max": maximum} for code, minimum, maximum in PRICE_OPTIONS}
+    return prepared
 
 
 def generate_from_catalog_file(

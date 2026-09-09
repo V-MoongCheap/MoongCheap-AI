@@ -1,0 +1,50 @@
+version: "v1"
+policy:
+  raw_data_local_only: true
+  external_sources_are_reference_only: true
+  taxonomy_auto_update: false
+sources:
+  mfds:
+    source_type: PRODUCT_FACT
+    local_path: data/interim/facet_discovery/i0030_products_clean_dedup.csv
+    role: product_verifiability
+    license: UNKNOWN
+    local_only: true
+  domeggook:
+    source_type: SELLER_LISTING
+    local_path: data/processed/domeggook/seller_offers_core.csv
+    role: commercial_salience
+    license: UNKNOWN
+    local_only: true
+  esci:
+    source_type: CONSUMER_SEARCH
+    local_path: data/processed/esci
+    role: consumer_salience_reference
+    license: SEE_SOURCE_REPOSITORY
+    local_only: true
+  xpqa:
+    source_type: CONSUMER_QA
+    local_path: data/raw/consumer_reference/xpqa
+    role: consumer_salience_reference
+    license: CDLA-Sharing-1.0
+    local_only: true
+  kuaisearch:
+    source_type: CONSUMER_SEARCH
+    local_path: data/raw/consumer_reference/kuaisearch
+    role: consumer_salience_reference
+    license: MIT
+    local_only: true
+    status: NOT_ACQUIRED
+  amazon_reviews:
+    source_type: CONSUMER_REVIEW
+    local_path: data/raw/facet_evidence/amazon_reviews
+    role: consumer_salience_reference
+    license: UNKNOWN
+    local_only: true
+    status: NOT_ACQUIRED
+  aihub:
+    source_type: KOREAN_EXPRESSION_REFERENCE
+    local_path: data/interim/facet_discovery/aihub_repeated_terms.csv
+    role: alias_expression_reference_only
+    license: UNKNOWN
+    local_only: true

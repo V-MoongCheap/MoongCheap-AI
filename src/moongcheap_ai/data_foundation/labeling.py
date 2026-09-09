@@ -124,9 +124,51 @@ class TaxonomyLoader:
     def encode(self, facet_values: dict[str, dict[str, Any]]) -> str:
         return "-".join(str(item["code"]) for item in facet_values.values())
 
+    def product_defaults(self, category_id: Any, rows: list[dict[str, Any]]) -> tuple[dict[str, dict[str, Any]], list[str]]:
+        """Convert mapped product facet evidence into taxonomy defaults."""
+        category = self.category(category_id)
+        if category is None:
+            return {}, [f"taxonomy category not found: {category_id}"]
+        defaults, warnings = self.resolve(category_id, "")
+        facets = {str(facet.get("name")): facet for facet in category.get("facets", [])}
+        for row in rows:
+            facet_name = str(row.get("facet_name", "")).strip()
+            source_field = str(row.get("source_field", "")).strip()
+            raw_value = str(row.get("value", "")).strip()
+            facet = facets.get(facet_name)
+            if facet is None and source_field:
+                facet_name = source_field
+                facet = facets.get(facet_name)
+            if not facet or not raw_value or str(row.get("mapping_status", "MAPPED")).upper() != "MAPPED":
+                continue
+            matches = []
+            for value in facet.get("values", []):
+                aliases = [value.get("value", ""), *(value.get("aliases") or [])]
+                if any(_normalise(alias) == _normalise(raw_value) for alias in aliases):
+                    matches.append(value)
+            if len(matches) == 1:
+                value = matches[0]
+                defaults[facet_name] = {"code": int(value["code"]), "value": value.get("value", ""), "matched_alias": raw_value}
+            elif not matches:
+                warnings.append(f"product facet value not found in taxonomy: {facet_name}={raw_value}")
+        return defaults, warnings
+
 
 def load_taxonomy(path: Path) -> TaxonomyLoader:
     return TaxonomyLoader.from_path(path)
+
+
+def build_product_facet_map(frame: pd.DataFrame) -> dict[str, list[dict[str, Any]]]:
+    """Index mapped product facets by source ID and local catalog-seed ID."""
+    result: dict[str, list[dict[str, Any]]] = {}
+    normalized = frame.fillna("")
+    if "mapping_status" in normalized:
+        normalized = normalized[normalized["mapping_status"].astype(str).str.upper().eq("MAPPED")]
+    for payload in normalized.to_dict(orient="records"):
+        source_id = str(payload.get("source_product_id", "")).strip()
+        for key in ([source_id, f"catalog-seed-{source_id}"] if source_id else []):
+            result.setdefault(key, []).append(payload)
+    return result
 
 
 def label_demand(demand_id: int | str, catalog_id: int | str, extra_requirement: str,
@@ -138,14 +180,21 @@ def label_demand(demand_id: int | str, catalog_id: int | str, extra_requirement:
 
 
 def label_demands(frame: pd.DataFrame, loader: TaxonomyLoader,
-                  catalog_category_map: dict[str, Any] | None = None) -> pd.DataFrame:
+                  catalog_category_map: dict[str, Any] | None = None,
+                  product_facet_map: dict[str, list[dict[str, Any]]] | None = None) -> pd.DataFrame:
     """Batch label demands through ERD's catalog_id -> category_id path."""
     rows: list[dict[str, Any]] = []
     for _, demand in frame.iterrows():
         category_id = demand.get("category_id", "") or demand.get("kan_code", "")
         if not category_id and catalog_category_map:
             category_id = catalog_category_map.get(str(demand.get("catalog_id", "")), "")
-        facet_values, warnings = loader.resolve(category_id, demand.get("extra_requirement", ""))
+        defaults, default_warnings = loader.product_defaults(category_id, (product_facet_map or {}).get(str(demand.get("catalog_id", "")), []))
+        requested, request_warnings = loader.resolve(category_id, demand.get("extra_requirement", ""))
+        facet_values = defaults.copy()
+        for facet_name, value in requested.items():
+            if int(value.get("code", 0)) != 0:
+                facet_values[facet_name] = value
+        warnings = default_warnings + request_warnings
         requirement = str(demand.get("extra_requirement", "") or "").strip()
         unresolved_items = []
         if requirement and any("did not match" in warning for warning in warnings):

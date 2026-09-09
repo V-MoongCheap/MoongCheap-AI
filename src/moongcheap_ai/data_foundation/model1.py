@@ -17,7 +17,7 @@ from .category_v2_1 import classify_v2_1
 
 MODEL_COLUMNS = ["category_key", "category_name", "source_product_id", "product_name", "source_category", "product_form", "functional_ingredients", "regulated_function", "intake_method", "sampling_reason"]
 MODEL_OUTPUT_COLUMNS = ["category_key", "category_name", "facet_id_candidate", "name", "definition", "value", "alias", "source_product_id", "source_field", "source_text", "status"]
-PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "facet_discovery_v0.txt"
+PROMPT_PATH = Path(__file__).resolve().parents[3] / "prompts" / "facet_discovery_v0.txt"
 
 
 class ModelCallError(RuntimeError):

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.data_foundation.labeling import label_demands, load_taxonomy
+from moongcheap_ai.data_foundation.labeling import build_product_facet_map, label_demands, load_taxonomy
 
 
 def main() -> None:
@@ -15,6 +15,7 @@ def main() -> None:
     parser.add_argument("--taxonomy", type=Path, default=Path("data/processed/facet_discovery/facet_taxonomy_v0.json"))
     parser.add_argument("--output", type=Path, default=Path("data/processed/demands/demand_labeled_v0.csv"))
     parser.add_argument("--catalog", type=Path, help="Backend product_catalog export with id and category_id")
+    parser.add_argument("--product-facets", type=Path, help="Product facet mapping with source_product_id, facet_name, value, mapping_status")
     parser.add_argument("--review-output", type=Path, default=Path("data/processed/demands/demand_label_review_queue_v0.csv"))
     parser.add_argument("--failure-output", type=Path, default=Path("data/processed/demands/labeling_failures_v0.csv"))
     parser.add_argument("--matching-output", type=Path, default=Path("data/processed/demands/facet_matching_report_v0.csv"))
@@ -33,9 +34,15 @@ def main() -> None:
         id_column = "id" if "id" in catalog.columns else "catalog_seed_id" if "catalog_seed_id" in catalog.columns else None
         if not id_column or "category_id" not in catalog.columns:
             raise SystemExit("catalog export must contain id (or catalog_seed_id) and Backend category_id")
-        catalog_map = dict(zip(catalog[id_column].astype(str), catalog["category_id"].astype(str)))
+            catalog_map = dict(zip(catalog[id_column].astype(str), catalog["category_id"].astype(str)))
+    product_facet_map = None
+    if args.product_facets:
+        if not args.product_facets.exists():
+            raise SystemExit(f"product facet mapping not found: {args.product_facets}")
+        product_facet_frame = pd.read_parquet(args.product_facets) if args.product_facets.suffix.lower() == ".parquet" else pd.read_csv(args.product_facets, dtype=str)
+        product_facet_map = build_product_facet_map(product_facet_frame)
     loader = load_taxonomy(args.taxonomy)
-    result = label_demands(demands.fillna(""), loader, catalog_map)
+    result = label_demands(demands.fillna(""), loader, catalog_map, product_facet_map)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     result.to_csv(args.output, index=False, encoding="utf-8-sig")
     matching_rows = []

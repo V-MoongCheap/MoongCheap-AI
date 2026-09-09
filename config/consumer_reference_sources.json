@@ -1,0 +1,36 @@
+{
+  "policy": {
+    "aihub_instruction_paths_ignored": true,
+    "raw_data_local_only": true,
+    "reviews_search_queries_and_qa_are_not_demand_ground_truth": true
+  },
+  "sources": [
+    {
+      "id": "esci",
+      "url": "https://github.com/amazon-science/esci-data",
+      "local_path": "data/datasets/esci",
+      "type": "SEARCH",
+      "role": "expression_reference_only",
+      "status": "available_local"
+    },
+    {
+      "id": "xpqa",
+      "url": "https://github.com/amazon-science/contextual-product-qa",
+      "local_path": "data/raw/consumer_reference/xpqa",
+      "type": "QA",
+      "role": "expression_reference_only",
+      "license": "CDLA-Sharing-1.0",
+      "status": "downloaded_local_only"
+    },
+    {
+      "id": "kuaisearch",
+      "url": "https://huggingface.co/datasets/benchen4395/KuaiSearch",
+      "local_path": "data/raw/consumer_reference/kuaisearch",
+      "type": "SEARCH",
+      "role": "expression_reference_only",
+      "license": "MIT",
+      "status": "not_downloaded",
+      "reason": "Full corpus is too large; Lite-only acquisition requires explicit review."
+    }
+  ]
+}

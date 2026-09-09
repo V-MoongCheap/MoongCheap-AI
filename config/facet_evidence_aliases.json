@@ -1,0 +1,31 @@
+{
+  "product_form": {
+    "tablet": ["정제", "타블렛", "tablet"],
+    "capsule": ["캡슐", "hard capsule", "soft capsule"],
+    "powder": ["분말", "가루", "powder"],
+    "liquid": ["액상", "액체", "liquid"],
+    "stick": ["스틱", "stick"]
+  },
+  "intake_frequency": {
+    "once_daily": ["하루 한 번", "1일 1회", "once a day"],
+    "multiple_daily": ["하루 두 번", "1일 2회", "하루 2회"]
+  },
+  "sugar_type": {
+    "sugar_free": ["무설탕", "sugar free", "sugar-free"],
+    "low_sugar": ["저당", "low sugar"]
+  },
+  "odor": {
+    "fishy": ["비린내", "fishy smell", "생선 냄새"],
+    "low_odor": ["냄새 적은", "저취", "low odor"],
+    "odorless": ["무취", "냄새 없음", "odorless"]
+  },
+  "capsule_size": {
+    "small": ["작은 알약", "삼키기 쉬운", "small pill"],
+    "large": ["큰 알약", "large pill"]
+  },
+  "storage_type": {
+    "refrigerated": ["냉장 보관", "refrigerate", "keep refrigerated"]
+  },
+  "ingredient_presence": {},
+  "ingredient_absence": {}
+}

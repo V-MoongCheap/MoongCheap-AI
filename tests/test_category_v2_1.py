@@ -10,13 +10,16 @@ def test_v21_promotes_only_approved_other_candidates():
     assert name == "피부·콜라겐"
 
 
-def test_v21_keeps_ids_blank_and_preserves_unmapped(tmp_path):
+def test_v21_keeps_ids_blank_and_retains_classification_when_source_category_is_missing(tmp_path):
     frame = pd.DataFrame([
         {"source_product_id": "1", "name": "콜라겐", "product_type": "콜라겐", "functional_ingredients": "콜라겐", "main_functionality": "피부", "product_form": "정제"},
         {"source_product_id": "2", "name": "미분류", "product_type": "", "functional_ingredients": "", "main_functionality": "", "product_form": "분말"},
     ])
     result = build_category_v2_1(frame, tmp_path)
-    assert result["unmapped"] == 1
+    assert result["unmapped"] == 0
+    mapping = pd.read_csv(tmp_path / "product_service_category_mapping_v2_1.csv", dtype=str).fillna("")
+    assert mapping.loc[mapping["source_product_id"] == "2", "service_category_candidate_key"].iloc[0] == "OTHER_FUNCTIONAL"
+    assert mapping.loc[mapping["source_product_id"] == "2", "source_category_missing"].iloc[0] == "True"
     tree = pd.read_csv(tmp_path / "service_category_tree_v2_1.csv", dtype=str).fillna("")
     assert tree["category_candidate_key"].str.startswith("health-functional-food").all()
     assert tree["category_candidate_key"].str.contains("skin_collagen").any()
