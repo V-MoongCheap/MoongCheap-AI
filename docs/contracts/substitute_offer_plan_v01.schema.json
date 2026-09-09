@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moongcheap.local/contracts/substitute-offer-plan-v0.1.schema.json",
+  "title": "Substitute Offer Plan v0.1",
+  "description": "Minimal mutation DTO. Ranking evidence remains in AI-owned diagnostics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "plannedAt",
+    "ruleVersion",
+    "proposals"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "substitute-offer-plan.v0.1"},
+    "plannedAt": {"type": "string", "format": "date-time"},
+    "ruleVersion": {"type": "string", "minLength": 1, "maxLength": 200},
+    "proposals": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/proposal"}
+    }
+  },
+  "$defs": {
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "demandId",
+        "expectedOriginalCatalogId",
+        "substituteCatalogId",
+        "demandBoardId"
+      ],
+      "properties": {
+        "demandId": {"type": "integer", "minimum": 1},
+        "expectedOriginalCatalogId": {"type": "integer", "minimum": 1},
+        "substituteCatalogId": {"type": "integer", "minimum": 1},
+        "demandBoardId": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

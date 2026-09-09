@@ -43,6 +43,7 @@ class DemandInput:
     desired_price_min: int | None = None
     desired_price_max: int | None = None
     quantity: int | None = None
+    extra_requirement: str | None = None
     is_substitutable: bool | None = None
     status: str | None = None
     label: str | None = None
@@ -60,6 +61,7 @@ class DemandInput:
             desired_price_min=value.get("desired_price_min"),
             desired_price_max=value.get("desired_price_max"),
             quantity=value.get("quantity"),
+            extra_requirement=value.get("extra_requirement"),
             is_substitutable=value.get("is_substitutable"),
             status=value.get("status"),
             label=value.get("label"),

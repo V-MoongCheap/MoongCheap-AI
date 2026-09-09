@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cronjob.yaml
+  - serviceaccount.yaml
+
+# Non-secret settings only. Keep the generated name hash enabled.
+configMapGenerator:
+  - name: demand-clustering-config
+    literals:
+      - BACKEND_BASE_URL=https://backend.invalid
+      - MFDS_CATALOG_PROFILES_PATH=/artifacts/releases/replace-with-artifact-version/catalog_profiles.csv
+      - DEMAND_TAXONOMY_PATH=/artifacts/releases/replace-with-artifact-version/taxonomy.json
+      - DEMAND_CONSTRAINT_RULES_PATH=/app/config/demand_constraint_rules.json
+      - DEMAND_CONSTRAINT_ALIASES_PATH=/app/config/demand_constraint_aliases.json
+      - E5_MODEL_PATH=/models/multilingual-e5-small/snapshots/614241f622f53c4eeff9890bdc4f31cfecc418b3
+      - E5_BATCH_SIZE=32
+      - CLUSTER_MIN_PARTICIPANTS=5
+      - BACKEND_HTTP_TIMEOUT_SECONDS=15
+      - POSTGRES_CONNECT_TIMEOUT_SECONDS=10
+      - OMP_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - TOKENIZERS_PARALLELISM=false
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HOME=/tmp/huggingface

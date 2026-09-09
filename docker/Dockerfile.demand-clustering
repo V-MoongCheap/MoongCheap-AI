@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1
+FROM ghcr.io/astral-sh/uv:0.10.7 AS uv
+FROM python:3.13.12-slim-trixie AS builder
+
+COPY --from=uv /uv /uvx /bin/
+ENV UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
+WORKDIR /build
+
+COPY packaging/demand-clustering/pyproject.toml packaging/demand-clustering/uv.lock ./packaging/demand-clustering/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --project packaging/demand-clustering --locked --no-dev --extra embeddings --no-install-project
+COPY src ./src
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --project packaging/demand-clustering --locked --no-dev --extra embeddings --no-editable
+
+FROM python:3.13.12-slim-trixie AS runtime
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ca-certificates libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    HF_HOME=/tmp/huggingface \
+    TOKENIZERS_PARALLELISM=false \
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    MFDS_CATALOG_PROFILES_PATH=/artifacts/catalog_profiles.csv \
+    DEMAND_TAXONOMY_PATH=/artifacts/taxonomy.json \
+    DEMAND_CONSTRAINT_RULES_PATH=/app/config/demand_constraint_rules.json \
+    DEMAND_CONSTRAINT_ALIASES_PATH=/app/config/demand_constraint_aliases.json \
+    E5_MODEL_PATH=/models/multilingual-e5-small
+
+WORKDIR /app
+COPY --from=builder /opt/venv /opt/venv
+COPY config/demand_constraint_rules.json config/demand_constraint_aliases.json ./config/
+
+USER 65534:65534
+ENTRYPOINT ["demand-clustering-batch"]

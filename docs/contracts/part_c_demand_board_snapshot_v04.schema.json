@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moongcheap.local/contracts/part-c-demand-board-snapshot-v0.4.schema.json",
+  "title": "Part C Demand Board Simulation Snapshot v0.4",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "dataClassification",
+    "generatedAt",
+    "consumerNotice",
+    "sourceSummary",
+    "simulationPolicy",
+    "batchTimeline",
+    "demandBoards",
+    "invariantChecks",
+    "sourceArtifacts"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "part-c-demand-board-snapshot.v0.4"},
+    "dataClassification": {
+      "const": "SYNTHETIC_TIMING_AND_PRICE_WITH_GROUNDED_PRODUCT_EVIDENCE"
+    },
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "consumerNotice": {"type": "string", "minLength": 1},
+    "sourceSummary": {"type": "object"},
+    "simulationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minParticipants",
+        "batchIntervalMinutes",
+        "simulationStartAt",
+        "arrivalWindowHours",
+        "arrivalWindowEndExclusive",
+        "registrationTimeOrigin",
+        "clusteringWindowHours",
+        "demandLifetimeDays",
+        "boardLifetimeDays",
+        "priceOrigin",
+        "catalogProfileOrigin",
+        "priceRule",
+        "profileRule",
+        "substituteConfirmation",
+        "participantCountIncludesPendingOffers",
+        "sellerDataIncluded",
+        "catalogEligibilityPolicy",
+        "functionEvidencePolicy",
+        "productRetrievalPolicy",
+        "functionCoveragePolicy",
+        "textScorerVersion"
+      ],
+      "properties": {
+        "minParticipants": {"type": "integer", "minimum": 1},
+        "batchIntervalMinutes": {"const": 60},
+        "simulationStartAt": {"type": "string", "format": "date-time"},
+        "arrivalWindowHours": {"type": "integer", "minimum": 1},
+        "arrivalWindowEndExclusive": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "registrationTimeOrigin": {
+          "const": "SYNTHETIC_STABLE_HASH_WITHIN_ARRIVAL_WINDOW"
+        },
+        "clusteringWindowHours": {"const": 48},
+        "demandLifetimeDays": {"type": "integer", "minimum": 1},
+        "boardLifetimeDays": {"type": "integer", "minimum": 1},
+        "priceOrigin": {"const": "SYNTHETIC_CANONICAL_7_BAND_HASH"},
+        "catalogProfileOrigin": {
+          "const": "MFDS_I0030_I2710_FUNCTION_EVIDENCE"
+        },
+        "priceRule": {"type": "string", "minLength": 1},
+        "profileRule": {"type": "string", "minLength": 1},
+        "substituteConfirmation": {"type": "string", "minLength": 1},
+        "participantCountIncludesPendingOffers": {"const": false},
+        "sellerDataIncluded": {"const": false},
+        "catalogEligibilityPolicy": {"type": "string", "minLength": 1},
+        "functionEvidencePolicy": {"type": "string", "minLength": 1},
+        "productRetrievalPolicy": {"type": "string", "minLength": 1},
+        "functionCoveragePolicy": {
+          "const": "IDENTITY_ONLY; all unapproved directional relations disabled"
+        },
+        "textScorerVersion": {
+          "const": "multilingual-e5-small-preference-ranker.v0.4"
+        }
+      }
+    },
+    "batchTimeline": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "batchNumber",
+          "batchId",
+          "plannedAt",
+          "newlyRegisteredDemandCount",
+          "unassignedInputCount",
+          "newBoardCount",
+          "substituteProposalCount",
+          "expiredDemandCount",
+          "cumulativeStateCounts"
+        ]
+      }
+    },
+    "demandBoards": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/demandBoard"}
+    },
+    "invariantChecks": {"$ref": "#/$defs/invariantChecks"},
+    "sourceArtifacts": {"$ref": "#/$defs/sourceArtifacts"}
+  },
+  "$defs": {
+    "demandBoard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "demandBoardId",
+        "catalogId",
+        "categoryId",
+        "taxonomyVersion",
+        "priceMin",
+        "priceMax",
+        "participantCount",
+        "pendingSubstituteOfferCount",
+        "status",
+        "createdAt",
+        "saleEndAt",
+        "directDemandIds",
+        "pendingSubstituteDemandIds"
+      ],
+      "properties": {
+        "demandBoardId": {"type": "integer", "minimum": 1},
+        "catalogId": {"type": "integer", "minimum": 1},
+        "categoryId": {"type": "string", "minLength": 1},
+        "taxonomyVersion": {"type": "string", "minLength": 1},
+        "priceMin": {"type": "integer", "minimum": 0},
+        "priceMax": {"type": "integer", "minimum": 0},
+        "participantCount": {"type": "integer", "minimum": 0},
+        "pendingSubstituteOfferCount": {"type": "integer", "minimum": 0},
+        "status": {"const": "GB_GATHERING"},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "saleEndAt": {"type": "string", "format": "date-time"},
+        "directDemandIds": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "uniqueItems": true
+        },
+        "pendingSubstituteDemandIds": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "invariantChecks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "sourceDemandCountChecked",
+        "proposalCountChecked",
+        "boardCountChecked",
+        "runtimeReviewRows",
+        "participantCountIncludesPendingOffers",
+        "relationAssistedProposalCount"
+      ],
+      "properties": {
+        "status": {"const": "PASSED"},
+        "sourceDemandCountChecked": {"const": 5000},
+        "proposalCountChecked": {"type": "integer", "minimum": 0},
+        "boardCountChecked": {"type": "integer", "minimum": 0},
+        "runtimeReviewRows": {"const": 0},
+        "participantCountIncludesPendingOffers": {"const": false},
+        "relationAssistedProposalCount": {"const": 0}
+      }
+    },
+    "sourceArtifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "demandInputSha256",
+        "taxonomySha256",
+        "groundedProfilesSha256",
+        "topCandidatesSha256",
+        "retrievalManifestSha256",
+        "modelId",
+        "modelRevision",
+        "modelDevice"
+      ],
+      "properties": {
+        "demandInputSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "taxonomySha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "groundedProfilesSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "topCandidatesSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "retrievalManifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "modelId": {"const": "intfloat/multilingual-e5-small"},
+        "modelRevision": {"type": "string", "minLength": 1},
+        "modelDevice": {"const": "cpu"}
+      }
+    }
+  }
+}

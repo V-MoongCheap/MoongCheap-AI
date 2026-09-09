@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moongcheap.local/contracts/part-c-demand-board-snapshot-v0.2.schema.json",
+  "title": "Part C Hourly Demand Board Simulation Snapshot v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "dataClassification",
+    "generatedAt",
+    "consumerNotice",
+    "sourceSummary",
+    "simulationPolicy",
+    "batchTimeline",
+    "demandBoards"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "part-c-demand-board-snapshot.v0.2"},
+    "dataClassification": {
+      "const": "SYNTHETIC_MECHANICS_ONLY_NOT_PRODUCT_FACT"
+    },
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "consumerNotice": {"type": "string", "minLength": 1},
+    "sourceSummary": {"type": "object"},
+    "simulationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minParticipants",
+        "batchIntervalMinutes",
+        "simulationStartAt",
+        "arrivalWindowHours",
+        "arrivalWindowEndExclusive",
+        "registrationTimeOrigin",
+        "clusteringWindowHours",
+        "demandLifetimeDays",
+        "boardLifetimeDays",
+        "priceOrigin",
+        "catalogProfileOrigin",
+        "priceRule",
+        "profileRule",
+        "substituteConfirmation",
+        "participantCountIncludesPendingOffers",
+        "sellerDataIncluded"
+      ],
+      "properties": {
+        "minParticipants": {"type": "integer", "minimum": 1},
+        "batchIntervalMinutes": {"const": 60},
+        "simulationStartAt": {"type": "string", "format": "date-time"},
+        "arrivalWindowHours": {"type": "integer", "minimum": 1},
+        "arrivalWindowEndExclusive": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "registrationTimeOrigin": {
+          "const": "SYNTHETIC_STABLE_HASH_WITHIN_ARRIVAL_WINDOW"
+        },
+        "clusteringWindowHours": {"const": 48},
+        "demandLifetimeDays": {"type": "integer", "minimum": 1},
+        "boardLifetimeDays": {"type": "integer", "minimum": 1},
+        "priceOrigin": {"const": "SYNTHETIC_CANONICAL_7_BAND_HASH"},
+        "catalogProfileOrigin": {
+          "const": "SYNTHETIC_HASH_NOT_PRODUCT_FACT"
+        },
+        "priceRule": {"type": "string", "minLength": 1},
+        "profileRule": {"type": "string", "minLength": 1},
+        "substituteConfirmation": {"type": "string", "minLength": 1},
+        "participantCountIncludesPendingOffers": {"const": false},
+        "sellerDataIncluded": {"const": false}
+      }
+    },
+    "batchTimeline": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/batch"}
+    },
+    "demandBoards": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/demandBoard"}
+    }
+  },
+  "$defs": {
+    "batch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batchNumber",
+        "batchId",
+        "plannedAt",
+        "newlyRegisteredDemandCount",
+        "unassignedInputCount",
+        "existingBoardAssignedCount",
+        "newBoardCount",
+        "newBoardIds",
+        "newBoardAssignedCount",
+        "substituteProposalCount",
+        "expiredDemandCount",
+        "cumulativeStateCounts"
+      ],
+      "properties": {
+        "batchNumber": {"type": "integer", "minimum": 1},
+        "batchId": {"type": "string", "minLength": 1},
+        "plannedAt": {"type": "string", "format": "date-time"},
+        "newlyRegisteredDemandCount": {"type": "integer", "minimum": 0},
+        "unassignedInputCount": {"type": "integer", "minimum": 0},
+        "existingBoardAssignedCount": {"type": "integer", "minimum": 0},
+        "newBoardCount": {"type": "integer", "minimum": 0},
+        "newBoardIds": {
+          "type": "array",
+          "items": {"type": "integer"}
+        },
+        "newBoardAssignedCount": {"type": "integer", "minimum": 0},
+        "substituteProposalCount": {"type": "integer", "minimum": 0},
+        "expiredDemandCount": {"type": "integer", "minimum": 0},
+        "cumulativeStateCounts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "demandBoard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "demandBoardId",
+        "catalogId",
+        "catalogDisplayName",
+        "categoryId",
+        "taxonomyVersion",
+        "priceMin",
+        "priceMax",
+        "participantCount",
+        "pendingSubstituteOfferCount",
+        "status",
+        "createdAt",
+        "saleEndAt",
+        "directDemandIds",
+        "pendingSubstituteDemandIds",
+        "facetValues",
+        "semanticText",
+        "profileOrigin"
+      ],
+      "properties": {
+        "demandBoardId": {"type": "integer"},
+        "catalogId": {"type": "integer"},
+        "catalogDisplayName": {"type": "string"},
+        "categoryId": {"type": "string", "minLength": 1},
+        "taxonomyVersion": {"type": "string", "minLength": 1},
+        "priceMin": {"type": "integer", "minimum": 0},
+        "priceMax": {"type": "integer", "minimum": 0},
+        "participantCount": {"type": "integer", "minimum": 0},
+        "pendingSubstituteOfferCount": {"type": "integer", "minimum": 0},
+        "status": {"const": "GB_GATHERING"},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "saleEndAt": {"type": "string", "format": "date-time"},
+        "directDemandIds": {
+          "type": "array",
+          "items": {"type": "integer"}
+        },
+        "pendingSubstituteDemandIds": {
+          "type": "array",
+          "items": {"type": "integer"}
+        },
+        "facetValues": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 1}
+        },
+        "semanticText": {"type": "string"},
+        "profileOrigin": {"const": "SYNTHETIC_HASH_NOT_PRODUCT_FACT"}
+      }
+    }
+  }
+}

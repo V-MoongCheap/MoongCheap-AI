@@ -1,0 +1,16 @@
+{
+  "version": "facet-alias-spike-v0.5-v026-reviewed-coverage",
+  "status": "EXPERIMENTAL_DEVELOPMENT",
+  "aliases": [
+    {"facet_name":"product_form","canonical_value":"정","surfaces":["정제"]},
+    {"facet_name":"product_form","canonical_value":"바","surfaces":["바형"]},
+    {"facet_name":"daily_frequency","canonical_value":"1일 1회","surfaces":["1일1회","하루 1회","하루에 1회","하루1회","하루 한 번","하루에 한 번","하루에 단 한 번","하루 한번","하루에 한번","하루 1번","하루에 1번","하루에 딱 1회","하루 딱 1회"]},
+    {"facet_name":"daily_frequency","canonical_value":"1일 2회","surfaces":["1일2회","하루 2회","하루에 2회","하루2회","하루 두 번","하루에 두 번","매일 두 번","매일 두 번씩","하루 두번","하루에 두번","하루 2번","하루에 2번"]},
+    {"facet_name":"daily_frequency","canonical_value":"1일 3회","surfaces":["1일3회","하루 3회","하루에 3회","하루3회","하루 세 번","하루에 세 번","하루 세번","하루에 세번","하루 3번","하루에 3번"]},
+    {"facet_name":"daily_frequency","canonical_value":"1일 4회","surfaces":["1일4회","하루 4회","하루에 4회","하루4회","하루 네 번","하루에 네 번","하루 네번","하루에 네번","하루 4번","하루에 4번"]},
+    {"facet_name":"daily_frequency","canonical_value":"1일 5회","surfaces":["1일5회","하루 5회","하루에 5회","하루5회","하루 다섯 번","하루에 다섯 번","하루 다섯번","하루에 다섯번","하루 5번","하루에 5번"]},
+    {"facet_name":"daily_frequency","canonical_value":"11일 1회","surfaces":["11일에 1회"]},
+    {"facet_name":"functional_ingredients","canonical_value":"프로바이오틱스, 아연","surfaces":["프로바이오틱스와 아연","프로바이오틱스와아연","프로바이오틱스 및 아연","프로바이오틱스·아연","프로바이오틱스랑 아연","프로바이오틱스랑아연","프로바이오틱스이랑 아연"]},
+    {"facet_name":"functional_ingredients","canonical_value":"루테인 제품","surfaces":["루테인"]}
+  ]
+}

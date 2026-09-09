@@ -7,7 +7,8 @@ from collections.abc import Mapping
 
 
 CLUSTER_MIN_PARTICIPANTS_ENV = "CLUSTER_MIN_PARTICIPANTS"
-DEFAULT_CLUSTER_MIN_PARTICIPANTS = 5
+MIN_CLUSTER_PARTICIPANTS = 5
+DEFAULT_CLUSTER_MIN_PARTICIPANTS = MIN_CLUSTER_PARTICIPANTS
 
 
 def load_min_cluster_participants(
@@ -28,6 +29,9 @@ def load_min_cluster_participants(
             f"{CLUSTER_MIN_PARTICIPANTS_ENV} must be an integer"
         ) from error
 
-    if value < 1:
-        raise ValueError(f"{CLUSTER_MIN_PARTICIPANTS_ENV} must be positive")
+    if value < MIN_CLUSTER_PARTICIPANTS:
+        raise ValueError(
+            f"{CLUSTER_MIN_PARTICIPANTS_ENV} must be at least "
+            f"{MIN_CLUSTER_PARTICIPANTS}"
+        )
     return value

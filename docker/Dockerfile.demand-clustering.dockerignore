@@ -1,0 +1,14 @@
+# Allowlist the inputs for this image; never send secrets, datasets, or models.
+**
+!packaging/
+!packaging/demand-clustering/
+!packaging/demand-clustering/pyproject.toml
+!packaging/demand-clustering/uv.lock
+!src/
+!src/moongcheap_ai/
+!src/moongcheap_ai/**
+!config/
+!config/demand_constraint_rules.json
+!config/demand_constraint_aliases.json
+**/__pycache__/
+**/*.py[cod]

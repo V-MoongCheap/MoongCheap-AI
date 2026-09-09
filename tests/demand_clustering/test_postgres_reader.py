@@ -72,6 +72,7 @@ class PostgreSQLClusteringInputReaderTest(unittest.TestCase):
                     board_columns,
                     [tuple(self.board_row[column] for column in board_columns)],
                 ),
+                (("demand_id", "demand_board_id"), [(1001, 3001)]),
             ]
         )
         connection = FakeConnection(cursor)
@@ -84,7 +85,15 @@ class PostgreSQLClusteringInputReaderTest(unittest.TestCase):
 
         self.assertEqual(connection.cursor_calls, 1)
         self.assertEqual([demand.id for demand in batch.demands], [1001])
+        self.assertEqual(
+            batch.demands[0].extra_requirement,
+            "캡슐형이면 좋겠어요.",
+        )
         self.assertEqual([board.id for board in batch.boards], [3001])
+        self.assertEqual(
+            batch.rejected_demand_board_pairs,
+            frozenset({(1001, 3001)}),
+        )
         self.assertEqual(
             batch.demands[0].created_at.utcoffset(),
             timedelta(hours=9),
@@ -99,12 +108,15 @@ class PostgreSQLClusteringInputReaderTest(unittest.TestCase):
 
         reader.read(as_of=self.as_of)
 
-        self.assertEqual(len(cursor.executions), 2)
+        self.assertEqual(len(cursor.executions), 3)
         demand_sql, demand_params = cursor.executions[0]
         board_sql, board_params = cursor.executions[1]
+        rejection_sql, rejection_params = cursor.executions[2]
         self.assertIn('"pay_method_id" IS NOT NULL', demand_sql)
         self.assertIn('"demand_board_id" IS NULL', demand_sql)
-        self.assertIn('"processed_at" IS NOT NULL', demand_sql)
+        self.assertIn('"extra_requirement"', demand_sql)
+        self.assertNotIn('"label" IS NOT NULL', demand_sql)
+        self.assertNotIn('"processed_at" IS NOT NULL', demand_sql)
         self.assertIn("INTERVAL '2 days'", demand_sql)
         self.assertNotIn("FOR UPDATE", demand_sql)
         self.assertIn('"sale_end_at" > %(as_of)s', board_sql)
@@ -117,6 +129,53 @@ class PostgreSQLClusteringInputReaderTest(unittest.TestCase):
             board_params,
             {"status": "GB_GATHERING", "as_of": self.as_of},
         )
+        self.assertIn('FROM "reject_history"', rejection_sql)
+        self.assertIn('"demand_id" = ANY(%(demand_ids)s)', rejection_sql)
+        self.assertIn('"demand_board_id" = ANY(%(board_ids)s)', rejection_sql)
+        self.assertEqual(rejection_params, {
+            "demand_ids": [1001],
+            "board_ids": [3001],
+        })
+        # A rejection made after the invocation began must remain visible.
+        self.assertNotIn("as_of", rejection_sql)
+        self.assertNotIn("created_at", rejection_sql)
+        self.assertNotIn("FOR UPDATE", rejection_sql)
+
+    def test_empty_rejection_history_keeps_candidates(self) -> None:
+        reader, _, cursor = self.make_reader()
+        cursor._datasets[2] = (("demand_id", "demand_board_id"), [])
+
+        batch = reader.read(as_of=self.as_of)
+
+        self.assertEqual(batch.rejected_demand_board_pairs, frozenset())
+        self.assertEqual([demand.id for demand in batch.demands], [1001])
+        self.assertEqual([board.id for board in batch.boards], [3001])
+
+    def test_skips_history_read_when_no_pairs_can_be_proposed(self) -> None:
+        for empty_index in (0, 1):
+            with self.subTest(empty_index=empty_index):
+                reader, _, cursor = self.make_reader()
+                columns, _ = cursor._datasets[empty_index]
+                cursor._datasets[empty_index] = (columns, [])
+
+                batch = reader.read(as_of=self.as_of)
+
+                self.assertEqual(batch.rejected_demand_board_pairs, frozenset())
+                self.assertEqual(len(cursor.executions), 2)
+
+    def test_history_read_failure_is_not_treated_as_no_rejections(self) -> None:
+        reader, _, cursor = self.make_reader()
+        execute = cursor.execute
+
+        def denied_history_read(query, params):
+            if 'FROM "reject_history"' in query:
+                raise RuntimeError("reject_history is unavailable")
+            return execute(query, params)
+
+        cursor.execute = denied_history_read
+
+        with self.assertRaisesRegex(RuntimeError, "reject_history"):
+            reader.read(as_of=self.as_of)
 
     def test_rejects_as_of_without_timezone_before_querying(self) -> None:
         reader, connection, cursor = self.make_reader()

@@ -1,0 +1,101 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: demand-clustering-job
+  labels:
+    app.kubernetes.io/name: demand-clustering-job
+    app.kubernetes.io/component: batch
+    app.kubernetes.io/part-of: moongcheap-ai
+spec:
+  # Initial handoff values; infrastructure confirms the final schedule/deadlines.
+  schedule: "15 * * * *"
+  timeZone: Asia/Seoul
+  suspend: true
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: demand-clustering-job
+            app.kubernetes.io/component: batch
+            app.kubernetes.io/part-of: moongcheap-ai
+        spec:
+          # This selects the AI node pool, not one particular hostname.
+          nodeSelector:
+            workload: ai
+            kubernetes.io/os: linux
+            kubernetes.io/arch: amd64
+          tolerations:
+            - key: workload
+              operator: Equal
+              value: ai
+              effect: NoSchedule
+          restartPolicy: Never
+          serviceAccountName: demand-clustering-job
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: demand-clustering-job
+              image: demand-clustering-job:replace-with-git-sha
+              imagePullPolicy: IfNotPresent
+              command: ["demand-clustering-batch"]
+              envFrom:
+                - configMapRef:
+                    name: demand-clustering-config
+              env:
+                - name: SHARED_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-batch-reader-database
+                      key: url
+                - name: BACKEND_INTERNAL_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-backend-internal-key
+                      key: internal-key
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 3Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: artifacts
+                  mountPath: /artifacts
+                  readOnly: true
+                - name: e5-model
+                  mountPath: /models/multilingual-e5-small
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            # Existing, populated claims in the same namespace; not provisioned here.
+            - name: artifacts
+              persistentVolumeClaim:
+                claimName: demand-clustering-artifacts
+                readOnly: true
+            - name: e5-model
+              persistentVolumeClaim:
+                claimName: demand-clustering-e5-model
+                readOnly: true
+            - name: tmp
+              emptyDir:
+                sizeLimit: 256Mi

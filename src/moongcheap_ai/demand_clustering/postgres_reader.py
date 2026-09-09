@@ -18,6 +18,7 @@ SELECT
     "desired_price_min",
     "desired_price_max",
     "quantity",
+    "extra_requirement",
     "is_substitutable",
     "status",
     "label",
@@ -29,9 +30,6 @@ FROM "demand"
 WHERE "status" = %(status)s
   AND "demand_board_id" IS NULL
   AND "pay_method_id" IS NOT NULL
-  AND "label" IS NOT NULL
-  AND btrim("label") <> ''
-  AND "processed_at" IS NOT NULL
   AND "created_at" > %(as_of)s - INTERVAL '2 days'
   AND "desire_end_at" > %(as_of)s
 ORDER BY "catalog_id", "id"
@@ -52,6 +50,14 @@ FROM "demand_board"
 WHERE "status" = %(status)s
   AND "sale_end_at" > %(as_of)s
 ORDER BY "catalog_id", "created_at", "id"
+""".strip()
+
+
+CLUSTERING_REJECTIONS_SQL = """
+SELECT DISTINCT "demand_id", "demand_board_id"
+FROM "reject_history"
+WHERE "demand_id" = ANY(%(demand_ids)s)
+  AND "demand_board_id" = ANY(%(board_ids)s)
 """.strip()
 
 
@@ -82,6 +88,7 @@ class PostgreSQLConnection(Protocol):
 class ClusteringInputBatch:
     demands: tuple[DemandInput, ...]
     boards: tuple[DemandBoardInput, ...]
+    rejected_demand_board_pairs: frozenset[tuple[int, int]] = frozenset()
 
 
 def _column_name(description_item: Any) -> str:
@@ -108,7 +115,7 @@ def _fetch_mappings(cursor: _Cursor) -> tuple[Mapping[str, Any], ...]:
 
 
 class PostgreSQLClusteringInputReader:
-    """Load eligible Demand and active DemandBoard rows without mutating DB."""
+    """Load eligible demands, active boards and rejection pairs without DML."""
 
     def __init__(self, connection: PostgreSQLConnection) -> None:
         self._connection = connection
@@ -130,9 +137,27 @@ class PostgreSQLClusteringInputReader:
             )
             board_rows = _fetch_mappings(cursor)
 
+            rejection_rows: tuple[Mapping[str, Any], ...] = ()
+            if demand_rows and board_rows:
+                # Read all currently visible rejections, including those created
+                # after as_of during API 1. A missing table or read permission
+                # must fail the batch rather than silently allow repeat offers.
+                cursor.execute(
+                    CLUSTERING_REJECTIONS_SQL,
+                    {
+                        "demand_ids": [row["id"] for row in demand_rows],
+                        "board_ids": [row["id"] for row in board_rows],
+                    },
+                )
+                rejection_rows = _fetch_mappings(cursor)
+
         return ClusteringInputBatch(
             demands=tuple(DemandInput.from_mapping(row) for row in demand_rows),
             boards=tuple(
                 DemandBoardInput.from_mapping(row) for row in board_rows
+            ),
+            rejected_demand_board_pairs=frozenset(
+                (row["demand_id"], row["demand_board_id"])
+                for row in rejection_rows
             ),
         )

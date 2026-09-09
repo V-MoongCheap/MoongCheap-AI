@@ -23,6 +23,7 @@ class InputModelsTest(unittest.TestCase):
 
         self.assertEqual(demands[0].catalog_id, boards[0].catalog_id)
         self.assertEqual(demands[0].status, "UNASSIGNED")
+        self.assertEqual(demands[0].extra_requirement, "캡슐형이면 좋겠어요.")
         self.assertEqual(boards[0].status, "GB_GATHERING")
         self.assertEqual(demands[0].created_at.utcoffset(), timedelta(hours=9))
         self.assertEqual(demands[0].processed_at.utcoffset(), timedelta(hours=9))
@@ -36,6 +37,7 @@ class InputModelsTest(unittest.TestCase):
         self.assertIsNone(demand.desired_price_max)
         self.assertIsNone(demand.quantity)
         self.assertIsNone(demand.is_substitutable)
+        self.assertIsNone(demand.extra_requirement)
         self.assertIsNone(demand.status)
         self.assertIsNone(demand.label)
         self.assertIsNone(demand.desire_end_at)

@@ -1,0 +1,120 @@
+# Demand Clustering CI/CD Handoff (Part B)
+# 실제 Secret 값은 작성하지 않습니다.
+
+repository: https://github.com/V-MoongCheap/kdt-ai-2-team2-integrated
+branch: develop
+
+build_command: "uv sync --project packaging/demand-clustering --locked --extra data --extra dev"
+test_command: "uv run --project packaging/demand-clustering --no-sync pytest -c packaging/demand-clustering/pyproject.toml"
+manifest_test_command: "tools/verify_kubernetes_manifests.sh"
+ci_tools: [uv, kubectl]  # 매니페스트 검사는 kubectl kustomize를 사용하며 클러스터 접속 없음
+runtime_install_command: "uv sync --project packaging/demand-clustering --locked --no-dev --extra embeddings --no-editable"
+runtime_command: "demand-clustering-batch"
+
+dockerfile_path: docker/Dockerfile.demand-clustering
+container_image_name: demand-clustering-job  # ECR repository 최종 명칭은 인프라 확인
+container_build_command: "docker build -f docker/Dockerfile.demand-clustering -t demand-clustering-job:<git-sha> ."
+container_architecture: linux/amd64  # 현재 검증 대상; EKS 노드 아키텍처 확인 필요
+
+kubernetes:
+  base_path: k8s/base
+  dev_example_path: k8s/overlays/dev
+  documentation: k8s/README.md
+  namespace_example: moongcheap-ai-dev  # Namespace 생성은 인프라; 실제 이름 확인 필요
+  schedule: "15 * * * *"  # 초기안
+  time_zone: Asia/Seoul
+  suspend: true
+  concurrency_policy: Forbid
+  backoff_limit: 0
+  restart_policy: Never
+  starting_deadline_seconds: 300
+  active_deadline_seconds: 1800
+  node_selector:
+    workload: ai
+    kubernetes.io/os: linux
+    kubernetes.io/arch: amd64
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: ai
+      effect: NoSchedule
+
+application_port: null  # 수요 클러스터링은 1회 실행 후 종료하는 배치
+health_check_path: ""
+metrics_path: ""
+
+environment_variables:
+  - name: BACKEND_BASE_URL
+    purpose: "Backend HTTP(S) base URL"
+  - name: MFDS_CATALOG_PROFILES_PATH
+    purpose: "Part A 상품도감 ID 기준의 MFDS profile CSV; DB 입력도 같은 ID 사용"
+  - name: DEMAND_TAXONOMY_PATH
+    purpose: "배포 profile과 일치하는 taxonomy JSON"
+  - name: DEMAND_CONSTRAINT_RULES_PATH
+    purpose: "자연어 조건 규칙 JSON"
+  - name: DEMAND_CONSTRAINT_ALIASES_PATH
+    purpose: "자연어 조건 별칭 JSON"
+  - name: E5_MODEL_PATH
+    purpose: "로컬 CPU E5 모델 디렉터리"
+  - name: E5_MODEL_REVISION
+    purpose: "선택 모델 revision"
+  - name: E5_BATCH_SIZE
+    purpose: "선택 embedding batch size; 기본 32"
+  - name: BACKEND_HTTP_TIMEOUT_SECONDS
+    purpose: "선택 HTTP timeout; 기본 15초"
+  - name: POSTGRES_CONNECT_TIMEOUT_SECONDS
+    purpose: "선택 DB connect timeout; 기본 10초"
+  - name: CLUSTER_MIN_PARTICIPANTS
+    purpose: "Demand Clustering 신규 Board 생성 최소 참여자 수 (선택, 기본값: 5)"
+
+secret_variables:
+  - name: SHARED_DATABASE_URL
+    purpose: "SELECT 전용 PostgreSQL DSN; JDBC URL 아님"
+    secret_name: ai-batch-reader-database
+    secret_key: url
+  - name: BACKEND_INTERNAL_KEY
+    purpose: "AWS Parameter Store SecureString에서 배포 시 주입하는 X-Internal-Key 값"
+    secret_name: ai-backend-internal-key
+    secret_key: internal-key
+
+resources:
+  requests:
+    cpu: "1"
+    memory: "3Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+  gpu: false
+  status: "초기 제안값; 구성요소 측정 조건과 한계는 docs/DEMAND_CLUSTERING_CONTAINER.md 참고"
+
+runtime_filesystem:
+  read_only_root: true
+  run_as_user: 65534
+  run_as_group: 65534
+  writable_tmp: "/tmp (emptyDir, 초기 sizeLimit 256Mi)"
+  read_only_mounts:
+    - path: /artifacts
+      existing_pvc: demand-clustering-artifacts
+      contents: "releases/<artifact-version>/catalog_profiles.csv 및 taxonomy.json"
+    - path: /models/multilingual-e5-small
+      existing_pvc: demand-clustering-e5-model
+      contents: "blobs/와 snapshots/<revision>/을 포함한 전체 모델 cache"
+
+external_dependencies:
+  - "Shared PostgreSQL (SELECT on demand, demand_board, reject_history)"
+  - "Backend formation-plans and substitute-offer-plans APIs"
+  - "Versioned taxonomy, Part A catalog profile, and local CPU E5 model artifacts"
+  - "AWS Parameter Store to Kubernetes Secret synchronization by the deployment environment"
+
+notes: >-
+  이 값들은 수요 클러스터링 배치 기준이다. 기본 CronJob과 dev 예시는 AI 저장소에서
+  제공하며 실제 배포 설정의 기준은 인프라 GitOps 저장소다. 이미지 push, GitOps 갱신,
+  ArgoCD/EKS 연결과 운영 배포는 인프라 측 작업이다. Parameter Store 조회 권한과
+  Kubernetes Secret 동기화는 배포 환경이 담당하며 앱은 AWS API를 직접 호출하지 않는다.
+  Namespace, Secret, PVC, Node Group 자체는 이 매니페스트가 생성하지 않는다.
+  실패한 요청은 저장하거나 재전송하지 않고 다음 정기 실행에서 DB를 새로 읽는다.
+  CronJob은 concurrencyPolicy=Forbid, Job은 backoffLimit=0,
+  Pod는 restartPolicy=Never로 설정해 실패한 배치를 즉시 재실행하지 않는다.
+  과거 슬롯을 전달하는 --planned-at/--batch-id 옵션과 checkpoint 볼륨은 사용하지 않는다.
+  모델은 실행 시 다운로드하지 않는다. PVC 파일 공급과 artifact 버전 갱신은 이미지 CI/CD와
+  별도로 연결한다. AI 노드가 한 대일 때 같은 노드에 모이며 이 매니페스트는 노드 수를 정하지 않는다.

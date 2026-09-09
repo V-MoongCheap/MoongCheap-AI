@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "moongcheap-ai"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.32,<3",
+    "pandas>=2.2,<3",
+    "python-dotenv>=1.0,<2",
+    "kiwipiepy==0.23.2",
+    "psycopg[binary]>=3.2,<4",
+]
+
+[project.scripts]
+demand-clustering-batch = "moongcheap_ai.demand_clustering.runtime_job:main"
+
+[project.optional-dependencies]
+data = [
+    "pyarrow>=15,<22",
+    "openpyxl>=3.1,<4",
+]
+dev = [
+    "pytest>=8,<9",
+    "jsonschema>=4,<5",
+    "PyYAML>=6,<7",
+    "ruff>=0.11,<1",
+]
+embeddings = [
+    "numpy==2.5.2",
+    "sentence-transformers==6.0.1",
+    "torch==2.14.0",
+    "transformers==5.16.1",
+]
+
+[tool.hatch.build]
+dev-mode-dirs = ["../../src"]
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.build.targets.wheel.force-include]
+"../../src/moongcheap_ai" = "moongcheap_ai"
+
+[tool.uv]
+# The wheel includes sources outside this project; rebuild it on each sync.
+# Third-party dependencies still use the shared download/build cache.
+reinstall-package = ["moongcheap-ai"]
+
+# Only the optional CPU embedding stack uses the PyTorch package index.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", extra = "embeddings" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.pytest.ini_options]
+# Simulation tests also import the repository's scripts package.
+pythonpath = ["../../src", "../.."]
+testpaths = ["../../tests"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

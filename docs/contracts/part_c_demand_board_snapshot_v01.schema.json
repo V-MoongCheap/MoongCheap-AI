@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moongcheap.local/contracts/part-c-demand-board-snapshot-v0.1.schema.json",
+  "title": "Part C Demand Board Simulation Snapshot v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "dataClassification",
+    "generatedAt",
+    "consumerNotice",
+    "sourceSummary",
+    "simulationPolicy",
+    "demandBoards"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "part-c-demand-board-snapshot.v0.1"},
+    "dataClassification": {
+      "const": "SYNTHETIC_MECHANICS_ONLY_NOT_PRODUCT_FACT"
+    },
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "consumerNotice": {"type": "string", "minLength": 1},
+    "sourceSummary": {"type": "object"},
+    "simulationPolicy": {
+      "type": "object",
+      "required": [
+        "minParticipants",
+        "priceOrigin",
+        "catalogProfileOrigin",
+        "substituteConfirmation",
+        "participantCountIncludesPendingOffers",
+        "sellerDataIncluded"
+      ],
+      "properties": {
+        "minParticipants": {"type": "integer", "minimum": 1},
+        "priceOrigin": {"const": "SYNTHETIC_CANONICAL_7_BAND_HASH"},
+        "catalogProfileOrigin": {"const": "SYNTHETIC_HASH_NOT_PRODUCT_FACT"},
+        "substituteConfirmation": {"type": "string"},
+        "participantCountIncludesPendingOffers": {"const": false},
+        "sellerDataIncluded": {"const": false}
+      }
+    },
+    "demandBoards": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/demandBoard"}
+    }
+  },
+  "$defs": {
+    "demandBoard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "demandBoardId",
+        "catalogId",
+        "catalogDisplayName",
+        "categoryId",
+        "taxonomyVersion",
+        "priceMin",
+        "priceMax",
+        "participantCount",
+        "pendingSubstituteOfferCount",
+        "status",
+        "saleEndAt",
+        "directDemandIds",
+        "pendingSubstituteDemandIds",
+        "facetValues",
+        "semanticText",
+        "profileOrigin"
+      ],
+      "properties": {
+        "demandBoardId": {"type": "integer"},
+        "catalogId": {"type": "integer"},
+        "catalogDisplayName": {"type": "string"},
+        "categoryId": {"type": "string", "minLength": 1},
+        "taxonomyVersion": {"type": "string", "minLength": 1},
+        "priceMin": {"type": "integer", "minimum": 0},
+        "priceMax": {"type": "integer", "minimum": 0},
+        "participantCount": {"type": "integer", "minimum": 0},
+        "pendingSubstituteOfferCount": {"type": "integer", "minimum": 0},
+        "status": {"const": "GB_GATHERING"},
+        "saleEndAt": {"type": "string", "format": "date-time"},
+        "directDemandIds": {
+          "type": "array",
+          "items": {"type": "integer"}
+        },
+        "pendingSubstituteDemandIds": {
+          "type": "array",
+          "items": {"type": "integer"}
+        },
+        "facetValues": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 1}
+        },
+        "semanticText": {"type": "string"},
+        "profileOrigin": {"const": "SYNTHETIC_HASH_NOT_PRODUCT_FACT"}
+      }
+    }
+  }
+}

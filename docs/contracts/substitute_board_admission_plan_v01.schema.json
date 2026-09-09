@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moongcheap.local/contracts/substitute-board-admission-plan-v0.1.schema.json",
+  "title": "Substitute Existing-Board Admission Plan v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "batchId",
+    "plannedAt",
+    "ruleVersion",
+    "textScorerVersion",
+    "proposals",
+    "notEligible",
+    "unmatched",
+    "stateContract"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "substitute-board-admission-plan.v0.1"},
+    "batchId": {"type": "string", "minLength": 1},
+    "plannedAt": {"type": "string", "format": "date-time"},
+    "ruleVersion": {"type": "string", "minLength": 1},
+    "textScorerVersion": {"type": ["string", "null"]},
+    "proposals": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/proposal"}
+    },
+    "notEligible": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/nonProposal"}
+    },
+    "unmatched": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/nonProposal"}
+    },
+    "stateContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal",
+        "accept",
+        "reject",
+        "proposalIncrementsParticipantCount"
+      ],
+      "properties": {
+        "proposal": {"const": "UNASSIGNED_TO_SUBSTITUTE_OFFERED"},
+        "accept": {"const": "SUBSTITUTE_OFFERED_TO_ASSIGNED"},
+        "reject": {"const": "SUBSTITUTE_OFFERED_TO_UNASSIGNED"},
+        "proposalIncrementsParticipantCount": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "nonProposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["demandId", "reasonCodes"],
+      "properties": {
+        "demandId": {"type": "integer"},
+        "reasonCodes": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1
+        }
+      }
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "demandId",
+        "action",
+        "fromStatus",
+        "proposedStatus",
+        "originalCatalogId",
+        "substituteCatalogId",
+        "demandBoardId",
+        "quantityToCarry",
+        "requiresUserConfirmation",
+        "participantCountDeltaOnProposal",
+        "participantCountDeltaOnAccept",
+        "onAcceptStatus",
+        "onRejectStatus",
+        "clearDemandBoardIdOnReject",
+        "requirementStatus",
+        "effectiveRequirementMode",
+        "rankEvidence"
+      ],
+      "properties": {
+        "demandId": {"type": "integer"},
+        "action": {"const": "PROPOSE_SUBSTITUTE_BOARD_ADMISSION"},
+        "fromStatus": {"const": "UNASSIGNED"},
+        "proposedStatus": {"const": "SUBSTITUTE_OFFERED"},
+        "originalCatalogId": {"type": "integer"},
+        "substituteCatalogId": {"type": "integer"},
+        "demandBoardId": {"type": "integer"},
+        "quantityToCarry": {"type": "integer", "minimum": 1, "maximum": 99},
+        "requiresUserConfirmation": {"const": true},
+        "participantCountDeltaOnProposal": {"const": 0},
+        "participantCountDeltaOnAccept": {"const": 1},
+        "onAcceptStatus": {"const": "ASSIGNED"},
+        "onRejectStatus": {"const": "UNASSIGNED"},
+        "clearDemandBoardIdOnReject": {"const": true},
+        "requirementStatus": {"type": "string"},
+        "effectiveRequirementMode": {
+          "enum": ["STRUCTURED", "SEMANTIC_TEXT", "NONE"]
+        },
+        "rankEvidence": {"$ref": "#/$defs/rankEvidence"}
+      }
+    },
+    "rankEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "demandBoardId",
+        "catalogId",
+        "rank",
+        "structuredPreferenceMatched",
+        "structuredPreferenceTotal",
+        "structuredPreferenceScore",
+        "textSimilarityScore",
+        "participantCount",
+        "matchedPreferences",
+        "unmatchedPreferences"
+      ],
+      "properties": {
+        "demandBoardId": {"type": "integer"},
+        "catalogId": {"type": "integer"},
+        "rank": {"type": "integer", "minimum": 1},
+        "structuredPreferenceMatched": {"type": "integer", "minimum": 0},
+        "structuredPreferenceTotal": {"type": "integer", "minimum": 0},
+        "structuredPreferenceScore": {"type": "number", "minimum": 0, "maximum": 1},
+        "textSimilarityScore": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "participantCount": {"type": "integer", "minimum": 0},
+        "matchedPreferences": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "unmatchedPreferences": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

@@ -14,7 +14,7 @@ class ClusteringConfigTest(unittest.TestCase):
         )
 
     def test_rejects_invalid_values(self) -> None:
-        for value in ("zero", "0", "-1"):
+        for value in ("zero", "0", "-1", "1", "4"):
             with self.subTest(value=value):
                 with self.assertRaisesRegex(ValueError, "must be"):
                     load_min_cluster_participants(

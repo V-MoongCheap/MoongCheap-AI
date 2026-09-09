@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moongcheap.local/contracts/function-coverage-relation-artifact-v1.schema.json",
+  "title": "MFDS Function Coverage Relation Artifact v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "artifactVersion",
+    "ruleVersion",
+    "artifactFingerprintSha256",
+    "deploymentStatus",
+    "goldStatus",
+    "identityPolicy",
+    "transitivityPolicy",
+    "runtimePolicy",
+    "relations"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "mfds-function-coverage-relation-artifact.v1"
+    },
+    "artifactVersion": {"type": "string", "minLength": 1},
+    "ruleVersion": {"type": "string", "minLength": 1},
+    "artifactFingerprintSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "deploymentStatus": {
+      "enum": ["REQUIRES_DOMAIN_OWNER_SIGNOFF", "APPROVED", "RETIRED"]
+    },
+    "goldStatus": {"type": "string", "minLength": 1},
+    "identityPolicy": {"type": "string", "minLength": 1},
+    "transitivityPolicy": {"type": "string", "minLength": 1},
+    "runtimePolicy": {"type": "string", "minLength": 1},
+    "relations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/relation"}
+    }
+  },
+  "$defs": {
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relationId",
+        "sourceClaimId",
+        "sourceClaimText",
+        "candidateClaimId",
+        "candidateClaimText",
+        "coverageLabel",
+        "ruleVersion",
+        "artifactVersion",
+        "decisionReasonCode",
+        "decisionProvenance"
+      ],
+      "properties": {
+        "relationId": {
+          "type": "string",
+          "pattern": "^MFDS-FDIR-[0-9A-F]{16}$"
+        },
+        "sourceClaimId": {"type": "string", "minLength": 1},
+        "sourceClaimText": {"type": "string"},
+        "candidateClaimId": {"type": "string", "minLength": 1},
+        "candidateClaimText": {"type": "string"},
+        "coverageLabel": {"const": "COVERS"},
+        "ruleVersion": {"type": "string", "minLength": 1},
+        "artifactVersion": {"type": "string", "minLength": 1},
+        "decisionReasonCode": {"type": "string"},
+        "decisionProvenance": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
