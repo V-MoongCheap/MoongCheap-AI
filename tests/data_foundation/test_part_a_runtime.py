@@ -90,6 +90,61 @@ def test_part_a_isolates_parser_failure_and_preserves_backend_ids(tmp_path, monk
     assert summary["externalLlmCalls"] == 0
 
 
+def test_part_a_prevalidates_category_before_parser_and_keeps_invalid_rows_pending(tmp_path, monkeypatch):
+    taxonomy, rules, aliases = _fixtures(tmp_path)
+
+    class ParserMustNotBeCalled:
+        calls = 0
+
+        def interpret(self, *args, **kwargs):
+            self.calls += 1
+            raise AssertionError("parser must not be called for an invalid category")
+
+    parser = ParserMustNotBeCalled()
+    monkeypatch.setattr(
+        "moongcheap_ai.data_foundation.part_a_runtime.DemandConstraintParser.from_taxonomy",
+        classmethod(lambda cls, *args, **kwargs: parser),
+    )
+    demands = pd.DataFrame([
+        {"demand_id": "missing", "catalog_id": "p1", "extra_requirement": "캡슐"},
+        {"demand_id": "unknown", "catalog_id": "p2", "category_id": "not-in-taxonomy", "extra_requirement": "캡슐"},
+    ])
+
+    result, summary = run_part_a_batch(demands, taxonomy, rules, aliases, processed_at="2026-09-10T00:00:00+00:00")
+
+    assert parser.calls == 0
+    assert list(result["status"]) == ["REVIEW", "REVIEW"]
+    assert list(result["diagnostic_code"]) == ["CATEGORY_MISSING", "CATEGORY_NOT_IN_TAXONOMY"]
+    assert list(result["processed_at"]) == ["", ""]
+    assert summary["categoryPrevalidationFailureCount"] == 2
+
+
+def test_part_a_rejects_invalid_substitution_consent_before_parser(tmp_path, monkeypatch):
+    taxonomy, rules, aliases = _fixtures(tmp_path)
+
+    class ParserMustNotBeCalled:
+        def interpret(self, *args, **kwargs):
+            raise AssertionError("parser must not be called for invalid input")
+
+    monkeypatch.setattr(
+        "moongcheap_ai.data_foundation.part_a_runtime.DemandConstraintParser.from_taxonomy",
+        classmethod(lambda cls, *args, **kwargs: ParserMustNotBeCalled()),
+    )
+    demands = pd.DataFrame([{
+        "demand_id": "invalid-bool",
+        "catalog_id": "p1",
+        "category_id": "c1",
+        "extra_requirement": "캡슐",
+        "is_substitutable": "maybe",
+    }])
+
+    result, _ = run_part_a_batch(demands, taxonomy, rules, aliases)
+
+    assert result.loc[0, "status"] == "REVIEW"
+    assert result.loc[0, "diagnostic_code"] == "INVALID_IS_SUBSTITUTABLE"
+    assert result.loc[0, "processed_at"] == ""
+
+
 def test_v22_category_local_alias_maps_powder_to_korean_value():
     taxonomy = json.loads(__import__("pathlib").Path("config/facet_taxonomy_v2_2.json").read_text(encoding="utf-8"))
     parser = DemandConstraintParser.from_taxonomy(

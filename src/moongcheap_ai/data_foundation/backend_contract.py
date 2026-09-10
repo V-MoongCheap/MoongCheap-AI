@@ -23,6 +23,10 @@ def build_label_result_payload(labeled: Any, *, processed_at: str) -> dict[str, 
         raise ValueError("labeled result missing columns: " + ", ".join(missing))
     rows = []
     for item in labeled.fillna("").to_dict(orient="records"):
+        # Review rows are diagnostic output only. Sending them would allow an
+        # unresolved input to be treated as a completed Backend update.
+        if str(item.get("label_status", "")).strip() == "REVIEW":
+            continue
         rows.append({
             "demandId": _identifier(item["demand_id"]),
             "catalogId": _identifier(item["catalog_id"]),

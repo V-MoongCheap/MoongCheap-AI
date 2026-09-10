@@ -185,30 +185,45 @@ def label_demands(frame: pd.DataFrame, loader: TaxonomyLoader,
     """Batch label demands through ERD's catalog_id -> category_id path."""
     rows: list[dict[str, Any]] = []
     for _, demand in frame.iterrows():
-        category_id = demand.get("category_id", "") or demand.get("kan_code", "")
+        category_id = str(demand.get("category_id", "") or demand.get("kan_code", "")).strip()
         if not category_id and catalog_category_map:
-            category_id = catalog_category_map.get(str(demand.get("catalog_id", "")), "")
-        defaults, default_warnings = loader.product_defaults(category_id, (product_facet_map or {}).get(str(demand.get("catalog_id", "")), []))
-        requested, request_warnings = loader.resolve(category_id, demand.get("extra_requirement", ""))
-        facet_values = defaults.copy()
-        for facet_name, value in requested.items():
-            if int(value.get("code", 0)) != 0:
-                facet_values[facet_name] = value
-        warnings = default_warnings + request_warnings
+            category_id = str(catalog_category_map.get(str(demand.get("catalog_id", "")), "") or "").strip()
         requirement = str(demand.get("extra_requirement", "") or "").strip()
-        unresolved_items = []
-        if requirement and any("did not match" in warning for warning in warnings):
-            unresolved_items.append(requirement)
+        if not category_id:
+            warnings = ["CATEGORY_MISSING"]
+            facet_values = {}
+            unresolved_items = [requirement] if requirement else []
+            label_status = "REVIEW"
+            label = ""
+        elif category_id not in loader.categories:
+            warnings = ["CATEGORY_NOT_IN_TAXONOMY"]
+            facet_values = {}
+            unresolved_items = [requirement] if requirement else []
+            label_status = "REVIEW"
+            label = ""
+        else:
+            defaults, default_warnings = loader.product_defaults(category_id, (product_facet_map or {}).get(str(demand.get("catalog_id", "")), []))
+            requested, request_warnings = loader.resolve(category_id, requirement)
+            facet_values = defaults.copy()
+            for facet_name, value in requested.items():
+                if int(value.get("code", 0)) != 0:
+                    facet_values[facet_name] = value
+            warnings = default_warnings + request_warnings
+            unresolved_items = []
+            if requirement and any("did not match" in warning for warning in warnings):
+                unresolved_items.append(requirement)
+            label_status = "LABELED" if not warnings else "LABELED_WITH_REVIEW"
+            label = loader.encode(facet_values)
         row = demand.to_dict()
         row.update({
             "category_id": str(category_id or ""),
-            "label": loader.encode(facet_values),
+            "label": label,
             "facet_values": json.dumps(facet_values, ensure_ascii=False, separators=(",", ":")),
             "desired_price_min": demand.get("desired_price_min", demand.get("desired_price", "")),
             "desired_price_max": demand.get("desired_price_max", ""),
             "quantity": demand.get("quantity", demand.get("desired_quantity", "")),
             "is_substitutable": demand.get("is_substitutable", True),
-            "label_status": "LABELED" if not warnings else "LABELED_WITH_REVIEW",
+            "label_status": label_status,
             "label_warnings": json.dumps(warnings, ensure_ascii=False),
             "unresolved_items": json.dumps(unresolved_items, ensure_ascii=False),
         })
