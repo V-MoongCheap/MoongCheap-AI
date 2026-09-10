@@ -1,7 +1,10 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.evaluation.build_part_a_gold_candidates import build_candidate_set
+from scripts.evaluation.finalize_part_a_gold_v2_2 import finalize
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,3 +41,14 @@ def test_challenge_split_covers_runtime_edge_states() -> None:
         "PARSED", "PASSTHROUGH", "CONFLICT", "REVIEW", "NOT_APPLICABLE", "NONE",
     }
     assert "ANY_OF" in set(challenge["proposed_expected_mode"])
+
+
+def test_finalize_blocks_pending_review(tmp_path: Path) -> None:
+    source = tmp_path / "candidates.csv"
+    frame = build_candidate_set(
+        ROOT / "config/facet_taxonomy_v2_2.json",
+        ROOT / "tests/demand_constraints/fixtures/v042_approved_eval.csv",
+    )
+    frame.to_csv(source, index=False, encoding="utf-8-sig")
+    with pytest.raises(ValueError, match="not APPROVED"):
+        finalize(source, tmp_path / "gold")

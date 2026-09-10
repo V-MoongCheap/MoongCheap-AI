@@ -13,6 +13,26 @@
 - Category count: 16
 - Pending review rows: 200
 
+## Candidate Partition
+
+evaluation_partition_candidate
+CHALLENGE     50
+DEV          100
+HOLDOUT       50
+
+## Candidate Provenance
+
+candidate_origin
+EXISTING_REVIEWED_FIXTURE    129
+NEW_CHALLENGE_CANDIDATE       50
+NEW_STANDARD_CANDIDATE        21
+
+## Parser Exposure
+
+parser_exposure
+KNOWN_TO_EXISTING_TESTS    129
+NEW_UNSEEN_CANDIDATE        71
+
 ## Provenance
 
 - Existing 200-row Legacy Gold: `NOT_FOUND`.

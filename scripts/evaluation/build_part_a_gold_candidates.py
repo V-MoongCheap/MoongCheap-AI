@@ -25,7 +25,9 @@ REVIEW_COLUMNS = [
     "case_id", "split_candidate", "category_id", "category_name", "extra_requirement",
     "is_substitutable", "proposed_expected_status", "proposed_expected_mode",
     "proposed_expected_constraints", "proposed_expected_preference_groups",
-    "scenario_type", "grounding_source", "generation_reason", "reviewer_status",
+    "scenario_type", "grounding_source", "generation_reason", "candidate_origin",
+    "source_reference", "existing_test_case_id", "parser_exposure", "evaluation_partition_candidate",
+    "reviewer_status",
     "corrected_expected_status", "corrected_expected_mode", "corrected_expected_constraints",
     "reviewer_note",
 ]
@@ -72,6 +74,10 @@ def _reference_rows(path: Path) -> list[dict[str, Any]]:
             "scenario_type": row["scenario"],
             "grounding_source": "human-reviewed v042 evaluation fixture",
             "generation_reason": "Existing reviewed expression pattern reused as a candidate; approval is pending.",
+            "candidate_origin": "EXISTING_REVIEWED_FIXTURE",
+            "source_reference": "tests/demand_constraints/fixtures/v042_approved_eval.csv",
+            "existing_test_case_id": row["sample_id"],
+            "parser_exposure": "KNOWN_TO_EXISTING_TESTS",
         })
     return rows
 
@@ -99,6 +105,10 @@ def _new_rows(values: dict[str, list[dict[str, Any]]], count: int, seed: int) ->
             "scenario_type": f"GROUNDED_{kind}_CANDIDATE",
             "grounding_source": "Facet Taxonomy V2.2 canonical value",
             "generation_reason": "Deterministic candidate from an existing category-local canonical value; human review required.",
+            "candidate_origin": "NEW_STANDARD_CANDIDATE",
+            "source_reference": "config/facet_taxonomy_v2_2.json",
+            "existing_test_case_id": "",
+            "parser_exposure": "NEW_UNSEEN_CANDIDATE",
         })
     rng.shuffle(rows)
     return rows
@@ -132,6 +142,10 @@ def _challenge_rows(values: dict[str, list[dict[str, Any]]]) -> list[dict[str, A
                 "constraints": constraints, "preference_groups": [{"operator": "ANY_OF", "aggregation": "MAX", "members": members}],
                 "scenario_type": scenario, "grounding_source": "V2.2 canonical values + runtime policy fixture",
                 "generation_reason": "Alternative-value policy candidate; parser output must be verified by a reviewer.",
+                "candidate_origin": "NEW_CHALLENGE_CANDIDATE",
+                "source_reference": "config/facet_taxonomy_v2_2.json; runtime policy fixture",
+                "existing_test_case_id": "",
+                "parser_exposure": "NEW_UNSEEN_CANDIDATE",
             })
             continue
         elif index < 29:
@@ -164,6 +178,10 @@ def _challenge_rows(values: dict[str, list[dict[str, Any]]]) -> list[dict[str, A
             "constraints": constraints, "preference_groups": [], "is_substitutable": status != "NOT_APPLICABLE",
             "scenario_type": scenario, "grounding_source": "V2.2 canonical values + runtime policy fixture",
             "generation_reason": "Runtime edge-case candidate; proposed status is not an automatic Gold label.",
+            "candidate_origin": "NEW_CHALLENGE_CANDIDATE",
+            "source_reference": "config/facet_taxonomy_v2_2.json; runtime policy fixture",
+            "existing_test_case_id": "",
+            "parser_exposure": "NEW_UNSEEN_CANDIDATE",
         })
     return rows
 
@@ -185,6 +203,13 @@ def _record(row: dict[str, Any], case_id: str, split: str, category_name: str) -
         "scenario_type": row["scenario_type"],
         "grounding_source": row["grounding_source"],
         "generation_reason": row["generation_reason"],
+        "candidate_origin": row["candidate_origin"],
+        "source_reference": row["source_reference"],
+        "existing_test_case_id": row["existing_test_case_id"],
+        "parser_exposure": row["parser_exposure"],
+        "evaluation_partition_candidate": (
+            "CHALLENGE" if split == "CHALLENGE" else ("DEV" if int(case_id.rsplit("-", 1)[-1]) <= 100 else "HOLDOUT")
+        ),
         "reviewer_status": "PENDING_REVIEW",
         "corrected_expected_status": "",
         "corrected_expected_mode": "",
@@ -218,6 +243,12 @@ def write_report(frame: pd.DataFrame, path: Path, reference_count: int) -> None:
         f"- Newly composed candidates: {len(frame) - reference_count}",
         f"- Category count: {frame['category_id'].nunique()}",
         f"- Pending review rows: {int(frame['reviewer_status'].eq('PENDING_REVIEW').sum())}", "",
+        "## Candidate Partition", "",
+        frame["evaluation_partition_candidate"].value_counts().sort_index().to_string(), "",
+        "## Candidate Provenance", "",
+        frame["candidate_origin"].value_counts().sort_index().to_string(), "",
+        "## Parser Exposure", "",
+        frame["parser_exposure"].value_counts().sort_index().to_string(), "",
         "## Provenance", "",
         "- Existing 200-row Legacy Gold: `NOT_FOUND`.",
         "- Existing 72.50% metric remains `LEGACY_EXPERIMENT_REFERENCE` and is not used as a baseline here.",
