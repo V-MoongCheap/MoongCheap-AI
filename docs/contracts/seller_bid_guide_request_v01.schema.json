@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moongcheap.local/contracts/seller-bid-guide-request-v0.1.schema.json",
+  "title": "Seller Bid Guide Request",
+  "description": "Backend → AI. 개별 소비자 식별정보는 싣지 않는다. 2026-09-09 Backend 회신 반영 — round_ref 제거, cluster_ref·product_ref 정수.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "input_context_version",
+    "cluster_ref",
+    "product_ref",
+    "participant_count",
+    "total_demand_quantity",
+    "minimum_success_quantity",
+    "maximum_supply_quantity",
+    "calculation_policy_version"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_context_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "계산에 사용한 수요·응찰 정보 버전. Backend 가 제공하는 마지막 변경 시각(UPDATED_AT) (2026-09-09 회신)"
+    },
+    "cluster_ref": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "분석 대상 수요보드 식별자. demand_board.id (2026-09-09 Backend 회신 — id 이므로 정수)"
+    },
+    "product_ref": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "판매자가 생성한 판매 상품 식별자. product.id — ⛔ product_catalog.id 가 아니다 (2026-09-09 Backend 회신)"
+    },
+    "participant_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "total_demand_quantity": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimum_success_quantity": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maximum_supply_quantity": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "calculation_policy_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "적용할 계산 정책 버전. AI 는 검증만 하고 발급하지 않는다. 지원하지 않는 값은 VERSION_MISMATCH 로 거절한다"
+    }
+  }
+}

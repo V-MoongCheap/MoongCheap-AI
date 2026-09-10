@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moongcheap.local/contracts/seller-bid-guide-error-v0.1.schema.json",
+  "title": "Seller Bid Guide Error",
+  "description": "오류 응답. 「AI API Contract」 2절 「공통 규격」 의 Error Format 을 따른다 — 그 절은 이 형식을 실시간 HTTP API에 적용한다고 정하고 있고 본 API 가 그것이다. 코드 체계는 같은 문서 7절 「Error Response」 를 따른다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "error"
+  ],
+  "properties": {
+    "request_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "요청의 추적값을 되돌려 준다. 본문을 읽기 전에 끊긴 경우(인증 실패)와 요청에 없거나 문자열이 아닌 경우 null"
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "details"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "INVALID_INPUT",
+            "VERSION_MISMATCH",
+            "UNAUTHORIZED",
+            "INTERNAL_ERROR"
+          ],
+          "description": "UNAUTHORIZED 는 2026-09-09 Backend 회신으로 확정됐다 — HTTP 403, 키 누락과 불일치를 구분하지 않는다. 나머지는 「AI API Contract」 7절 「Error Response」 의 코드다"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retryable": {
+          "type": "boolean",
+          "description": "⚠️ 코드별 값은 계약이 정하지 않았다. 2절 예시의 INVALID_INPUT=false 만 확인된다"
+        },
+        "details": {
+          "type": "object",
+          "description": "계약 예시가 빈 객체다. 무엇을 담을지 정해지지 않았다"
+        }
+      }
+    }
+  }
+}

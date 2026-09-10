@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moongcheap.local/contracts/seller-bid-guide-response-v0.1.schema.json",
+  "title": "Seller Bid Guide Response",
+  "description": "AI → Backend. 「AI–Backend 판매자 수요 분석 연동 API 기능 요구 명세서(협의안)」 5.5절 「성공 응답」 구조. 수치는 결정적 계산 결과이며 생성 모델이 수정하지 않는다. 개별 소비자 값은 포함하지 않는다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "input_context_version",
+    "metrics",
+    "analysis_reason",
+    "calculation_evidence",
+    "unresolved_items",
+    "calculation_policy_version"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "요청값과 동일"
+    },
+    "input_context_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "계산에 사용한 수요·응찰 정보 버전"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "계산 정책으로 산출한 구조화 지표. 「AI API Contract」 5절 「Seller Analysis API」 의 Response 표가 나열한 네 필드다. 상태는 비율에서 도출한다 — ratio >= 1.0 이면 충족. 「AI API Contract」 6절 「Seller RAG API」 가 이 객체를 Required 입력으로 받는다",
+      "additionalProperties": false,
+      "required": [
+        "participant_count",
+        "total_demand_quantity",
+        "moq_attainment_ratio",
+        "supply_coverage_ratio"
+      ],
+      "properties": {
+        "participant_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "분석 시점의 유효 참여 요청 수(인원). 수량 대용으로 쓰지 않는다"
+        },
+        "total_demand_quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "분석 시점의 유효 총수요 수량. 만료분 제외"
+        },
+        "moq_attainment_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "description": "total_demand_quantity / minimum_success_quantity. 1.0 이상이면 MOQ 충족이다 ⚠️ 「AI API Contract」 5절 「Seller Analysis API」 Response 표는 이 필드를 `number/null` 로 둔다. 여기서 null 을 허용하지 않는 것은 요청 계약이 네 수량을 모두 Required 양의 정수로 받아 **분모가 0 이 될 경로가 없기 때문**이다. 계약 쪽 null 을 유지할지 빼는지는 확인 필요 — 넓히면 Backend 가 처리해야 할 분기가 늘고, 좁힌 채로 두면 우리 OpenAPI 와 계약이 갈린다."
+        },
+        "supply_coverage_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "description": "maximum_supply_quantity / total_demand_quantity. 1.0 이상이면 공급 충분이다. ⚠️ 상한 1.0 적용 여부는 확정 대기 — 문서가 2 대 2 로 갈린다. 적용: 「AI API Contract」 5절 예시(`1.0` · 근거 문장 *\"약 1.15이며, 계산 정책의 상한 1.0을 적용했습니다\"*) · 「AI 파트 → 백엔드 스키마 명세(초안)」 2절 `score_supply_fulfill` *\"100% 상한\"*. 미적용: 「AI 평가 데이터셋 및 평가 지표 정의서」 16절(`150 / 120 = 1.25`) · 「AI 통합 영역 최종 선정 및 BE/FE 통합 인터페이스 명세」 3.5절(`1.15`) ⚠️ 「AI API Contract」 5절 「Seller Analysis API」 Response 표는 이 필드를 `number/null` 로 둔다. 여기서 null 을 허용하지 않는 것은 요청 계약이 네 수량을 모두 Required 양의 정수로 받아 **분모가 0 이 될 경로가 없기 때문**이다. 계약 쪽 null 을 유지할지 빼는지는 확인 필요 — 넓히면 Backend 가 처리해야 할 분기가 늘고, 좁힌 채로 두면 우리 OpenAPI 와 계약이 갈린다."
+        }
+      }
+    },
+    "calculation_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "계산에 사용한 입력값·산식·단위 근거. 템플릿으로만 만들며 생성 모델이 문장을 새로 쓰지 않는다"
+    },
+    "unresolved_items": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "정보 부족 등으로 계산하지 못한 항목. 채움 규칙의 형식은 확정 대기(명세서 8-2)"
+    },
+    "calculation_policy_version": {
+      "type": "string",
+      "const": "seller-metrics-v1",
+      "description": "실제 적용한 계산 정책 버전. 요청값과 동일하며 지원하지 않는 값은 애초에 거절된다"
+    },
+    "analysis_reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "판매자에게 보여줄 판단 사유 한 문장. 「AI 통합 영역 최종 선정 및 BE/FE 통합 인터페이스 명세」 3.6절 「FE 화면 반영」 의 「수요 분석」 항목. 2026-09-09 Backend 회신으로 AI 가 제공하기로 확정했고 Backend 가 REASON 필드에 저장한다. ⛔ 템플릿이며 생성 모델을 쓰지 않는다. 입력에 없는 사실과 확정적 예측을 담지 않는다"
+    }
+  }
+}
