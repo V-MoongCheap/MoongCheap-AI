@@ -16,7 +16,7 @@ def test_text_evidence_drops_medical_claims_and_keeps_only_attributes() -> None:
 def test_cross_source_aggregation_preserves_review_status() -> None:
     frame = pd.DataFrame([
         {"category": "vitamin", "normalized_attribute": "odor", "normalized_value": "fishy", "source": "mfds", "source_type": "PRODUCT_FACT", "document_id": "p1", "medical_risk": "SAFE_ATTRIBUTE"},
-        {"category": "vitamin", "normalized_attribute": "odor", "normalized_value": "fishy", "source": "seller", "source_type": "SELLER_LISTING", "document_id": "s1", "medical_risk": "SAFE_ATTRIBUTE"},
+        {"category": "vitamin", "normalized_attribute": "odor", "normalized_value": "fishy", "source": "seller", "source_type": "SELLER_PRODUCT_EVIDENCE", "document_id": "s1", "medical_risk": "SAFE_ATTRIBUTE"},
     ])
     aggregate = aggregate_evidence(frame)
     queue = build_review_queue(aggregate, frame)

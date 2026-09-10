@@ -1,0 +1,293 @@
+{
+  "version": "taxonomy-value-crosswalk-v2",
+  "purpose": "Resolve reviewed alias targets to category-local V2.2 values and codes.",
+  "taxonomy_version": "v2.2",
+  "mappings": {
+    "product_form": {
+      "health-functional-food:blood_sugar_metabolic": {
+        "tablet": {
+          "value": "정",
+          "code": 1
+        },
+        "powder": {
+          "value": "분말",
+          "code": 2
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 3
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 4
+        }
+      },
+      "health-functional-food:dietary_fiber": {
+        "tablet": {
+          "value": "정",
+          "code": 3
+        },
+        "powder": {
+          "value": "분말",
+          "code": 1
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 7
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 4
+        }
+      },
+      "health-functional-food:eye_health": {
+        "tablet": {
+          "value": "정",
+          "code": 3
+        },
+        "powder": {
+          "value": "분말",
+          "code": 5
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 6
+        }
+      },
+      "health-functional-food:heart_blood": {
+        "tablet": {
+          "value": "정",
+          "code": 2
+        },
+        "powder": {
+          "value": "분말",
+          "code": 3
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 4
+        }
+      },
+      "health-functional-food:joint_health": {
+        "tablet": {
+          "value": "정",
+          "code": 1
+        },
+        "powder": {
+          "value": "분말",
+          "code": 3
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 4
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 2
+        }
+      },
+      "health-functional-food:liver_health": {
+        "tablet": {
+          "value": "정",
+          "code": 1
+        },
+        "powder": {
+          "value": "분말",
+          "code": 5
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 4
+        }
+      },
+      "health-functional-food:male_health": {
+        "tablet": {
+          "value": "정",
+          "code": 3
+        },
+        "powder": {
+          "value": "분말",
+          "code": 2
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 6
+        }
+      },
+      "health-functional-food:omega_fatty_acid": {
+        "tablet": {
+          "value": "정",
+          "code": 6
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 2
+        }
+      },
+      "health-functional-food:other_functional": {
+        "tablet": {
+          "value": "정",
+          "code": 1
+        },
+        "powder": {
+          "value": "분말",
+          "code": 3
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 4
+        }
+      },
+      "health-functional-food:probiotics": {
+        "tablet": {
+          "value": "정",
+          "code": 3
+        },
+        "powder": {
+          "value": "분말",
+          "code": 1
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 4
+        }
+      },
+      "health-functional-food:propolis": {
+        "tablet": {
+          "value": "정",
+          "code": 4
+        },
+        "powder": {
+          "value": "분말",
+          "code": 3
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 1
+        }
+      },
+      "health-functional-food:protein": {
+        "tablet": {
+          "value": "정",
+          "code": 2
+        },
+        "powder": {
+          "value": "분말",
+          "code": 1
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 3
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 4
+        }
+      },
+      "health-functional-food:red_ginseng": {
+        "tablet": {
+          "value": "정",
+          "code": 4
+        },
+        "powder": {
+          "value": "분말",
+          "code": 3
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 1
+        }
+      },
+      "health-functional-food:skin_collagen": {
+        "tablet": {
+          "value": "정",
+          "code": 3
+        },
+        "powder": {
+          "value": "분말",
+          "code": 2
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 5
+        }
+      },
+      "health-functional-food:theanine_sleep": {
+        "tablet": {
+          "value": "정",
+          "code": 1
+        },
+        "powder": {
+          "value": "분말",
+          "code": 3
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 4
+        }
+      },
+      "health-functional-food:vitamin_mineral": {
+        "tablet": {
+          "value": "정",
+          "code": 1
+        },
+        "powder": {
+          "value": "분말",
+          "code": 3
+        },
+        "capsule": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "liquid": {
+          "value": "액상",
+          "code": 4
+        }
+      }
+    }
+  }
+}

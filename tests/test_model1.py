@@ -1,6 +1,6 @@
 import pandas as pd
 
-from moongcheap_ai.data_foundation.model1 import MockModelAdapter, OllamaAdapter, parse_model_output, sample_products
+from moongcheap_ai.data_foundation.model1 import MockModelAdapter, OllamaAdapter, OpenAICompatibleAdapter, TransformersAdapter, create_model_adapter, parse_model_output, sample_products
 from moongcheap_ai.data_foundation.model1_postprocess import atomic_values, map_products, normalize_candidates
 
 def test_composite_values_are_split_before_deduplication():
@@ -41,6 +41,11 @@ def test_ollama_adapter_keeps_provider_swappable():
     assert adapter.provider == "ollama"
     assert adapter.model == "actual-model-name"
     assert adapter.endpoint.endswith("11434")
+
+
+def test_model_factory_supports_non_ollama_runtimes():
+    assert isinstance(create_model_adapter("openai_compatible", "model", endpoint="http://localhost:8000/v1"), OpenAICompatibleAdapter)
+    assert isinstance(create_model_adapter("transformers", "local-model"), TransformersAdapter)
 
 def test_postprocess_normalizes_form_names_and_values():
     review = pd.DataFrame([{"category_key": "C", "facet_id_candidate": "form", "name": "Product Form", "definition": "", "value": " powder ", "alias": "", "source_product_id": "1", "source_field": "product_form"}, {"category_key": "C", "facet_id_candidate": "form", "name": "제품 형태", "definition": "", "value": "분말", "alias": "", "source_product_id": "2", "source_field": "product_form"}])

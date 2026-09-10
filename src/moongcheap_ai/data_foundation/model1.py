@@ -46,17 +46,35 @@ class UnavailableModelAdapter:
         raise ModelCallError("No executable Model 1 provider or local model is configured")
 
 
+def _build_prompt(prompt_path: Path, category: str, products: list[dict[str, Any]], prompt_version: str) -> str:
+    product_text = json.dumps(products, ensure_ascii=False)
+    prompt_template = prompt_path.read_text(encoding="utf-8")
+    return f"{prompt_template}\n\nPrompt version: {prompt_version}\nTarget category_key: {category}\nInput products (evidence only):\n{product_text}"
+
+
+def _parse_json_response(raw_response: str, provider: str) -> dict[str, Any]:
+    try:
+        return json.loads(raw_response)
+    except json.JSONDecodeError:
+        start, end = raw_response.find("{"), raw_response.rfind("}")
+        if start >= 0 and end > start:
+            try:
+                return json.loads(raw_response[start:end + 1])
+            except json.JSONDecodeError:
+                pass
+        raise ModelCallError(f"{provider} returned invalid JSON")
+
+
 class OllamaAdapter:
     provider = "ollama"
 
-    def __init__(self, model: str, endpoint: str = "http://localhost:11434") -> None:
+    def __init__(self, model: str, endpoint: str = "http://localhost:11434", prompt_path: Path | None = None) -> None:
         self.model = model
         self.endpoint = endpoint.rstrip("/")
+        self.prompt_path = prompt_path or PROMPT_PATH
 
     def generate_facet_candidates(self, category: str, products: list[dict[str, Any]], prompt_version: str) -> dict[str, Any]:
-        product_text = json.dumps(products, ensure_ascii=False)
-        prompt_template = PROMPT_PATH.read_text(encoding="utf-8")
-        prompt = f"{prompt_template}\n\nPrompt version: {prompt_version}\nTarget category_key: {category}\nInput products (evidence only):\n{product_text}"
+        prompt = _build_prompt(self.prompt_path, category, products, prompt_version)
         body = json.dumps({"model": self.model, "prompt": prompt, "format": "json", "stream": False, "think": False}, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(f"{self.endpoint}/api/generate", data=body, headers={"Content-Type": "application/json"}, method="POST")
         try:
@@ -67,10 +85,78 @@ class OllamaAdapter:
         raw_response = payload.get("response", "")
         if not raw_response:
             raise ModelCallError("Ollama returned an empty response")
+        return _parse_json_response(raw_response, "Ollama")
+
+
+class OpenAICompatibleAdapter:
+    """Adapter for OpenAI-compatible local servers or commercial APIs."""
+
+    provider = "openai_compatible"
+
+    def __init__(self, model: str, endpoint: str = "https://api.openai.com/v1", api_key: str = "", prompt_path: Path | None = None) -> None:
+        self.model = model
+        self.endpoint = endpoint.rstrip("/")
+        self.api_key = api_key
+        self.prompt_path = prompt_path or PROMPT_PATH
+
+    def generate_facet_candidates(self, category: str, products: list[dict[str, Any]], prompt_version: str) -> dict[str, Any]:
+        prompt = _build_prompt(self.prompt_path, category, products, prompt_version)
+        body = json.dumps({"model": self.model, "messages": [{"role": "user", "content": prompt}], "temperature": 0, "response_format": {"type": "json_object"}}, ensure_ascii=False).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        request = urllib.request.Request(f"{self.endpoint}/chat/completions", data=body, headers=headers, method="POST")
         try:
-            return json.loads(raw_response)
-        except json.JSONDecodeError as exc:
-            raise ModelCallError(f"Ollama returned invalid JSON: {exc}") from exc
+            with urllib.request.urlopen(request, timeout=300) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+            raise ModelCallError(f"OpenAI-compatible call failed: {exc}") from exc
+        try:
+            content = payload["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ModelCallError("OpenAI-compatible response schema invalid") from exc
+        return _parse_json_response(content, "OpenAI-compatible provider")
+
+
+class TransformersAdapter:
+    """Offline Hugging Face Transformers adapter, loaded lazily when selected."""
+
+    provider = "transformers"
+
+    def __init__(self, model: str, prompt_path: Path | None = None) -> None:
+        self.model = model
+        self.prompt_path = prompt_path or PROMPT_PATH
+        self._pipeline = None
+
+    def _get_pipeline(self):
+        if self._pipeline is None:
+            try:
+                from transformers import pipeline
+                self._pipeline = pipeline("text-generation", model=self.model, tokenizer=self.model)
+            except Exception as exc:
+                raise ModelCallError(f"Transformers model unavailable: {exc}") from exc
+        return self._pipeline
+
+    def generate_facet_candidates(self, category: str, products: list[dict[str, Any]], prompt_version: str) -> dict[str, Any]:
+        prompt = _build_prompt(self.prompt_path, category, products, prompt_version)
+        try:
+            output = self._get_pipeline()(prompt, max_new_tokens=2048, do_sample=False, return_full_text=False)[0]["generated_text"]
+        except ModelCallError:
+            raise
+        except Exception as exc:
+            raise ModelCallError(f"Transformers generation failed: {exc}") from exc
+        return _parse_json_response(output, "Transformers")
+
+
+def create_model_adapter(provider: str, model: str, endpoint: str = "", api_key: str = "", prompt_path: Path | None = None) -> ModelAdapter:
+    provider_key = provider.strip().casefold()
+    if provider_key == "ollama":
+        return OllamaAdapter(model, endpoint=endpoint or "http://localhost:11434", prompt_path=prompt_path)
+    if provider_key in {"openai", "openai_compatible", "vllm", "lm_studio"}:
+        return OpenAICompatibleAdapter(model, endpoint=endpoint or "https://api.openai.com/v1", api_key=api_key, prompt_path=prompt_path)
+    if provider_key in {"transformers", "huggingface", "hf"}:
+        return TransformersAdapter(model, prompt_path=prompt_path)
+    return UnavailableModelAdapter()
 
 
 class MockModelAdapter:
@@ -147,7 +233,7 @@ def parse_model_output(payload: Any, input_products: pd.DataFrame) -> tuple[pd.D
                 for value in values:
                     rows.append({"category_key": category_key, "category_name": category_name, "facet_id_candidate": facet.get("facet_id_candidate", ""), "name": name, "definition": facet.get("definition", ""), "value": value.get("value", ""), "alias": "|".join(value.get("aliases") or []), "source_product_id": source_id, "source_field": source_field, "source_text": source_text, "status": "PROVISIONAL_MODEL_OUTPUT"})
         return pd.DataFrame(rows, columns=MODEL_OUTPUT_COLUMNS), failures
-    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (AttributeError, TypeError, ValueError, json.JSONDecodeError) as exc:
         failures.append({"failure_type": "SCHEMA_VALIDATION_FAILED", "detail": str(exc)})
         return pd.DataFrame(columns=MODEL_OUTPUT_COLUMNS), failures
 

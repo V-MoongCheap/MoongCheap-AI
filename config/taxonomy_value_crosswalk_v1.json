@@ -1,0 +1,13 @@
+{
+  "version": "taxonomy-value-crosswalk-v1",
+  "purpose": "Map reviewed Alias sheet canonical values to the current V2.1 taxonomy values.",
+  "source": "Current V2.1 taxonomy product_form values and reviewed Alias sheet",
+  "mappings": {
+    "product_form": {
+      "tablet": "정",
+      "powder": "분말",
+      "capsule": "캡슐",
+      "liquid": "액상"
+    }
+  }
+}

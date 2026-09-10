@@ -34,7 +34,7 @@ def main() -> None:
         id_column = "id" if "id" in catalog.columns else "catalog_seed_id" if "catalog_seed_id" in catalog.columns else None
         if not id_column or "category_id" not in catalog.columns:
             raise SystemExit("catalog export must contain id (or catalog_seed_id) and Backend category_id")
-            catalog_map = dict(zip(catalog[id_column].astype(str), catalog["category_id"].astype(str)))
+        catalog_map = dict(zip(catalog[id_column].astype(str), catalog["category_id"].astype(str)))
     product_facet_map = None
     if args.product_facets:
         if not args.product_facets.exists():

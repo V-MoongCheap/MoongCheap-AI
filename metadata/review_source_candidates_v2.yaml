@@ -1,0 +1,26 @@
+version: 2
+retrieved_at: 2026-09-09
+purpose: 추가 국내 건강기능식품 Review Source 후보 Preflight
+policy: 공식몰·공개 Review·상품 연결·robots·약관을 모두 확인하기 전에는 수집하지 않는다.
+sources:
+  - {source_id: drs_best_korea, url: https://www.drsbest.co.kr/, decision: BLOCKED_OTHER, reason: 국내 공식 유통몰과 공개 Review 연결 미확인}
+  - {source_id: ilyang_health, url: https://www.ilyang.co.kr/, decision: BLOCKED_OTHER, reason: 공식 건강기능식품몰과 공개 Review 미확인}
+  - {source_id: dongkook_health, url: https://www.dkpharm.co.kr/, decision: BLOCKED_OTHER, reason: 회사 사이트와 판매 채널 구분 필요}
+  - {source_id: daewoong_health, url: https://www.daewoong.co.kr/, decision: BLOCKED_OTHER, reason: 자사몰 Review 원문과 상품 연결 미확인}
+  - {source_id: gc_health, url: https://www.gccorp.com/, decision: BLOCKED_OTHER, reason: 공개 건기식 Review 몰 미확인}
+  - {source_id: ildong_health, url: https://www.ildong.com/, decision: BLOCKED_OTHER, reason: 정상 공개 Review 경로 미확인}
+  - {source_id: kwangdong_health, url: https://www.ekwangdong.com/, decision: BLOCKED_OTHER, reason: 공개 Review 연결 자사몰 미확인}
+  - {source_id: hanmi_health, url: https://www.hanmi.co.kr/, decision: BLOCKED_OTHER, reason: 건기식 자사몰 Review 미확인}
+  - {source_id: yuyu_health, url: https://www.yuyu.co.kr/, decision: BLOCKED_OTHER, reason: 공개 Review와 상품 연결 미확인}
+  - {source_id: huons_health, url: https://www.huons.com/, decision: BLOCKED_OTHER, reason: 공개 건기식 Review 판매몰 미확인}
+  - {source_id: d_mall_donga, url: https://www.dmall.co.kr/, decision: BLOCKED_OTHER, reason: 공개 Review와 자동수집 정책 미확인}
+  - {source_id: daesang_wellife, url: https://www.daesangwellife.com/, decision: BLOCKED_OTHER, reason: 공개 Review와 Product 연결 미확인}
+  - {source_id: vitatree, url: https://www.vitatree.co.kr/, decision: BLOCKED_OTHER, reason: 공식몰 여부와 Review 정책 미확인}
+  - {source_id: new_origin, url: https://www.neworigin.co.kr/, decision: BLOCKED_OTHER, reason: 건기식 범위와 공개 Review 연결 미확인}
+  - {source_id: solgar_korea, url: https://www.solgar.co.kr/, decision: BLOCKED_OTHER, reason: 국내 공식 판매몰과 공개 Review 미확인}
+  - {source_id: gnc_korea, url: https://www.gnc.co.kr/, decision: BLOCKED_OTHER, reason: 국내 공식 유통몰과 공개 Review 미확인}
+  - {source_id: denps, url: https://www.denps.com/, decision: BLOCKED_OTHER, reason: 공개 Review·정책·Product 연결 미확인}
+  - {source_id: celltrion_health, url: https://www.celltrionskincure.com/, decision: BLOCKED_OTHER, reason: 건기식 자사몰 Review 조건 미확인}
+  - {source_id: jw_health, url: https://www.jwpharma.co.kr/, decision: BLOCKED_OTHER, reason: 공개 Review와 상품 연결 미확인}
+  - {source_id: pharmbio_health, url: https://www.pharmbio.co.kr/, decision: BLOCKED_OTHER, reason: 공식몰과 공개 Review 미확인}
+  - {source_id: hy_vfood, url: https://www.hy.co.kr/, decision: BLOCKED_OTHER, reason: 브랜드몰 Review 원문과 수집 가능성 미확인}

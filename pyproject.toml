@@ -2,7 +2,7 @@
 name = "moongcheap-ai"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["requests>=2.32,<3", "pandas>=2.2,<3", "python-dotenv>=1.0,<2"]
+dependencies = ["requests>=2.32,<3", "pandas>=2.2,<3", "python-dotenv>=1.0,<2", "pypinyin>=0.55,<1", "kiwipiepy==0.23.2"]
 
 # 판매자 수요 분석 HTTP 진입 계층에만 필요하다. 기본 의존성에 넣지 않는 이유는
 # 계산 계층이 표준 라이브러리만 쓰고, 배치 전용 실행 환경에는 서버가 필요 없기 때문이다.

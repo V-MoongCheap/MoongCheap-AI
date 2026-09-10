@@ -18,6 +18,7 @@ __pycache__/
 .pytest_cache/
 .pytest_tmp*/
 .venv/
+.venv_translation/
 venv/
 .mypy_cache/
 .ruff_cache/
@@ -49,6 +50,7 @@ reports/
 .terraform.lock.hcl
 
 # Local data: raw and generated artifacts are never committed
+data/models/
 data/raw/*
 !data/raw/**/.gitkeep
 data/interim/*

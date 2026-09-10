@@ -45,9 +45,23 @@ class TaxonomyFacetMatcher(KiwiFacetMatcher):
         if alias_path is not None:
             payload = json.loads(Path(alias_path).read_text(encoding="utf-8"))
             for rule in payload.get("aliases", []):
+                local_values = rule.get("category_local_values", {})
                 for category_id, facets in self.values.items():
+                    local_target = local_values.get(category_id, {})
+                    target_code = local_target.get("code")
+                    target_value = local_target.get("value", rule.get("canonical_value", ""))
                     for candidate in facets.get(rule["facet_name"], []):
-                        if normalize(candidate.value) == normalize(rule["canonical_value"]):
+                        # Reviewed aliases may use a language-neutral target
+                        # (for example powder) while V2.2 stores the
+                        # category-local value as 분말. Prefer the reviewed
+                        # local code, then its local value, then the legacy
+                        # canonical value for older alias rows.
+                        matches_local_code = (
+                            target_code is not None
+                            and candidate.value_code == int(target_code)
+                        )
+                        matches_local_value = normalize(candidate.value) == normalize(str(target_value))
+                        if matches_local_code or matches_local_value:
                             self.aliases[
                                 (category_id, candidate.facet_name, candidate.value_code)
                             ].extend(rule["surfaces"])

@@ -1,0 +1,305 @@
+{
+  "version": "model1-reviewed-aliases-v2",
+  "taxonomy_version": "v2.2",
+  "taxonomy_is_modified": false,
+  "aliases": [
+    {
+      "facet_name": "product_form",
+      "canonical_value": "powder",
+      "surfaces": [
+        "가루",
+        "분말"
+      ],
+      "category_local_values": {
+        "health-functional-food:blood_sugar_metabolic": {
+          "value": "분말",
+          "code": 2
+        },
+        "health-functional-food:dietary_fiber": {
+          "value": "분말",
+          "code": 1
+        },
+        "health-functional-food:eye_health": {
+          "value": "분말",
+          "code": 5
+        },
+        "health-functional-food:heart_blood": {
+          "value": "분말",
+          "code": 3
+        },
+        "health-functional-food:joint_health": {
+          "value": "분말",
+          "code": 3
+        },
+        "health-functional-food:liver_health": {
+          "value": "분말",
+          "code": 5
+        },
+        "health-functional-food:male_health": {
+          "value": "분말",
+          "code": 2
+        },
+        "health-functional-food:other_functional": {
+          "value": "분말",
+          "code": 3
+        },
+        "health-functional-food:probiotics": {
+          "value": "분말",
+          "code": 1
+        },
+        "health-functional-food:propolis": {
+          "value": "분말",
+          "code": 3
+        },
+        "health-functional-food:protein": {
+          "value": "분말",
+          "code": 1
+        },
+        "health-functional-food:red_ginseng": {
+          "value": "분말",
+          "code": 3
+        },
+        "health-functional-food:skin_collagen": {
+          "value": "분말",
+          "code": 2
+        },
+        "health-functional-food:theanine_sleep": {
+          "value": "분말",
+          "code": 3
+        },
+        "health-functional-food:vitamin_mineral": {
+          "value": "분말",
+          "code": 3
+        }
+      }
+    },
+    {
+      "facet_name": "product_form",
+      "canonical_value": "tablet",
+      "surfaces": [
+        "정제"
+      ],
+      "category_local_values": {
+        "health-functional-food:blood_sugar_metabolic": {
+          "value": "정",
+          "code": 1
+        },
+        "health-functional-food:dietary_fiber": {
+          "value": "정",
+          "code": 3
+        },
+        "health-functional-food:eye_health": {
+          "value": "정",
+          "code": 3
+        },
+        "health-functional-food:heart_blood": {
+          "value": "정",
+          "code": 2
+        },
+        "health-functional-food:joint_health": {
+          "value": "정",
+          "code": 1
+        },
+        "health-functional-food:liver_health": {
+          "value": "정",
+          "code": 1
+        },
+        "health-functional-food:male_health": {
+          "value": "정",
+          "code": 3
+        },
+        "health-functional-food:omega_fatty_acid": {
+          "value": "정",
+          "code": 6
+        },
+        "health-functional-food:other_functional": {
+          "value": "정",
+          "code": 1
+        },
+        "health-functional-food:probiotics": {
+          "value": "정",
+          "code": 3
+        },
+        "health-functional-food:propolis": {
+          "value": "정",
+          "code": 4
+        },
+        "health-functional-food:protein": {
+          "value": "정",
+          "code": 2
+        },
+        "health-functional-food:red_ginseng": {
+          "value": "정",
+          "code": 4
+        },
+        "health-functional-food:skin_collagen": {
+          "value": "정",
+          "code": 3
+        },
+        "health-functional-food:theanine_sleep": {
+          "value": "정",
+          "code": 1
+        },
+        "health-functional-food:vitamin_mineral": {
+          "value": "정",
+          "code": 1
+        }
+      }
+    },
+    {
+      "facet_name": "product_form",
+      "canonical_value": "capsule",
+      "surfaces": [
+        "알약",
+        "캡슐"
+      ],
+      "category_local_values": {
+        "health-functional-food:blood_sugar_metabolic": {
+          "value": "캡슐",
+          "code": 3
+        },
+        "health-functional-food:dietary_fiber": {
+          "value": "캡슐",
+          "code": 7
+        },
+        "health-functional-food:eye_health": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "health-functional-food:heart_blood": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "health-functional-food:joint_health": {
+          "value": "캡슐",
+          "code": 4
+        },
+        "health-functional-food:liver_health": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "health-functional-food:male_health": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "health-functional-food:omega_fatty_acid": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "health-functional-food:other_functional": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "health-functional-food:probiotics": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "health-functional-food:propolis": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "health-functional-food:protein": {
+          "value": "캡슐",
+          "code": 3
+        },
+        "health-functional-food:red_ginseng": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "health-functional-food:skin_collagen": {
+          "value": "캡슐",
+          "code": 1
+        },
+        "health-functional-food:theanine_sleep": {
+          "value": "캡슐",
+          "code": 2
+        },
+        "health-functional-food:vitamin_mineral": {
+          "value": "캡슐",
+          "code": 2
+        }
+      }
+    },
+    {
+      "facet_name": "product_form",
+      "canonical_value": "liquid",
+      "surfaces": [
+        "액상"
+      ],
+      "category_local_values": {
+        "health-functional-food:blood_sugar_metabolic": {
+          "value": "액상",
+          "code": 4
+        },
+        "health-functional-food:dietary_fiber": {
+          "value": "액상",
+          "code": 4
+        },
+        "health-functional-food:eye_health": {
+          "value": "액상",
+          "code": 6
+        },
+        "health-functional-food:heart_blood": {
+          "value": "액상",
+          "code": 4
+        },
+        "health-functional-food:joint_health": {
+          "value": "액상",
+          "code": 2
+        },
+        "health-functional-food:liver_health": {
+          "value": "액상",
+          "code": 4
+        },
+        "health-functional-food:male_health": {
+          "value": "액상",
+          "code": 6
+        },
+        "health-functional-food:omega_fatty_acid": {
+          "value": "액상",
+          "code": 2
+        },
+        "health-functional-food:other_functional": {
+          "value": "액상",
+          "code": 4
+        },
+        "health-functional-food:probiotics": {
+          "value": "액상",
+          "code": 4
+        },
+        "health-functional-food:propolis": {
+          "value": "액상",
+          "code": 1
+        },
+        "health-functional-food:protein": {
+          "value": "액상",
+          "code": 4
+        },
+        "health-functional-food:red_ginseng": {
+          "value": "액상",
+          "code": 1
+        },
+        "health-functional-food:skin_collagen": {
+          "value": "액상",
+          "code": 5
+        },
+        "health-functional-food:theanine_sleep": {
+          "value": "액상",
+          "code": 4
+        },
+        "health-functional-food:vitamin_mineral": {
+          "value": "액상",
+          "code": 4
+        }
+      }
+    }
+  ],
+  "summary": {
+    "review_rows": 66,
+    "applied_rows": 24,
+    "deferred_rows": 38,
+    "rejected_rows": 4,
+    "target_not_found_rows": 0,
+    "corrected_target_rows": 19
+  }
+}

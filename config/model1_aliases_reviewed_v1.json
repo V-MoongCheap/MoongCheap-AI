@@ -1,0 +1,195 @@
+{
+  "version": "model1-reviewed-aliases-v1",
+  "source": "data\\review\\model1_alias_human_review.csv",
+  "taxonomy": "F:\\kt\\kt\\integration_project\\data\\processed\\downstream_v2_1\\taxonomy_candidate_v2_1.json",
+  "taxonomy_is_modified": false,
+  "aliases": [
+    {
+      "facet_name": "product_form",
+      "canonical_value": "분말",
+      "surfaces": [
+        "가루",
+        "분말"
+      ]
+    },
+    {
+      "facet_name": "product_form",
+      "canonical_value": "정",
+      "surfaces": [
+        "정제"
+      ]
+    },
+    {
+      "facet_name": "product_form",
+      "canonical_value": "캡슐",
+      "surfaces": [
+        "알약",
+        "캡슐"
+      ]
+    },
+    {
+      "facet_name": "product_form",
+      "canonical_value": "액상",
+      "surfaces": [
+        "액상"
+      ]
+    }
+  ],
+  "blocked_aliases": [
+    {
+      "facet_name": "intake_convenience",
+      "canonical_value": "convenient",
+      "taxonomy_canonical_value": "convenient",
+      "surface_count": 3,
+      "surfaces": "먹기 편 | 간편하게 먹 | 복용하기 편",
+      "source_review_orders": "5 | 6 | 34 | 35 | 60 | 61",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "swallowability",
+      "canonical_value": "easy",
+      "taxonomy_canonical_value": "easy",
+      "surface_count": 3,
+      "surfaces": "목넘김 | 넘기기 | 삼키기",
+      "source_review_orders": "7 | 8 | 9",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "tablet_size",
+      "canonical_value": "large",
+      "taxonomy_canonical_value": "large",
+      "surface_count": 2,
+      "surfaces": "큰 알 | 알이 크",
+      "source_review_orders": "10 | 11 | 55 | 56",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "taste",
+      "canonical_value": "taste",
+      "taxonomy_canonical_value": "taste",
+      "surface_count": 3,
+      "surfaces": "맛이 | 맛은 | 쓴맛",
+      "source_review_orders": "12 | 18 | 25",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "tablet_size",
+      "canonical_value": "size",
+      "taxonomy_canonical_value": "size",
+      "surface_count": 1,
+      "surfaces": "사이즈가",
+      "source_review_orders": "13 | 14",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "packaging",
+      "canonical_value": "packaging",
+      "taxonomy_canonical_value": "packaging",
+      "surface_count": 2,
+      "surfaces": "포장도 | 포장이",
+      "source_review_orders": "15 | 16 | 19 | 20",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "odor",
+      "canonical_value": "smell",
+      "taxonomy_canonical_value": "smell",
+      "surface_count": 1,
+      "surfaces": "향이",
+      "source_review_orders": "17",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "odor",
+      "canonical_value": "odor",
+      "taxonomy_canonical_value": "odor",
+      "surface_count": 1,
+      "surfaces": "냄새가 나",
+      "source_review_orders": "21",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "odor",
+      "canonical_value": "fishy",
+      "taxonomy_canonical_value": "fishy",
+      "surface_count": 1,
+      "surfaces": "비린내",
+      "source_review_orders": "23",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "tablet_size",
+      "canonical_value": "small",
+      "taxonomy_canonical_value": "small",
+      "surface_count": 2,
+      "surfaces": "알이 작 | 작은 알",
+      "source_review_orders": "36 | 37 | 62 | 63",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "packaging",
+      "canonical_value": "individual_packaging",
+      "taxonomy_canonical_value": "individual_packaging",
+      "surface_count": 1,
+      "surfaces": "개별 포장",
+      "source_review_orders": "51 | 52",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "taste",
+      "canonical_value": "after_taste",
+      "taxonomy_canonical_value": "after_taste",
+      "surface_count": 1,
+      "surfaces": "뒷맛",
+      "source_review_orders": "54",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "packaging",
+      "canonical_value": "stick_packaging",
+      "taxonomy_canonical_value": "stick_packaging",
+      "surface_count": 1,
+      "surfaces": "스틱 포장",
+      "source_review_orders": "57 | 58",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "ingredient_inclusion",
+      "canonical_value": "ingredient_mentioned",
+      "taxonomy_canonical_value": "ingredient_mentioned",
+      "surface_count": 1,
+      "surfaces": "영양성분",
+      "source_review_orders": "59",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "ingredient_inclusion",
+      "canonical_value": "content",
+      "taxonomy_canonical_value": "content",
+      "surface_count": 1,
+      "surfaces": "함량이 높",
+      "source_review_orders": "64",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    },
+    {
+      "facet_name": "intake_convenience",
+      "canonical_value": "take",
+      "taxonomy_canonical_value": "take",
+      "surface_count": 1,
+      "surfaces": "챙겨 먹기",
+      "source_review_orders": "65 | 66",
+      "apply_status": "BLOCKED_FACET_NOT_IN_TAXONOMY"
+    }
+  ],
+  "summary": {
+    "accepted_review_rows": 62,
+    "unique_alias_targets": 20,
+    "ready_to_apply_targets": 4,
+    "blocked_targets": 16,
+    "decision_counts": {
+      "NEEDS_REVIEW": 41,
+      "APPROVE_ALIAS": 21,
+      "REJECT_DIFFERENT_MEANING": 4
+    }
+  }
+}

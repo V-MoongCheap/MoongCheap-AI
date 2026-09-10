@@ -1,0 +1,67 @@
+﻿facet_id,value_candidate,seed_expression,candidate_expression,example_sentence,occurrence_count,semantic_similarity,proposed_alias,reviewer_decision
+ingredient_inclusion,ingredient_mentioned,함량,함량이 높,아몬드함량이 높아좋아요. 싼가격에 많이 살수있어 좋습니다.,2,0.5,,PENDING_REVIEW
+ingredient_inclusion,ingredient_mentioned,성분,성분이 좋,적당히 도톰하고 좋네요.성분이 좋아서 믿고 구매했어요,34,0.5,,PENDING_REVIEW
+ingredient_inclusion,ingredient_mentioned,성분,영양성분,영양성분 및 품질이 좋아요,4,0.5,,PENDING_REVIEW
+intake_convenience,convenient,먹기 편,먹기 편,덜 피곤한것 같네요 환절기고 피곤해서 먹기시작했는데약이 작아서 먹기 편하기도 하고좀 덜 피곤한 것 같아 먹기 잘한것 같음.가격도 괜찮아서 앞으로도 쭉 먹을예정임,126,1.0,,PENDING_REVIEW
+intake_convenience,convenient,간편하게 먹,간편하게 먹,간편하게 먹을수 있어서 너무 좋아요,42,1.0,,PENDING_REVIEW
+intake_convenience,convenient,챙겨 먹,챙겨 먹기,다이어트도 해야겠고 밥 챙겨 먹기도 힘들고 해서 주문 했어요~냉장고에 가득 쟁이고 싶어요~,1,0.75,,PENDING_REVIEW
+intake_convenience,convenient,복용하기 편,복용하기 편,워낙 유명한제품이라 ㅋ 가격도 비싸지않고 하루한알이라 복용하기 편해요~~ 낱개포장된것도 마음에 들구요 ㅋ 세노비스 워낙 유명하니 믿고 구매했습니다,3,1.0,,PENDING_REVIEW
+intake_convenience,inconvenient,먹기 편,먹기 편,덜 피곤한것 같네요 환절기고 피곤해서 먹기시작했는데약이 작아서 먹기 편하기도 하고좀 덜 피곤한 것 같아 먹기 잘한것 같음.가격도 괜찮아서 앞으로도 쭉 먹을예정임,126,1.0,,PENDING_REVIEW
+intake_convenience,inconvenient,간편하게 먹,간편하게 먹,간편하게 먹을수 있어서 너무 좋아요,42,1.0,,PENDING_REVIEW
+intake_convenience,inconvenient,챙겨 먹,챙겨 먹기,다이어트도 해야겠고 밥 챙겨 먹기도 힘들고 해서 주문 했어요~냉장고에 가득 쟁이고 싶어요~,1,0.75,,PENDING_REVIEW
+intake_convenience,inconvenient,복용하기 편,복용하기 편,워낙 유명한제품이라 ㅋ 가격도 비싸지않고 하루한알이라 복용하기 편해요~~ 낱개포장된것도 마음에 들구요 ㅋ 세노비스 워낙 유명하니 믿고 구매했습니다,3,1.0,,PENDING_REVIEW
+odor,fishy,향,향이,아직 세제는 써보지 않았어요. 섬유유연제는 저에겐 향이 너무나도 진합니다. 100원짜리동전만큼 넣고 사용하고있습니다.,1260,0.5,,PENDING_REVIEW
+odor,fishy,비린내,비린내,야채다상하고 짓물러져있고 과메기에 비린내가 나는건알지만 그정도로 심하게 날줄은 정말상상을못했네요 제꺼만그랬던건지몰라도 저는 진짜최악이였습니다,234,1.0,,PENDING_REVIEW
+odor,fishy,냄새,냄새가 안,배송은 마음에 듭니다만 상품은 냄새 어쩔꺼예요. 별의별 짓을 다해도 냄새가 안빠짐. 토하겠음 ㅜㅜ,106,0.5,,PENDING_REVIEW
+odor,fishy,냄새,냄새가 나,화장실에 놓고보니 뚜껑 한부분이 조금 부서졌는데 이미 다뜯어서 그냥 썼어요. 근데 뚜껑 닫을때도 힘줘서 닫아야해서 불편하고 밀폐도 그닥이에여 ㅠ 애기 똥 기저귀도 없는데 쿰쿰한? 냄새가 나네요 ㅠㅠ,266,0.5,,PENDING_REVIEW
+odor,fishy,냄새,냄새가 없,배송은 5-6일 소요됐어요 상품은 새거처럼 왔는데 열선타는 냄새가 정말 심하네요 냄새가 없어질지는 잘 모르겠어요,25,0.5,,PENDING_REVIEW
+packaging,individual_packaging,포장,포장도,"포장도 하나하나 포장해주시고^^ 다른곳은 레드장몽이라 판매해서 구매해보면 레드가 하나있고 나머지는 전부 레드가 아닌데 여긴 전부 싱싱하고 올레드입니다,, 재구매합니다~~~당도도 좋아요",1437,0.667,,PENDING_REVIEW
+packaging,individual_packaging,포장,포장이,배송이 빠르고 깔끔한 포장이예요,953,0.667,,PENDING_REVIEW
+packaging,individual_packaging,개별 포장,개별 포장,"상품이미지와 배달된 마이쮸가 다르네요 상품이미지는 진공개별포장인데, 배달된 상품은 그냥 개별 포장이라 아쉽네요",31,1.0,,PENDING_REVIEW
+packaging,individual_packaging,스틱 포장,스틱 포장,재구매 늘 쓰던거라 주문했어요. 100개는 플라스틱 포장이 아니더라고요. 재구매시에는 플라스틱 용기 있는 걸로 주문해야겠어요.^^,5,1.0,,PENDING_REVIEW
+packaging,portable,포장,포장도,"포장도 하나하나 포장해주시고^^ 다른곳은 레드장몽이라 판매해서 구매해보면 레드가 하나있고 나머지는 전부 레드가 아닌데 여긴 전부 싱싱하고 올레드입니다,, 재구매합니다~~~당도도 좋아요",1437,0.667,,PENDING_REVIEW
+packaging,portable,포장,포장이,배송이 빠르고 깔끔한 포장이예요,953,0.667,,PENDING_REVIEW
+packaging,portable,개별 포장,개별 포장,"상품이미지와 배달된 마이쮸가 다르네요 상품이미지는 진공개별포장인데, 배달된 상품은 그냥 개별 포장이라 아쉽네요",31,1.0,,PENDING_REVIEW
+packaging,portable,스틱 포장,스틱 포장,재구매 늘 쓰던거라 주문했어요. 100개는 플라스틱 포장이 아니더라고요. 재구매시에는 플라스틱 용기 있는 걸로 주문해야겠어요.^^,5,1.0,,PENDING_REVIEW
+product_form,capsule,분말,분말,분말이 고아서 쓰기좋아요 아이 양치질용으로 아이 사탕용으로 잘 쓰고 있어요 감사합니다^^,37,1.0,,PENDING_REVIEW
+product_form,capsule,가루,가루,"한 달을 써봤습니다. 저는 무쌍이고 유분은 보통인 편이에요~ (기름종이 or 팩트 사용 No) 오전 9시쯤 바르고, 오후 3~4시쯤 되면 다 번져 있습니다.... 가루날림도 많고요 ㅠㅠ 가격 때문에 별 2개예요....",668,1.0,,PENDING_REVIEW
+product_form,capsule,액상,액상,액상이 많이나오네요,36,1.0,,PENDING_REVIEW
+product_form,capsule,캡슐,캡슐,"재구매 가격이 저렴해 그닥 큰 기대없었는데, 크레마도 풍부하도 넘 맛있어서 재구매했어요. 캡슐 색이 좀 촌스러운 것 빼면 모든게 만족스러운 커피 캡슐.^^",36,1.0,,PENDING_REVIEW
+product_form,capsule,알약,알약,그린프로폴리스 찾으셔서 인터넷 검색하다 평이 좋아서 구입했어요. 알크기도 적당하고 톡터지는 액상 아니고 일반 알약이라 더 좋아하시네요. 한달 먹어보고 괜찮으면 계속 구입할려구요.,48,1.0,,PENDING_REVIEW
+product_form,capsule,정제,정제,가죽세정제. 좋은거같아요. 차안에 손자국도 잘닦여요,53,1.0,,PENDING_REVIEW
+product_form,liquid,분말,분말,분말이 고아서 쓰기좋아요 아이 양치질용으로 아이 사탕용으로 잘 쓰고 있어요 감사합니다^^,37,1.0,,PENDING_REVIEW
+product_form,liquid,가루,가루,"한 달을 써봤습니다. 저는 무쌍이고 유분은 보통인 편이에요~ (기름종이 or 팩트 사용 No) 오전 9시쯤 바르고, 오후 3~4시쯤 되면 다 번져 있습니다.... 가루날림도 많고요 ㅠㅠ 가격 때문에 별 2개예요....",668,1.0,,PENDING_REVIEW
+product_form,liquid,액상,액상,액상이 많이나오네요,36,1.0,,PENDING_REVIEW
+product_form,liquid,캡슐,캡슐,"재구매 가격이 저렴해 그닥 큰 기대없었는데, 크레마도 풍부하도 넘 맛있어서 재구매했어요. 캡슐 색이 좀 촌스러운 것 빼면 모든게 만족스러운 커피 캡슐.^^",36,1.0,,PENDING_REVIEW
+product_form,liquid,알약,알약,그린프로폴리스 찾으셔서 인터넷 검색하다 평이 좋아서 구입했어요. 알크기도 적당하고 톡터지는 액상 아니고 일반 알약이라 더 좋아하시네요. 한달 먹어보고 괜찮으면 계속 구입할려구요.,48,1.0,,PENDING_REVIEW
+product_form,liquid,정제,정제,가죽세정제. 좋은거같아요. 차안에 손자국도 잘닦여요,53,1.0,,PENDING_REVIEW
+product_form,powder,분말,분말,분말이 고아서 쓰기좋아요 아이 양치질용으로 아이 사탕용으로 잘 쓰고 있어요 감사합니다^^,37,1.0,,PENDING_REVIEW
+product_form,powder,가루,가루,"한 달을 써봤습니다. 저는 무쌍이고 유분은 보통인 편이에요~ (기름종이 or 팩트 사용 No) 오전 9시쯤 바르고, 오후 3~4시쯤 되면 다 번져 있습니다.... 가루날림도 많고요 ㅠㅠ 가격 때문에 별 2개예요....",668,1.0,,PENDING_REVIEW
+product_form,powder,액상,액상,액상이 많이나오네요,36,1.0,,PENDING_REVIEW
+product_form,powder,캡슐,캡슐,"재구매 가격이 저렴해 그닥 큰 기대없었는데, 크레마도 풍부하도 넘 맛있어서 재구매했어요. 캡슐 색이 좀 촌스러운 것 빼면 모든게 만족스러운 커피 캡슐.^^",36,1.0,,PENDING_REVIEW
+product_form,powder,알약,알약,그린프로폴리스 찾으셔서 인터넷 검색하다 평이 좋아서 구입했어요. 알크기도 적당하고 톡터지는 액상 아니고 일반 알약이라 더 좋아하시네요. 한달 먹어보고 괜찮으면 계속 구입할려구요.,48,1.0,,PENDING_REVIEW
+product_form,powder,정제,정제,가죽세정제. 좋은거같아요. 차안에 손자국도 잘닦여요,53,1.0,,PENDING_REVIEW
+product_form,tablet,분말,분말,분말이 고아서 쓰기좋아요 아이 양치질용으로 아이 사탕용으로 잘 쓰고 있어요 감사합니다^^,37,1.0,,PENDING_REVIEW
+product_form,tablet,가루,가루,"한 달을 써봤습니다. 저는 무쌍이고 유분은 보통인 편이에요~ (기름종이 or 팩트 사용 No) 오전 9시쯤 바르고, 오후 3~4시쯤 되면 다 번져 있습니다.... 가루날림도 많고요 ㅠㅠ 가격 때문에 별 2개예요....",668,1.0,,PENDING_REVIEW
+product_form,tablet,액상,액상,액상이 많이나오네요,36,1.0,,PENDING_REVIEW
+product_form,tablet,캡슐,캡슐,"재구매 가격이 저렴해 그닥 큰 기대없었는데, 크레마도 풍부하도 넘 맛있어서 재구매했어요. 캡슐 색이 좀 촌스러운 것 빼면 모든게 만족스러운 커피 캡슐.^^",36,1.0,,PENDING_REVIEW
+product_form,tablet,알약,알약,그린프로폴리스 찾으셔서 인터넷 검색하다 평이 좋아서 구입했어요. 알크기도 적당하고 톡터지는 액상 아니고 일반 알약이라 더 좋아하시네요. 한달 먹어보고 괜찮으면 계속 구입할려구요.,48,1.0,,PENDING_REVIEW
+product_form,tablet,정제,정제,가죽세정제. 좋은거같아요. 차안에 손자국도 잘닦여요,53,1.0,,PENDING_REVIEW
+swallowability,easy,삼키기,삼키기,"고구마가 품절이고 특대가 바로 배송해준다고하여 주문했는데 배송도 너~무 오래 걸렸고, 처음 받자마자 사이즈는 남자어른 팔뚝만해서 놀랐고, 압력솥으로 삶았는데 섬유질이 너무 많아 삼키기어려운 정도여서 삶은거 다 버렸네요.",11,1.0,,PENDING_REVIEW
+swallowability,easy,목넘김,목넘김,배송오자마자 잘먹고있어요. 사무실에 놔두고 매일 잊지않고 잘먹게되네요. 과일 야채 혼자사닌깐 잘 못챙겨먹는데 요걸로 대신 먹어서 그런지 피곤함도 덜한게 저한테 잘맞네요. 목넘김도 편해서 더 맘에들어요.,25,1.0,,PENDING_REVIEW
+swallowability,easy,넘기기,넘기기,사이즈가 커서 목 넘기기 좀 힘드네요 물을 많이 마셔야해요 알약 잘 드시는 분은 괜찮을수도. 전 약간 힘드네요,12,1.0,,PENDING_REVIEW
+tablet_size,large,사이즈,사이즈가,사이즈가 딱이에요!! 오자마자 쪄 먹엇는뎅 달디달아요,1788,0.75,,PENDING_REVIEW
+tablet_size,large,알이 작,알이 작,포장은 잘되어 있더라구요 깨진 계란 하나도 없고 근데 알아 너무 작네여 일반 계란이랑 비교했는데 너무 조그매서 매추리알같네요 진짜 왜이렇게 알이 작나요???? 진짜 산거 후회해요,42,1.0,,PENDING_REVIEW
+tablet_size,large,알이 크,알이 크,생각보다 알이 크고 좀 싸구려같은 느낌이 많이 나요 ㅠㅠ,9,1.0,,PENDING_REVIEW
+tablet_size,large,작은 알,작은 알,비타민 미네랄 제품을 먹고있는데 칼슘 마스네슘도 먹이려고 샀어요 같은 우유맛이라 되어있어도 실제 맛은 달라서 야가 잘 안먹으려고 하네요. 작은 알갱이도 씹히구요,3,1.0,,PENDING_REVIEW
+tablet_size,large,큰 알,큰 알,"디자인은 이뻤는데, 오메가3처럼 사이즈가 좀 큰 알약은 두개 넣으면 안 닫히더라구요ㅠㅠ 그래도 꾸역꾸역 넣었는데 여행간 지 하루만에 케이스가 깨졌습니다...사실 분들은 꼭 하나씩만 넣으시길 추천드려요!",2,1.0,,PENDING_REVIEW
+tablet_size,small,사이즈,사이즈가,사이즈가 딱이에요!! 오자마자 쪄 먹엇는뎅 달디달아요,1788,0.75,,PENDING_REVIEW
+tablet_size,small,알이 작,알이 작,포장은 잘되어 있더라구요 깨진 계란 하나도 없고 근데 알아 너무 작네여 일반 계란이랑 비교했는데 너무 조그매서 매추리알같네요 진짜 왜이렇게 알이 작나요???? 진짜 산거 후회해요,42,1.0,,PENDING_REVIEW
+tablet_size,small,알이 크,알이 크,생각보다 알이 크고 좀 싸구려같은 느낌이 많이 나요 ㅠㅠ,9,1.0,,PENDING_REVIEW
+tablet_size,small,작은 알,작은 알,비타민 미네랄 제품을 먹고있는데 칼슘 마스네슘도 먹이려고 샀어요 같은 우유맛이라 되어있어도 실제 맛은 달라서 야가 잘 안먹으려고 하네요. 작은 알갱이도 씹히구요,3,1.0,,PENDING_REVIEW
+tablet_size,small,큰 알,큰 알,"디자인은 이뻤는데, 오메가3처럼 사이즈가 좀 큰 알약은 두개 넣으면 안 닫히더라구요ㅠㅠ 그래도 꾸역꾸역 넣었는데 여행간 지 하루만에 케이스가 깨졌습니다...사실 분들은 꼭 하나씩만 넣으시길 추천드려요!",2,1.0,,PENDING_REVIEW
+taste,bitter,맛,맛은,양은 많은데 맛은 없었습니다,1229,0.5,,PENDING_REVIEW
+taste,bitter,맛,맛이,닭 특유의 비린 맛이 나서 별로요 ㅠㅠ,3238,0.5,,PENDING_REVIEW
+taste,bitter,쓴맛,쓴맛,리뷰가너무좋아서 구매했어요.외관케이스랑은 너무깔큼하고있는데 치약이좀쓴편이에요.첫맛부터끝까지쓴맛이너무써서 저랑신랑아이들이랑은안맞는거같아요ㅜㅜ,100,1.0,,PENDING_REVIEW
+taste,bitter,쓴맛,단맛,박스를 열었을때는 알이 굵고 애기 머리통만한 고구마라 좋아라했어요. 구워먹으려고 자르는 순간 표면이 까맣게 변했고 굽고 나니까 속이 까매진게 보이네요. 단맛도 안나고 약간 쓴맛 같은게 나서 속상하네요.,245,0.333,,PENDING_REVIEW
+taste,bitter,뒷맛,뒷맛,맛잇어요-처음 받아서 먹어보니 약간 보통김치처럼 그런맛이 아니고 조금 이상하더라고요 ---근데 자꾸 먹어보니 맛있어요 뒷맛이 새콤하니 맛있네요,12,1.0,,PENDING_REVIEW
