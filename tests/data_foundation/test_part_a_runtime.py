@@ -116,6 +116,12 @@ def test_part_a_prevalidates_category_before_parser_and_keeps_invalid_rows_pendi
     assert list(result["status"]) == ["REVIEW", "REVIEW"]
     assert list(result["diagnostic_code"]) == ["CATEGORY_MISSING", "CATEGORY_NOT_IN_TAXONOMY"]
     assert list(result["processed_at"]) == ["", ""]
+    assert set(result.loc[0, ["effectiveRequirementMode", "preferenceGroups", "passthroughText"]].index) == {
+        "effectiveRequirementMode", "preferenceGroups", "passthroughText"
+    }
+    assert result.loc[0, "effectiveRequirementMode"] == "NONE"
+    assert result.loc[0, "preferenceGroups"] == "[]"
+    assert pd.isna(result.loc[0, "passthroughText"])
     assert summary["categoryPrevalidationFailureCount"] == 2
 
 
@@ -143,6 +149,9 @@ def test_part_a_rejects_invalid_substitution_consent_before_parser(tmp_path, mon
     assert result.loc[0, "status"] == "REVIEW"
     assert result.loc[0, "diagnostic_code"] == "INVALID_IS_SUBSTITUTABLE"
     assert result.loc[0, "processed_at"] == ""
+    assert result.loc[0, "effectiveRequirementMode"] == "NONE"
+    assert result.loc[0, "preferenceGroups"] == "[]"
+    assert pd.isna(result.loc[0, "passthroughText"])
 
 
 def test_v22_category_local_alias_maps_powder_to_korean_value():
