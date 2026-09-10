@@ -8,8 +8,8 @@
 - Candidate rows: 200
 - Standard candidates: 150
 - Challenge candidates: 50
-- Reused human-reviewed reference rows: 129
-- Newly composed candidates: 71
+- Reused human-reviewed reference rows: 100
+- Newly composed candidates: 100
 - Category count: 16
 - Pending review rows: 200
 
@@ -23,21 +23,21 @@ HOLDOUT       50
 ## Candidate Provenance
 
 candidate_origin
-EXISTING_REVIEWED_FIXTURE    129
+EXISTING_REVIEWED_FIXTURE    100
 NEW_CHALLENGE_CANDIDATE       50
-NEW_STANDARD_CANDIDATE        21
+NEW_STANDARD_CANDIDATE        50
 
 ## Parser Exposure
 
 parser_exposure
-KNOWN_TO_EXISTING_TESTS    129
-NEW_UNSEEN_CANDIDATE        71
+KNOWN_TO_EXISTING_TESTS    100
+NEW_UNSEEN_CANDIDATE       100
 
 ## Provenance
 
 - Existing 200-row Legacy Gold: `NOT_FOUND`.
 - Existing 72.50% metric remains `LEGACY_EXPERIMENT_REFERENCE` and is not used as a baseline here.
-- 129 rows come from the tracked human-reviewed v042 evaluation fixture.
+- 100 unique rows come from the tracked human-reviewed v042 evaluation fixture.
 - Remaining rows are deterministic candidate compositions from V2.2 category-local canonical values.
 - MFDS raw product facts were not available in the tracked workspace, so they are not claimed as grounding for these rows.
 - No row is automatically finalized as Gold.
@@ -57,15 +57,15 @@ CHALLENGE        ANY_OF_CANDIDATE                              8
                  NOT_APPLICABLE_CANDIDATE                      5
                  PASSTHROUGH_CANDIDATE                         6
                  REVIEW_CANDIDATE                              5
-STANDARD         GROUNDED_EXCLUDE_CANDIDATE                    7
-                 GROUNDED_MUST_CANDIDATE                       7
-                 GROUNDED_PREFER_CANDIDATE                     7
-                 MULTI_FACET_NOMINAL_PROHIBITION_LOCALITY      8
+STANDARD         GROUNDED_EXCLUDE_CANDIDATE                   16
+                 GROUNDED_MUST_CANDIDATE                      17
+                 GROUNDED_PREFER_CANDIDATE                    17
+                 MULTI_FACET_NOMINAL_PROHIBITION_LOCALITY      4
                  NEGATED_REMOVAL_ALTERNATIVE_DELIBERATION     30
                  NEGATED_REMOVAL_SAME_TARGET_FINAL_CONTROL    12
                  NEGATIVE_COMPARATIVE_FINAL_HARD_CONTROL       8
-                 NOMINAL_PROHIBITION_ORDER_VARIATION          36
+                 NOMINAL_PROHIBITION_ORDER_VARIATION          15
                  POSITIVE_NOMINAL_INCLUSION_CONTROL           17
-                 REPORTED_NOMINAL_PROHIBITION_ONLY             9
+                 REPORTED_NOMINAL_PROHIBITION_ONLY             5
                  SOFT_NEGATIVE_COMPARATIVE_CONTROL             9
 
