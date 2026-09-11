@@ -1,0 +1,127 @@
+{
+  "total_rows": 200,
+  "result_path": "reports\\part_a_v2_2_gold\\part_a_v2_2_gold_evaluation_results.csv",
+  "DEV": {
+    "rows": 100,
+    "status_match": {
+      "count": 100,
+      "rate": 1.0
+    },
+    "parser_mode_match": {
+      "count": 100,
+      "rate": 1.0
+    },
+    "effective_mode_match": {
+      "count": 100,
+      "rate": 1.0
+    },
+    "constraints_match": {
+      "count": 100,
+      "rate": 1.0
+    },
+    "preference_groups_match": {
+      "count": 100,
+      "rate": 1.0
+    },
+    "passthrough_match": {
+      "count": 100,
+      "rate": 1.0
+    },
+    "row_pass": {
+      "count": 100,
+      "rate": 1.0
+    }
+  },
+  "HOLDOUT": {
+    "rows": 50,
+    "status_match": {
+      "count": 32,
+      "rate": 0.64
+    },
+    "parser_mode_match": {
+      "count": 31,
+      "rate": 0.62
+    },
+    "effective_mode_match": {
+      "count": 32,
+      "rate": 0.64
+    },
+    "constraints_match": {
+      "count": 31,
+      "rate": 0.62
+    },
+    "preference_groups_match": {
+      "count": 50,
+      "rate": 1.0
+    },
+    "passthrough_match": {
+      "count": 50,
+      "rate": 1.0
+    },
+    "row_pass": {
+      "count": 31,
+      "rate": 0.62
+    }
+  },
+  "CHALLENGE": {
+    "rows": 50,
+    "status_match": {
+      "count": 15,
+      "rate": 0.3
+    },
+    "parser_mode_match": {
+      "count": 20,
+      "rate": 0.4
+    },
+    "effective_mode_match": {
+      "count": 15,
+      "rate": 0.3
+    },
+    "constraints_match": {
+      "count": 28,
+      "rate": 0.56
+    },
+    "preference_groups_match": {
+      "count": 42,
+      "rate": 0.84
+    },
+    "passthrough_match": {
+      "count": 44,
+      "rate": 0.88
+    },
+    "row_pass": {
+      "count": 15,
+      "rate": 0.3
+    }
+  },
+  "overall": {
+    "status_match": {
+      "count": 147,
+      "rate": 0.735
+    },
+    "parser_mode_match": {
+      "count": 151,
+      "rate": 0.755
+    },
+    "effective_mode_match": {
+      "count": 147,
+      "rate": 0.735
+    },
+    "constraints_match": {
+      "count": 159,
+      "rate": 0.795
+    },
+    "preference_groups_match": {
+      "count": 192,
+      "rate": 0.96
+    },
+    "passthrough_match": {
+      "count": 194,
+      "rate": 0.97
+    },
+    "row_pass": {
+      "count": 146,
+      "rate": 0.73
+    }
+  }
+}
