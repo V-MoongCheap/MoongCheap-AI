@@ -1,4 +1,0 @@
--r requirements.txt
-
-# Optional quality and local development tools can be added here without
-# changing the runtime dependency set.
