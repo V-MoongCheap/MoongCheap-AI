@@ -182,10 +182,11 @@ def sample_products(frame: pd.DataFrame, max_per_category: int = 24, seed: int =
     sampled: list[pd.DataFrame] = []
     for category_key, group in data[data["category_key"] != "UNMAPPED"].groupby("category_key", sort=True):
         group = group.sample(frac=1, random_state=seed).drop_duplicates(subset=["source_product_id"])
+        slots = max(1, max_per_category // 3)
         selected = pd.concat([
-            group.sort_values("source_category_path" if "source_category_path" in group else "product_type").head(max_per_category // 3),
-            group[group.get("product_form", "") != ""].head(max_per_category // 3),
-            group[group.get("functional_ingredients", "") != ""].head(max_per_category // 3),
+            group.sort_values("source_category_path" if "source_category_path" in group else "product_type").head(slots),
+            group[group.get("product_form", "") != ""].head(slots),
+            group[group.get("functional_ingredients", "") != ""].head(slots),
         ]).drop_duplicates(subset=["source_product_id"]).head(max_per_category)
         selected = selected.copy()
         selected["sampling_reason"] = "category/source/form/ingredient diversity sample"

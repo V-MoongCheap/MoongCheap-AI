@@ -20,6 +20,11 @@ def test_sampling_is_category_scoped_and_reproducible():
     assert set(left.columns) >= {"category_key", "source_product_id", "sampling_reason"}
 
 
+def test_sampling_keeps_small_limits_non_empty():
+    result = sample_products(_frame(), max_per_category=2)
+    assert len(result) == 1
+
+
 def test_mock_output_parser_accepts_input_evidence():
     frame = _frame()
     output = MockModelAdapter().generate_facet_candidates("health-functional-food:vitamin_mineral", [{"category_name": "비타민·미네랄", "source_product_id": "1", "product_form": "정제"}], "v0")
