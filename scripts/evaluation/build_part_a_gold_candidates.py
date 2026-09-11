@@ -283,15 +283,15 @@ def _apply_quality_patches(frame: pd.DataFrame) -> pd.DataFrame:
     """
     by_id = frame.set_index("case_id")
 
-    # The phrase expresses a soft preference, not a hard requirement.
+    # The phrase explicitly asks to find products containing this value.
     row = "part-a-v2-2-121"
     constraints = json.loads(by_id.at[row, "proposed_expected_constraints"])
     for item in constraints:
-        item["constraint_type"] = "PREFER"
+        item["constraint_type"] = "MUST"
     by_id.at[row, "proposed_expected_constraints"] = json.dumps(
         constraints, ensure_ascii=False, separators=(",", ":")
     )
-    by_id.at[row, "proposed_expected_mode"] = "PREFER"
+    by_id.at[row, "proposed_expected_mode"] = "MUST"
 
     # The taxonomy uses the same daily-frequency value in this sentence, but
     # the wording expresses a preference rather than a hard requirement.

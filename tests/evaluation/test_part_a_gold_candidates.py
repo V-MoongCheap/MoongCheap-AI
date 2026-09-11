@@ -92,8 +92,8 @@ def test_assistant_qa_corrections_are_applied_without_auto_approval() -> None:
     ).set_index("case_id")
 
     row = frame.loc["part-a-v2-2-121"]
-    assert row["proposed_expected_mode"] == "PREFER"
-    assert '"constraint_type":"PREFER"' in row["proposed_expected_constraints"]
+    assert row["proposed_expected_mode"] == "MUST"
+    assert '"constraint_type":"MUST"' in row["proposed_expected_constraints"]
 
     row = frame.loc["part-a-v2-2-129"]
     assert row["extra_requirement"] == "캡슐 제형이 포함된 제품을 찾아주세요."
