@@ -45,13 +45,13 @@ def _constraint(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def _constraints(value: Any) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
+    if not isinstance(value, (list, tuple)):
         return []
     return [_constraint(item) for item in value if isinstance(item, dict)]
 
 
 def _groups(value: Any) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
+    if not isinstance(value, (list, tuple)):
         return []
     result: list[dict[str, Any]] = []
     for group in value:

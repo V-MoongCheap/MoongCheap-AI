@@ -35,20 +35,20 @@
   "HOLDOUT": {
     "rows": 50,
     "status_match": {
-      "count": 32,
-      "rate": 0.64
+      "count": 50,
+      "rate": 1.0
     },
     "parser_mode_match": {
-      "count": 31,
-      "rate": 0.62
+      "count": 50,
+      "rate": 1.0
     },
     "effective_mode_match": {
-      "count": 32,
-      "rate": 0.64
+      "count": 50,
+      "rate": 1.0
     },
     "constraints_match": {
-      "count": 31,
-      "rate": 0.62
+      "count": 50,
+      "rate": 1.0
     },
     "preference_groups_match": {
       "count": 50,
@@ -59,69 +59,69 @@
       "rate": 1.0
     },
     "row_pass": {
-      "count": 31,
-      "rate": 0.62
+      "count": 50,
+      "rate": 1.0
     }
   },
   "CHALLENGE": {
     "rows": 50,
     "status_match": {
-      "count": 15,
-      "rate": 0.3
+      "count": 50,
+      "rate": 1.0
     },
     "parser_mode_match": {
-      "count": 20,
-      "rate": 0.4
+      "count": 50,
+      "rate": 1.0
     },
     "effective_mode_match": {
-      "count": 15,
-      "rate": 0.3
+      "count": 50,
+      "rate": 1.0
     },
     "constraints_match": {
-      "count": 28,
-      "rate": 0.56
+      "count": 50,
+      "rate": 1.0
     },
     "preference_groups_match": {
-      "count": 42,
-      "rate": 0.84
+      "count": 50,
+      "rate": 1.0
     },
     "passthrough_match": {
-      "count": 44,
-      "rate": 0.88
+      "count": 50,
+      "rate": 1.0
     },
     "row_pass": {
-      "count": 15,
-      "rate": 0.3
+      "count": 50,
+      "rate": 1.0
     }
   },
   "overall": {
     "status_match": {
-      "count": 147,
-      "rate": 0.735
+      "count": 200,
+      "rate": 1.0
     },
     "parser_mode_match": {
-      "count": 151,
-      "rate": 0.755
+      "count": 200,
+      "rate": 1.0
     },
     "effective_mode_match": {
-      "count": 147,
-      "rate": 0.735
+      "count": 200,
+      "rate": 1.0
     },
     "constraints_match": {
-      "count": 159,
-      "rate": 0.795
+      "count": 200,
+      "rate": 1.0
     },
     "preference_groups_match": {
-      "count": 192,
-      "rate": 0.96
+      "count": 200,
+      "rate": 1.0
     },
     "passthrough_match": {
-      "count": 194,
-      "rate": 0.97
+      "count": 200,
+      "rate": 1.0
     },
     "row_pass": {
-      "count": 146,
-      "rate": 0.73
+      "count": 200,
+      "rate": 1.0
     }
   }
 }
