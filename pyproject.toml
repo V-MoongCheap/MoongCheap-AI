@@ -8,6 +8,7 @@ dependencies = ["requests>=2.32,<3", "pandas>=2.2,<3", "python-dotenv>=1.0,<2", 
 # 계산 계층이 표준 라이브러리만 쓰고, 배치 전용 실행 환경에는 서버가 필요 없기 때문이다.
 [project.optional-dependencies]
 api = ["fastapi==0.115.6", "uvicorn==0.34.0", "httpx==0.28.1"]
+model1-hf = ["transformers>=4.48,<5", "accelerate>=1.2,<2", "huggingface-hub>=0.27,<1", "safetensors>=0.4,<1", "torch>=2.5,<3"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
