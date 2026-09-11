@@ -85,6 +85,36 @@ def test_taxonomy_cleanup_removes_invalid_daily_frequency_and_duplicate_value() 
     assert set(frame["reviewer_status"]) == {"PENDING_REVIEW"}
 
 
+def test_assistant_qa_corrections_are_applied_without_auto_approval() -> None:
+    frame = build_candidate_set(
+        ROOT / "config/facet_taxonomy_v2_2.json",
+        ROOT / "tests/demand_constraints/fixtures/v042_approved_eval.csv",
+    ).set_index("case_id")
+
+    row = frame.loc["part-a-v2-2-121"]
+    assert row["proposed_expected_mode"] == "PREFER"
+    assert '"constraint_type":"PREFER"' in row["proposed_expected_constraints"]
+
+    row = frame.loc["part-a-v2-2-129"]
+    assert row["extra_requirement"] == "캡슐 제형이 포함된 제품을 찾아주세요."
+    assert '"value_code":1' in row["proposed_expected_constraints"]
+
+    assert frame.loc["part-a-v2-2-149", "extra_requirement"] == (
+        "오메가-3지방산함유유지가 포함된 제품을 찾습니다."
+    )
+    assert frame.loc["part-a-v2-2-180", "extra_requirement"] == (
+        "겔은 반드시 포함하고, 겔은 제외해주세요."
+    )
+    assert frame.loc["part-a-v2-2-191", "extra_requirement"] == (
+        "반드시 캡슐 제품이면 좋겠어요."
+    )
+
+    # QA corrections prepare the candidate set; human approval is still required.
+    assert set(frame["reviewer_status"]) == {"PENDING_REVIEW"}
+    assert "11일 1회" not in frame.loc["part-a-v2-2-118", "reviewer_note"]
+    assert "TAXONOMY_CHECK_REQUIRED" not in frame.loc["part-a-v2-2-162", "reviewer_note"]
+
+
 def test_finalize_blocks_pending_review(tmp_path: Path) -> None:
     source = tmp_path / "candidates.csv"
     frame = build_candidate_set(

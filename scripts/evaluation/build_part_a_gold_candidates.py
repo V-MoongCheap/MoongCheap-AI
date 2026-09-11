@@ -293,6 +293,11 @@ def _apply_quality_patches(frame: pd.DataFrame) -> pd.DataFrame:
     )
     by_id.at[row, "proposed_expected_mode"] = "PREFER"
 
+    # The taxonomy uses the same daily-frequency value in this sentence, but
+    # the wording expresses a preference rather than a hard requirement.
+    row = "part-a-v2-2-121"
+    by_id.at[row, "proposed_expected_effective_requirement_mode"] = "STRUCTURED"
+
     # Avoid using a catch-all product-form value in a holdout example.
     row = "part-a-v2-2-129"
     constraints = json.loads(by_id.at[row, "proposed_expected_constraints"])
@@ -322,12 +327,12 @@ def _apply_quality_patches(frame: pd.DataFrame) -> pd.DataFrame:
         by_id.at[case_id, "extra_requirement"] = text
 
     by_id.at["part-a-v2-2-118", "reviewer_note"] = (
-        "TAXONOMY_CHECK_REQUIRED: other_functional daily_frequency code 5의 "
-        "'11일 1회'가 의도된 canonical value인지 확인 필요."
+        "QA 확인 완료: other_functional daily_frequency code 6의 '1일 5회'는 "
+        "V2.2 taxonomy에 존재하는 canonical value이다."
     )
     by_id.at["part-a-v2-2-162", "reviewer_note"] = (
-        "TAXONOMY_CHECK_REQUIRED: 판토텐산·비오틴 조합의 순서만 다른 두 value code "
-        "(4, 5) equivalence 확인 필요."
+        "QA 확인 완료: V2.2 taxonomy에서는 '판토텐산, 비오틴'을 code 4로 유지하고 "
+        "순서가 뒤집힌 중복 value는 제거했다."
     )
     return by_id.reset_index()
 
@@ -351,7 +356,8 @@ def build_candidate_set(taxonomy_path: Path = DEFAULT_TAXONOMY, reference_path: 
     for index, row in enumerate(rows):
         split = "STANDARD" if index < 150 else "CHALLENGE"
         records.append(_record(row, f"part-a-v2-2-{index + 1:03d}", split, names.get(row["category_id"], "")))
-    return pd.DataFrame(records, columns=REVIEW_COLUMNS)
+    frame = pd.DataFrame(records, columns=REVIEW_COLUMNS)
+    return _apply_quality_patches(frame)
 
 
 def write_report(frame: pd.DataFrame, path: Path, reference_count: int) -> None:
