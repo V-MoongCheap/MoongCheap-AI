@@ -22,7 +22,7 @@ from moongcheap_ai.data_foundation.model1 import (
 
 
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "facet_discovery_multisource_v1.txt"
-CATEGORY_KEYS = {
+SMOKE_CATEGORY_KEYS = {
     "health-functional-food:vitamin_mineral",
     "health-functional-food:probiotics",
     "health-functional-food:skin_collagen",
@@ -62,18 +62,18 @@ def _as_source_rows(frame: pd.DataFrame, source_type: str) -> pd.DataFrame:
     return result[SOURCE_COLUMNS]
 
 
-def load_products(path: Path) -> pd.DataFrame:
+def load_products(path: Path, max_per_category: int = 24) -> pd.DataFrame:
     if not path.exists():
         return _empty_sources()
     products = pd.read_csv(path, dtype=str).fillna("")
-    sampled = sample_products(products, max_per_category=8)
+    sampled = sample_products(products, max_per_category=max_per_category)
     sampled = sampled.rename(columns={"name": "product_name", "product_type": "source_category"})
     sampled["source_type"] = "MFDS_PRODUCT"
     sampled["evidence_text"] = sampled.apply(lambda row: " | ".join(_text(row.get(column)) for column in ("product_name", "product_form", "functional_ingredients", "regulated_function") if _text(row.get(column))), axis=1)
     return _as_source_rows(sampled, "MFDS_PRODUCT")
 
 
-def load_seller_offers(path: Path) -> pd.DataFrame:
+def load_seller_offers(path: Path, max_per_category: int = 24) -> pd.DataFrame:
     if not path.exists():
         return _empty_sources()
     frame = pd.read_csv(path, dtype=str).fillna("")
@@ -92,10 +92,10 @@ def load_seller_offers(path: Path) -> pd.DataFrame:
         "sampling_reason": "seller listing evidence",
     })
     normalized["product_type"] = normalized["source_category"]
-    sampled = sample_products(normalized, max_per_category=8)
+    sampled = sample_products(normalized, max_per_category=max_per_category)
     sampled = sampled.rename(columns={"name": "product_name", "product_type": "source_category"})
     sampled["source_product_id"] = sampled["source_product_id"].map(lambda value: value if str(value).startswith("seller:") else f"seller:{value}")
-    sampled["evidence_text"] = sampled.apply(lambda row: " | ".join(_text(row.get(column)) for column in ("product_name", "source_category", "functional_ingredients", "price_text", "quantity_text", "seller_condition") if _text(row.get(column))), axis=1)
+    sampled["evidence_text"] = sampled.apply(lambda row: " | ".join(_text(row.get(column)) for column in ("product_name", "source_category", "functional_ingredients", "quantity_text", "seller_condition") if _text(row.get(column))), axis=1)
     return _as_source_rows(sampled, "SELLER_LISTING")
 
 
@@ -151,7 +151,7 @@ def load_boards(path: Path) -> pd.DataFrame:
     return _as_source_rows(pd.DataFrame(rows), "DEMAND_BOARD_SYNTHETIC") if rows else _empty_sources()
 
 
-def load_translated_queries(path: Path) -> pd.DataFrame:
+def load_translated_queries(path: Path, max_per_category: int = 12) -> pd.DataFrame:
     if not path.exists():
         return _empty_sources()
     frame = pd.read_parquet(path).fillna("")
@@ -163,7 +163,7 @@ def load_translated_queries(path: Path) -> pd.DataFrame:
         "health-functional-food:skin_collagen": ("콜라겐", "피부", "보습", "주름"),
     }.items():
         mask = query.str.contains("|".join(re.escape(item) for item in hints), case=False, regex=True, na=False)
-        for item in frame[mask].drop_duplicates("query_translated").head(4).itertuples():
+        for item in frame[mask].drop_duplicates("query_translated").head(max_per_category).itertuples():
             rows.append({
                 "category_key": category_key,
                 "category_name": category_key,
@@ -177,18 +177,28 @@ def load_translated_queries(path: Path) -> pd.DataFrame:
     return _as_source_rows(pd.DataFrame(rows), "CONSUMER_SEARCH") if rows else _empty_sources()
 
 
-def build_multisource_input(paths: dict[str, Path]) -> pd.DataFrame:
+def _call_sampled_loader(loader: Any, path: Path, max_per_category: int) -> pd.DataFrame:
+    """Keep one-argument test doubles compatible with configurable loaders."""
+    try:
+        return loader(path, max_per_category=max_per_category)
+    except TypeError as exc:
+        if "max_per_category" not in str(exc):
+            raise
+        return loader(path)
+
+
+def build_multisource_input(paths: dict[str, Path], max_products_per_category: int = 24, max_sellers_per_category: int = 24, max_queries_per_category: int = 12) -> pd.DataFrame:
     # Demand data describes request conditions, not product attributes. Keep it
     # in the demand-labeling pipeline instead of allowing it to create facets.
     frames = [
-        load_products(paths["products"]),
-        load_seller_offers(paths["sellers"]),
-        load_translated_queries(paths["queries"]),
+        _call_sampled_loader(load_products, paths["products"], max_products_per_category),
+        _call_sampled_loader(load_seller_offers, paths["sellers"], max_sellers_per_category),
+        _call_sampled_loader(load_translated_queries, paths["queries"], max_queries_per_category),
     ]
     data = pd.concat([frame for frame in frames if not frame.empty], ignore_index=True)
     if data.empty:
         return _empty_sources()
-    return data[data["category_key"].isin(CATEGORY_KEYS)].drop_duplicates(["category_key", "source_product_id"]).reset_index(drop=True)
+    return data[data["category_key"].astype(str).str.startswith("health-functional-food:")].drop_duplicates(["category_key", "source_product_id"]).reset_index(drop=True)
 
 
 def parse_reasoned_output(payload: dict[str, Any], input_frame: pd.DataFrame) -> tuple[pd.DataFrame, list[dict[str, str]]]:
@@ -263,27 +273,35 @@ def select_candidates(candidates: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).drop(columns=["facet_norm", "value_norm"], errors="ignore").reset_index(drop=True)
 
 
-def run_model(model_name: str, data: pd.DataFrame, categories: set[str], retries: int, provider: str = "ollama", endpoint: str = "", api_key: str = "") -> tuple[list[dict], list[dict], dict, list[dict]]:
+def run_model(model_name: str, data: pd.DataFrame, categories: set[str], retries: int, provider: str = "ollama", endpoint: str = "", api_key: str = "", batch_size: int = 24) -> tuple[list[dict], list[dict], dict, list[dict]]:
     adapter = create_model_adapter(provider, model_name, endpoint=endpoint, api_key=api_key, prompt_path=PROMPT_PATH)
     raw, candidates, failures = [], [], []
     started = time.perf_counter()
     calls = 0
+    batch_count = 0
     for category_key, group in data[data["category_key"].isin(categories)].groupby("category_key", sort=True):
-        for attempt in range(retries + 1):
-            try:
-                response = adapter.generate_facet_candidates(category_key, group.to_dict("records"), "facet_discovery_multisource_v1")
-                calls += 1
-                raw.append({"model": model_name, "category_key": category_key, "attempt": attempt + 1, "response": response})
-                parsed, parse_failures = parse_reasoned_output(response, group)
-                if not parsed.empty:
-                    candidates.extend([{**row, "model": model_name} for row in parsed.to_dict("records")])
-                failures.extend([{**item, "model": model_name, "category_key": category_key} for item in parse_failures])
-                if not parse_failures or not parsed.empty:
-                    break
-            except ModelCallError as exc:
-                calls += 1
-                failures.append({"failure_type": "MODEL_CALL_FAILED", "detail": str(exc), "model": model_name, "category_key": category_key})
-    report = {"provider": adapter.provider, "model": model_name, "calls": calls, "candidate_rows": len(candidates), "failure_rows": len(failures), "runtime_seconds": round(time.perf_counter() - started, 3)}
+        for batch_start in range(0, len(group), max(1, batch_size)):
+            batch_count += 1
+            model_group = group.iloc[batch_start:batch_start + max(1, batch_size)].copy()
+            # Price is an independent demand constraint, not a facet. Keep it
+            # in the source audit data, but do not expose it to the facet model.
+            if "price_text" in model_group:
+                model_group["price_text"] = ""
+            for attempt in range(retries + 1):
+                try:
+                    response = adapter.generate_facet_candidates(category_key, model_group.to_dict("records"), "facet_discovery_multisource_v1")
+                    calls += 1
+                    raw.append({"model": model_name, "category_key": category_key, "batch": batch_count, "attempt": attempt + 1, "response": response})
+                    parsed, parse_failures = parse_reasoned_output(response, model_group)
+                    if not parsed.empty:
+                        candidates.extend([{**row, "model": model_name} for row in parsed.to_dict("records")])
+                    failures.extend([{**item, "model": model_name, "category_key": category_key, "batch": batch_count} for item in parse_failures])
+                    if not parse_failures or not parsed.empty:
+                        break
+                except ModelCallError as exc:
+                    calls += 1
+                    failures.append({"failure_type": "MODEL_CALL_FAILED", "detail": str(exc), "model": model_name, "category_key": category_key, "batch": batch_count})
+    report = {"provider": adapter.provider, "model": model_name, "calls": calls, "batches": batch_count, "candidate_rows": len(candidates), "failure_rows": len(failures), "runtime_seconds": round(time.perf_counter() - started, 3)}
     return raw, candidates, report, failures
 
 
@@ -301,15 +319,24 @@ def main() -> None:
     parser.add_argument("--api-key-env", default="")
     parser.add_argument("--smoke-only", action="store_true")
     parser.add_argument("--retries", type=int, default=0)
+    parser.add_argument("--max-products-per-category", type=int, default=24)
+    parser.add_argument("--max-sellers-per-category", type=int, default=24)
+    parser.add_argument("--max-queries-per-category", type=int, default=12)
+    parser.add_argument("--batch-size", type=int, default=24)
     args = parser.parse_args()
     api_key = os.getenv(args.api_key_env, "") if args.api_key_env else ""
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    data = build_multisource_input({"products": args.products, "sellers": args.sellers, "demands": args.demands, "boards": args.boards, "queries": args.queries})
+    data = build_multisource_input(
+        {"products": args.products, "sellers": args.sellers, "demands": args.demands, "boards": args.boards, "queries": args.queries},
+        max_products_per_category=args.max_products_per_category,
+        max_sellers_per_category=args.max_sellers_per_category,
+        max_queries_per_category=args.max_queries_per_category,
+    )
     data.to_json(args.output_dir / "multisource_model_input_v1.jsonl", orient="records", lines=True, force_ascii=False)
-    categories = CATEGORY_KEYS if args.smoke_only else set(data["category_key"].unique())
+    categories = SMOKE_CATEGORY_KEYS.intersection(set(data["category_key"].unique())) if args.smoke_only else set(data["category_key"].unique())
     all_raw, all_candidates, model_reports, failures = [], [], [], []
     for model_name in [item.strip() for item in args.models.split(",") if item.strip()]:
-        raw, candidates, report, model_failures = run_model(model_name, data, categories, args.retries, provider=args.provider, endpoint=args.endpoint, api_key=api_key)
+        raw, candidates, report, model_failures = run_model(model_name, data, categories, args.retries, provider=args.provider, endpoint=args.endpoint, api_key=api_key, batch_size=args.batch_size)
         all_raw.extend(raw); all_candidates.extend(candidates); model_reports.append(report); failures.extend(model_failures)
     candidate_frame = pd.DataFrame(all_candidates)
     if not candidate_frame.empty:
@@ -331,12 +358,12 @@ def main() -> None:
     selected.to_csv(args.output_dir / "multisource_selected_candidates_v1.csv", index=False, encoding="utf-8-sig")
     pd.DataFrame(failures).to_csv(args.output_dir / "multisource_model_failures_v1.csv", index=False, encoding="utf-8-sig")
     source_counts = data["source_type"].value_counts().to_dict() if not data.empty else {}
-    report = {"status": "COMPLETED", "models": model_reports, "categories": sorted(categories), "input_rows": len(data), "source_row_counts": source_counts, "candidate_rows": len(candidate_frame), "selected_rows": len(selected), "consensus_selected_rows": int(selected.selection_status.eq("SELECTED_CANDIDATE").sum()) if not selected.empty else 0, "reason_present_rows": int(candidate_frame.reason_status.eq("PRESENT").sum()) if not candidate_frame.empty and "reason_status" in candidate_frame else 0, "failure_rows": len(failures), "excluded_sources": ["GROUNDED_DEMAND_SYNTHETIC", "DEMAND_BOARD_SYNTHETIC"], "taxonomy_changed": False}
+    report = {"status": "COMPLETED", "models": model_reports, "categories": sorted(categories), "input_rows": len(data), "source_row_counts": source_counts, "category_row_counts": data.groupby(["category_key", "source_type"]).size().unstack(fill_value=0).to_dict(orient="index") if not data.empty else {}, "candidate_rows": len(candidate_frame), "selected_rows": len(selected), "consensus_selected_rows": int(selected.selection_status.eq("SELECTED_CANDIDATE").sum()) if not selected.empty else 0, "reason_present_rows": int(candidate_frame.reason_status.eq("PRESENT").sum()) if not candidate_frame.empty and "reason_status" in candidate_frame else 0, "failure_rows": len(failures), "excluded_sources": ["GROUNDED_DEMAND_SYNTHETIC", "DEMAND_BOARD_SYNTHETIC"], "taxonomy_changed": False, "sampling": {"products_per_category": args.max_products_per_category, "sellers_per_category": args.max_sellers_per_category, "queries_per_category": args.max_queries_per_category}, "price_used_as_facet_evidence": False}
     (args.output_dir / "multisource_facet_discovery_report_v1.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     lines = ["# 다중 소스 Facet Discovery V1", "", f"- 대상 Category: {len(categories)}개", f"- 입력 행: {len(data):,}건", f"- 전체 후보: {len(candidate_frame):,}건", f"- 합의 후보: {report['consensus_selected_rows']:,}건", f"- 이유 포함 후보: {report['reason_present_rows']:,}건", f"- 실패: {len(failures):,}건", "", "## 입력 소스", "", "| 소스 유형 | 행 수 |", "|---|---:|"]
     lines.extend(f"| {key} | {value:,} |" for key, value in sorted(source_counts.items()))
-    lines += ["", "## 모델별 실행", "", "| 모델 | 호출 | 후보 | 실패 | 실행 시간(초) |", "|---|---:|---:|---:|---:|"]
-    lines.extend(f"| {item['model']} | {item['calls']} | {item['candidate_rows']} | {item['failure_rows']} | {item['runtime_seconds']} |" for item in model_reports)
+    lines += ["", "## 모델별 실행", "", "| 모델 | 호출 | 배치 | 후보 | 실패 | 실행 시간(초) |", "|---|---:|---:|---:|---:|---:|"]
+    lines.extend(f"| {item['model']} | {item['calls']} | {item.get('batches', 0)} | {item['candidate_rows']} | {item['failure_rows']} | {item['runtime_seconds']} |" for item in model_reports)
     lines += ["", "## 모델별 선정 이유", "", "아래 이유는 모델별 원본 후보 설명입니다. 모델 간 공통 후보가 아니어도 각 모델의 판단을 비교할 수 있습니다."]
     for model_name, group in candidate_frame.groupby("model", sort=True) if "model" in candidate_frame.columns else []:
         lines += ["", f"### {model_name}", "", "| Category | Facet | Value | 실제 데이터 관찰 요약 | 모델 설명 | 값의 의미 |", "|---|---|---|---|---|---|"]

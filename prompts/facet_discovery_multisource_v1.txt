@@ -8,7 +8,7 @@ The input contains evidence from several source types. Treat each source accordi
   facets from synthetic requests, participant counts, simulated prices, or statuses.
 - CONSUMER_SEARCH: translated consumer-search evidence. It indicates language or search interest, not confirmed demand.
 
-Discover candidate facets that can distinguish products or express a purchase condition. Use only values supported by the input. A facet may be a product facet (form, ingredient, intake), a purchase condition (price band, MOQ, delivery), or a consumer preference. Do not turn a regulated function sentence into a final preference value. Do not treat synthetic price, time, or board counts as real-world behavior.
+Discover candidate facets that can distinguish products or express a product/consumer usage condition. Use only values supported by the input. A facet may be a product facet (form, ingredient, intake), seller-side condition (MOQ or delivery), or a consumer preference. Price is an independent demand field and must never be proposed as a facet or value. Do not turn a regulated function sentence into a final preference value. Do not treat synthetic price, time, or board counts as real-world behavior.
 
 Return JSON only. Every evidence source_product_id and source_text must occur in the input. Each facet must include a concise selection_reason describing the observed data basis for proposing it. State which input fields or source types contain the candidate and, when the evidence supports it, how broadly it is observed. Each value should also include a short value_reason describing the observed value.
 
