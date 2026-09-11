@@ -351,7 +351,7 @@ def build_candidate_set(taxonomy_path: Path = DEFAULT_TAXONOMY, reference_path: 
     for index, row in enumerate(rows):
         split = "STANDARD" if index < 150 else "CHALLENGE"
         records.append(_record(row, f"part-a-v2-2-{index + 1:03d}", split, names.get(row["category_id"], "")))
-    return _apply_quality_patches(pd.DataFrame(records, columns=REVIEW_COLUMNS))[REVIEW_COLUMNS]
+    return pd.DataFrame(records, columns=REVIEW_COLUMNS)
 
 
 def write_report(frame: pd.DataFrame, path: Path, reference_count: int) -> None:

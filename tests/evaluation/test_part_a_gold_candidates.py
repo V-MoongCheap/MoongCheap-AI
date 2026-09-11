@@ -75,15 +75,13 @@ def test_holdout_contains_only_unseen_candidates() -> None:
     ).all()
 
 
-def test_qa_patches_preserve_unresolved_taxonomy_notes() -> None:
+def test_taxonomy_cleanup_removes_invalid_daily_frequency_and_duplicate_value() -> None:
     frame = build_candidate_set(
         ROOT / "config/facet_taxonomy_v2_2.json",
         ROOT / "tests/demand_constraints/fixtures/v042_approved_eval.csv",
     ).set_index("case_id")
-    assert frame.at["part-a-v2-2-121", "proposed_expected_mode"] == "PREFER"
-    assert "캡슐 제형" in frame.at["part-a-v2-2-129", "extra_requirement"]
-    assert "TAXONOMY_CHECK_REQUIRED" in frame.at["part-a-v2-2-118", "reviewer_note"]
-    assert "TAXONOMY_CHECK_REQUIRED" in frame.at["part-a-v2-2-162", "reviewer_note"]
+    assert not frame["proposed_expected_constraints"].str.contains("11일 1회").any()
+    assert not frame["proposed_expected_constraints"].str.contains("비오틴, 판토텐산").any()
     assert set(frame["reviewer_status"]) == {"PENDING_REVIEW"}
 
 
