@@ -162,3 +162,10 @@ def test_hybrid_model_override_keeps_unmentioned_product_defaults() -> None:
     assert values["form"]["code"] == 1
     assert values["sugar"]["code"] == 1
     assert not warnings
+
+
+def test_pandas_missing_requirement_is_treated_as_empty() -> None:
+    loader = TaxonomyLoader(TAXONOMY)
+    values, warnings = loader.resolve("C1", pd.NA)
+    assert all(value["code"] == 0 for value in values.values())
+    assert warnings == []

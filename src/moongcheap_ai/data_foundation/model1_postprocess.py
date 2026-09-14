@@ -14,14 +14,26 @@ CANONICAL_FACETS = {"form": ("product_form", "제품 형태"), "product form": (
 FORM_VALUES = {"powder": "분말", "분말": "분말", "capsule": "캡슐", "캡슐": "캡슐", "tablet": "정", "정": "정", "liquid": "액상", "액상": "액상"}
 REGULATED_GROUPS = ((r"배변\s*활동|장\s*건강|장건강", "장 건강"), (r"유산균\s*증식.*유해균\s*억제", "유산균 증식 및 유해균 억제"), (r"혈중\s*콜레스테롤", "혈중 콜레스테롤 개선"), (r"자외선.*피부.*손상.*피부.*건강|피부.*손상.*자외선", "자외선에 의한 피부 손상으로부터 피부 건강 유지"), (r"피부\s*보습", "피부 보습"), (r"뼈\s*건강", "뼈 건강"))
 
+def _text(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        missing = pd.isna(value)
+    except (TypeError, ValueError):
+        missing = False
+    if isinstance(missing, bool) and missing:
+        return ""
+    return str(value)
+
+
 def normalize_text(value: Any) -> str:
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or ""))).strip().casefold()
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", _text(value))).strip().casefold()
 
 def canonical_facet(facet_id: Any, name: Any) -> tuple[str, str]:
     return CANONICAL_FACETS.get(normalize_text(facet_id), CANONICAL_FACETS.get(normalize_text(name), (normalize_text(facet_id) or "unknown", str(name or facet_id).strip())))
 
 def canonical_value(facet_id: str, value: Any) -> str:
-    value = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or ""))).strip()
+    value = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", _text(value))).strip()
     if facet_id == "product_form":
         return FORM_VALUES.get(value.casefold(), value)
     if facet_id == "functional_ingredients":

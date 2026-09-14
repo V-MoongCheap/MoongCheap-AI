@@ -15,8 +15,21 @@ class TaxonomyValidationError(ValueError):
     pass
 
 
+def _text(value: Any) -> str:
+    """Convert scalar input safely, including pandas missing scalars."""
+    if value is None:
+        return ""
+    try:
+        missing = pd.isna(value)
+    except (TypeError, ValueError):
+        missing = False
+    if isinstance(missing, bool) and missing:
+        return ""
+    return str(value)
+
+
 def _normalise(value: Any) -> str:
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or "")).casefold()).strip()
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", _text(value)).casefold()).strip()
 
 
 NO_REQUIREMENT_PHRASES = {"조건 없음", "조건없음", "상관 없음", "상관없음", "아무 조건 없음", "무관"}
@@ -98,7 +111,7 @@ class TaxonomyLoader:
             raise TaxonomyValidationError("facet orders must be contiguous from 1")
 
     def category(self, category_id: Any) -> dict[str, Any] | None:
-        return self.categories.get(str(category_id or "").strip()) or self.root_category
+        return self.categories.get(_text(category_id).strip()) or self.root_category
 
     def resolve(self, category_id: Any, extra_requirement: Any) -> tuple[dict[str, dict[str, Any]], list[str]]:
         category = self.category(category_id)

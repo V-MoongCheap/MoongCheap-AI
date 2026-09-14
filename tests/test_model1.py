@@ -21,6 +21,10 @@ def test_composite_values_are_split_before_deduplication():
     assert atomic_values("regulated_function", "skin moisturizing (생리활성기능 2등급)") == ["skin moisturizing"]
 
 
+def test_atomic_values_handles_pandas_missing_scalar():
+    assert atomic_values("product_form", pd.NA) == []
+
+
 def _frame():
     return pd.DataFrame([{"source_product_id": "1", "name": "비타민", "product_type": "비타민 C", "product_form": "정제", "functional_ingredients": "비타민 C", "main_functionality": "항산화", "intake_method": "1일 1회"}])
 
