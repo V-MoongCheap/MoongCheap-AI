@@ -47,7 +47,7 @@ def test_schedule_starts_suspended_and_disables_immediate_retry(resources):
     spec = cronjob["spec"]
     assert cronjob["apiVersion"] == "batch/v1"
     assert spec["suspend"] is True
-    assert spec["schedule"] == "15 * * * *"
+    assert spec["schedule"] == "45 * * * *"
     assert spec["timeZone"] == "Asia/Seoul"
     assert spec["concurrencyPolicy"] == "Forbid"
     assert spec["startingDeadlineSeconds"] == 300

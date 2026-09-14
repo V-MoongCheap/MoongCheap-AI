@@ -24,7 +24,7 @@ k8s/
 ```
 
 - 개발 Namespace는 Cloud V2 규약의 `ai`다. 인프라가 Namespace와 같은 공간의 Secret/PVC를 준비한다.
-- 매시간 15분, `Asia/Seoul`, `suspend: true`로 시작한다.
+- 매시간 45분, `Asia/Seoul`, `suspend: true`로 시작한다.
 - `concurrencyPolicy: Forbid`, `backoffLimit: 0`, `restartPolicy: Never`다.
   실패한 실행은 즉시 재시도하지 않고 다음 정기 배치에서 최신 DB 상태로 재계산한다.
 - 시작 지연 허용은 5분, Job 실행 제한은 30분이며 초기 제안값이다.

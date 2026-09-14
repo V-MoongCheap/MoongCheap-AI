@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/part-of: moongcheap-ai
 spec:
   # Initial handoff values; infrastructure confirms the final schedule/deadlines.
-  schedule: "15 * * * *"
+  schedule: "45 * * * *"
   timeZone: Asia/Seoul
   suspend: true
   concurrencyPolicy: Forbid

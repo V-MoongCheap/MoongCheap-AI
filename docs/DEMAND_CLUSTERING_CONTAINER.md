@@ -98,7 +98,7 @@ docker run --rm --read-only \
 | --- | --- |
 | 실행 형태 | 시간별 CronJob, 컨테이너 기본 entrypoint 그대로 사용 |
 | 기본 매니페스트 | `k8s/base`, 개발 환경 예시 `k8s/overlays/dev` |
-| 초기 스케줄·제한 | 매시간 15분, `Asia/Seoul`, 실행 제한 30분, `suspend: true` |
+| 초기 스케줄·제한 | 매시간 45분, `Asia/Seoul`, 실행 제한 30분, `suspend: true` |
 | 노드 배치 | `workload=backend-ai` + Linux amd64 선택, AI 전용 taint 허용 없음 |
 | 중첩·재실행 | `concurrencyPolicy: Forbid`, `backoffLimit: 0`, `restartPolicy: Never` |
 | CPU | requests `1`, limits `2` |
