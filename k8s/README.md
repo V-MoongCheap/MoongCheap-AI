@@ -31,7 +31,9 @@ k8s/
 - CPU requests/limits는 `1`/`2`, 메모리는 `3Gi`/`4Gi`, GPU는 사용하지 않는다.
 - non-root `65534:65534`, 읽기 전용 root, 권한 상승 금지, capabilities 제거를 적용한다.
   `/tmp`만 `emptyDir`로 쓰기 가능하며 초기 한도는 `256Mi`다.
-- Kubernetes API를 호출하지 않으므로 ServiceAccount 토큰을 마운트하지 않는다.
+- 전용 ServiceAccount는 Cloud의 `{service-or-component}-sa` 규약에 맞춘
+  `demand-clustering-sa`이며, CronJob의 `serviceAccountName`에서 참조한다.
+  Kubernetes API를 호출하지 않으므로 ServiceAccount 토큰을 마운트하지 않는다.
   HTTP 서버가 아니므로 Service·Ingress·포트·HTTP probe를 추가하지 않는다.
 
 `Forbid`는 같은 CronJob이 만든 Job 사이에만 적용된다. 다른 AI CronJob이나 수동
