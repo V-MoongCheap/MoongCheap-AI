@@ -8,6 +8,19 @@
 - Model 2: Demand 자연어를 Label로 변환한다. `Rule-first Hybrid`를 기본 구조로 사용하되, LLM fallback 모델은 비교 후 결정한다.
 - LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
+### 현재 로컬 후보의 범위
+
+Kimi 계열을 전체 제외하지 않는다. 공식 Moonshot 후보인
+`moonshotai/Moonlight-16B-A3B-Instruct`는 총 16B 파라미터의 MoE 모델이며
+활성 파라미터가 약 3B인 별도 비교 후보로 둔다. 다만 24GB Apple Silicon에서는
+원본 BF16 가중치가 현실적인 기본 경로가 아니므로, 4-bit MLX/GGUF 양자화판을
+별도 런타임에서 평가한다. `Kimi-K2/K2.6/K3` 같은 초대형 계열은 현재 로컬
+MPS 평가 범위에서 제외한다. Kimi-VL은 멀티모달 모델이므로 현재 텍스트 전용
+Facet/Label 비교의 기본 후보로 사용하지 않는다.
+
+Kanana는 기존 Transformers 4 계열 환경에서 평가한다. Transformers 5 계열
+환경으로 옮겨서 판단하지 않는다.
+
 ## 현재까지의 측정
 
 ### Model 2 Rule baseline
