@@ -117,7 +117,7 @@ def build_report(sheet: pd.DataFrame, stats: dict[str, int], output: Path, input
         "## Input and Review Policy",
         f"- input: `{input_path}`",
         f"- total Alias Candidate: {stats['candidate_count']}",
-        f"- source_type: `KOREAN_SHOPPING_REVIEW_EXPRESSION_REFERENCE`",
+        "- source_type: `KOREAN_SHOPPING_REVIEW_EXPRESSION_REFERENCE`",
         "- category_id/category_name: 원본에 Category 정보가 없어 `NOT_AVAILABLE_SOURCE_HAS_NO_CATEGORY`로 기록",
         "- reviewer_decision initial value: `PENDING_REVIEW`",
         "- `corrected_value_candidate` is reserved for a human-corrected standard value; the generated `value_candidate` is preserved.",

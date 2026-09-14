@@ -126,10 +126,17 @@ def run_benchmark(staging: pd.DataFrame, max_rows: int = 50000) -> tuple[pd.Data
     word_vectors = [word_model.vector(terms) for terms in word_terms]
     char_vectors = [char_model.vector(terms) for terms in char_terms]
 
-    exact = lambda left, right: float(names[left] == names[right] and bool(names[left]))
-    word = lambda left, right: _cosine(word_vectors[left], word_vectors[right])
-    char = lambda left, right: _cosine(char_vectors[left], char_vectors[right])
-    hybrid = lambda left, right: 0.5 * word(left, right) + 0.5 * char(left, right)
+    def exact(left: int, right: int) -> float:
+        return float(names[left] == names[right] and bool(names[left]))
+
+    def word(left: int, right: int) -> float:
+        return _cosine(word_vectors[left], word_vectors[right])
+
+    def char(left: int, right: int) -> float:
+        return _cosine(char_vectors[left], char_vectors[right])
+
+    def hybrid(left: int, right: int) -> float:
+        return 0.5 * word(left, right) + 0.5 * char(left, right)
     models = [("exact_normalized_name", exact), ("word_tfidf", word), ("char_tfidf_2_4gram", char), ("hybrid_word_char", hybrid)]
 
     rows = []

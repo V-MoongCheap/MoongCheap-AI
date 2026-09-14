@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from moongcheap_ai.data_foundation.labeling import build_product_facet_map, label_demands, load_taxonomy
-from report_demand_labeling_metrics import _metric_row
+from moongcheap_ai.data_foundation.labeling import build_product_facet_map, label_demands, load_taxonomy  # noqa: E402
+from report_demand_labeling_metrics import _metric_row  # noqa: E402
 
 
 def _read(path: Path) -> pd.DataFrame:

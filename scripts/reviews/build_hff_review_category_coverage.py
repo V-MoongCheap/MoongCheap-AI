@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.data_foundation.facet_evidence import build_review_evidence
 
 
 THRESHOLDS = ((0, "CRITICAL"), (49, "VERY_LOW"), (149, "LOW"), (299, "MODERATE"))
@@ -103,7 +102,6 @@ def build_report(
             counts = subset.groupby("product_id").size().sort_values(ascending=False)
             total = len(subset)
             concentration_rows.append({"source": source, "service_category_name": category, "total_reviews": total, "unique_products": int(len(counts)), "reviews_per_product_median": float(counts.median()) if len(counts) else 0, "reviews_per_product_max": int(counts.max()) if len(counts) else 0, "top_1_product_share": float(counts.head(1).sum() / total) if total else 0, "top_5_product_share": float(counts.head(5).sum() / total) if total else 0, "top_10_product_share": float(counts.head(10).sum() / total) if total else 0})
-    concentration = pd.DataFrame(concentration_rows)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     coverage.to_csv(output.with_suffix(".csv"), index=False, encoding="utf-8-sig")

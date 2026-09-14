@@ -8,9 +8,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import unicodedata
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -65,7 +64,6 @@ def _accepted(row: pd.Series) -> bool:
 
 
 def build_alias_artifacts(review: pd.DataFrame, taxonomy: dict[str, Any], crosswalk: dict[str, Any]) -> tuple[dict[str, Any], pd.DataFrame]:
-    category_ids = {str(c["category_id"]) for c in taxonomy["categories"]}
     taxonomy_facets = {f["name"] for c in taxonomy["categories"] for f in c["facets"]}
     form_by_category = crosswalk.get("mappings", {}).get("product_form", {})
     form_map: dict[str, dict[str, Any]] = defaultdict(dict)

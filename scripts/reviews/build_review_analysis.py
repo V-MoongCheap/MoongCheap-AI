@@ -5,7 +5,6 @@ import json
 from collections import Counter
 from pathlib import Path
 
-import pandas as pd
 
 from moongcheap_ai.data_foundation.facet_evidence import build_review_evidence
 

@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 
-from moongcheap_ai.data_foundation.backend_contract import build_label_result_payload, validate_backend_response
+from moongcheap_ai.data_foundation.backend_contract import validate_backend_response
 from moongcheap_ai.data_foundation.labeling import taxonomy_from_category_facet_rows
 from moongcheap_ai.data_foundation.runtime_job import run_batch
 

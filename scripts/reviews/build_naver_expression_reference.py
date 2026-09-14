@@ -146,7 +146,7 @@ def build_report(audit: dict[str, object], summary: dict[str, dict[str, int]], o
         "이 자료는 한국 쇼핑 리뷰 표현과 Alias 후보를 탐색하기 위한 참고 데이터다. 건강기능식품 리뷰로 분류하지 않으며 HFF Facet Consumer Salience Count에 포함하지 않는다.",
         "",
         "## Raw Audit",
-        f"- source_type: `KOREAN_SHOPPING_REVIEW_EXPRESSION_REFERENCE`",
+        "- source_type: `KOREAN_SHOPPING_REVIEW_EXPRESSION_REFERENCE`",
         f"- raw_path: `{raw_path}`",
         f"- row_count: {audit['row_count']}",
         f"- columns: `{audit['columns']}`",

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -86,7 +85,6 @@ def _apply_aliases(frame: pd.DataFrame, matcher: ReviewedAliasMatcher) -> tuple[
             corrected_hits += int(match["canonical_value"] != "")
         output.at[index, "facet_values"] = json.dumps(current, ensure_ascii=False, separators=(",", ":"))
         row_conflicts.append(current_row_conflict)
-        ordered = sorted(current.values(), key=lambda item: str(item.get("facet_name", "")))
         # The taxonomy loader already encoded the canonical facet order. Replace only
         # the affected code positions through the existing label where possible.
         label_parts = str(row.get("label", "")).split("-")

@@ -20,7 +20,6 @@ def build_report(before_dir: Path, after_dir: Path, output: Path) -> dict[str, i
     review = pd.read_csv(after_dir / "facet_review_queue_v2.csv")
     nutrime = review.get("nutrime_review_evidence_count", pd.Series(0, index=review.index))
     chongkundang = review.get("chongkundang_review_evidence_count", pd.Series(0, index=review.index))
-    review_source_counts = evidence[evidence["source_type"].eq("KOREAN_HFF_RAW_REVIEW")].groupby("source").size().to_dict()
     lgu_purchase_evidence_rows = int((evidence["source_type"] == "KOREAN_HFF_PURCHASE_AGGREGATE").sum())
     source_pair = evidence[evidence["source_type"].eq("KOREAN_HFF_RAW_REVIEW")].groupby(["normalized_attribute", "normalized_value"])["source"].nunique()
     combinations = {
@@ -50,7 +49,7 @@ def build_report(before_dir: Path, after_dir: Path, output: Path) -> dict[str, i
         "- Mapping After: 82.27% / 348건 / 423건",
         "- Mapping failure: 100건 기준 31건 모두 PRODUCT_ID_NOT_FOUND",
         "- HFF confirmed review: 348건",
-        f"- Analysis Review: 399건 (상품별 최대 50건), raw review snapshot 423건은 별도 보존",
+        "- Analysis Review: 399건 (상품별 최대 50건), raw review snapshot 423건은 별도 보존",
         f"- Facet evidence used by this run: {metrics['review_evidence_rows']}건",
         "- Medical outcome sentence: 5건 별도 제외",
         "- Unique product: 19개",
