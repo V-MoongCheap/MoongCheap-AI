@@ -27,16 +27,13 @@ spec:
             app.kubernetes.io/component: batch
             app.kubernetes.io/part-of: moongcheap-ai
         spec:
-          # This selects the AI node pool, not one particular hostname.
+          # Infrastructure must label the shared BE/AI nodes; this creates no node group.
           nodeSelector:
-            workload: ai
+            workload: backend-ai
             kubernetes.io/os: linux
             kubernetes.io/arch: amd64
-          tolerations:
-            - key: workload
-              operator: Equal
-              value: ai
-              effect: NoSchedule
+          # No dedicated AI taint is assumed in the shared worker design.
+          tolerations: []
           restartPolicy: Never
           serviceAccountName: demand-clustering-job
           automountServiceAccountToken: false

@@ -20,7 +20,7 @@ kubernetes:
   base_path: k8s/base
   dev_example_path: k8s/overlays/dev
   documentation: k8s/README.md
-  namespace_example: moongcheap-ai-dev  # Namespace 생성은 인프라; 실제 이름 확인 필요
+  namespace_example: ai  # Cloud V2 규약; Namespace와 같은 공간의 Secret/PVC는 인프라가 준비
   schedule: "15 * * * *"  # 초기안
   time_zone: Asia/Seoul
   suspend: true
@@ -30,14 +30,16 @@ kubernetes:
   starting_deadline_seconds: 300
   active_deadline_seconds: 1800
   node_selector:
-    workload: ai
+    workload: backend-ai
     kubernetes.io/os: linux
     kubernetes.io/arch: amd64
-  tolerations:
-    - key: workload
-      operator: Equal
-      value: ai
-      effect: NoSchedule
+  tolerations: []  # 공유 BE·AI Worker; 별도 taint 정책이 추가되면 함께 조정
+
+helm:
+  workload_kind: CronJob
+  required_resources: [CronJob, ConfigMap, ServiceAccount]
+  documentation: k8s/README.md
+  status: "Cloud GitOps 차트에 이 실행 계약 반영 필요; 현재 AI 저장소는 Kustomize 기준 매니페스트 제공"
 
 application_port: null  # 수요 클러스터링은 1회 실행 후 종료하는 배치
 health_check_path: ""
@@ -75,7 +77,7 @@ secret_variables:
     secret_name: ai-batch-reader-database
     secret_key: url
   - name: BACKEND_INTERNAL_KEY
-    purpose: "AWS Parameter Store SecureString에서 배포 시 주입하는 X-Internal-Key 값"
+    purpose: "AWS Secrets Manager 관리 값을 배포 환경이 Kubernetes Secret으로 공급하는 X-Internal-Key; 동기화 방식 미확정"
     secret_name: ai-backend-internal-key
     secret_key: internal-key
 
@@ -106,12 +108,12 @@ external_dependencies:
   - "Shared PostgreSQL (SELECT on demand, demand_board, reject_history)"
   - "Backend formation-plans and substitute-offer-plans APIs"
   - "Versioned taxonomy, Part A catalog profile, and local CPU E5 model artifacts"
-  - "AWS Parameter Store to Kubernetes Secret synchronization by the deployment environment"
+  - "AWS Secrets Manager to Kubernetes Secret synchronization by the deployment environment (mechanism TBD)"
 
 notes: >-
   이 값들은 수요 클러스터링 배치 기준이다. 기본 CronJob과 dev 예시는 AI 저장소에서
   제공하며 실제 배포 설정의 기준은 인프라 GitOps 저장소다. 이미지 push, GitOps 갱신,
-  ArgoCD/EKS 연결과 운영 배포는 인프라 측 작업이다. Parameter Store 조회 권한과
+  ArgoCD/EKS 연결과 운영 배포는 인프라 측 작업이다. Secrets Manager 조회 권한과
   Kubernetes Secret 동기화는 배포 환경이 담당하며 앱은 AWS API를 직접 호출하지 않는다.
   Namespace, Secret, PVC, Node Group 자체는 이 매니페스트가 생성하지 않는다.
   실패한 요청은 저장하거나 재전송하지 않고 다음 정기 실행에서 DB를 새로 읽는다.
@@ -119,4 +121,6 @@ notes: >-
   Pod는 restartPolicy=Never로 설정해 실패한 배치를 즉시 재실행하지 않는다.
   과거 슬롯을 전달하는 --planned-at/--batch-id 옵션과 checkpoint 볼륨은 사용하지 않는다.
   모델은 실행 시 다운로드하지 않는다. PVC 파일 공급과 artifact 버전 갱신은 이미지 CI/CD와
-  별도로 연결한다. AI 노드가 한 대일 때 같은 노드에 모이며 이 매니페스트는 노드 수를 정하지 않는다.
+  별도로 연결한다. workload=backend-ai 라벨은 인프라가 실제 노드에 제공해야 한다.
+  BE·AI Worker는 Backend와 시스템 Pod도 공유하므로 합산 자원 여유를 확인한다.
+  이 매니페스트는 Node Group이나 노드 수를 정하지 않는다.

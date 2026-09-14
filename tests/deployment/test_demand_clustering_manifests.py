@@ -32,7 +32,7 @@ def resources(request, tmp_path_factory):
     assert {document["kind"] for document in documents} == {
         "CronJob", "ConfigMap", "ServiceAccount",
     }
-    expected_namespace = "moongcheap-ai-dev" if request.param == "overlays/dev" else None
+    expected_namespace = "ai" if request.param == "overlays/dev" else None
     for document in documents:
         assert document["metadata"].get("namespace") == expected_namespace
     return {document["kind"]: document for document in documents}
@@ -56,14 +56,12 @@ def test_schedule_starts_suspended_and_disables_immediate_retry(resources):
     assert pod_spec(resources)["restartPolicy"] == "Never"
 
 
-def test_ai_node_selector_and_matching_toleration(resources):
+def test_shared_backend_ai_node_selector_without_dedicated_ai_taint(resources):
     pod = pod_spec(resources)
     assert pod["nodeSelector"] == {
-        "workload": "ai", "kubernetes.io/os": "linux", "kubernetes.io/arch": "amd64",
+        "workload": "backend-ai", "kubernetes.io/os": "linux", "kubernetes.io/arch": "amd64",
     }
-    assert pod["tolerations"] == [{
-        "key": "workload", "operator": "Equal", "value": "ai", "effect": "NoSchedule",
-    }]
+    assert pod["tolerations"] == []
     assert "nodeName" not in pod
     assert "hostNetwork" not in pod
 

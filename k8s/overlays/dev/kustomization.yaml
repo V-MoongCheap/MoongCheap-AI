@@ -4,12 +4,12 @@ kind: Kustomization
 resources:
   - ../../base
 
-# Example namespace. Infrastructure provisions it and the external dependencies.
-namespace: moongcheap-ai-dev
+# Cloud V2 namespace. Infrastructure provisions it and the external dependencies.
+namespace: ai
 
 labels:
   - pairs:
-      app.kubernetes.io/instance: moongcheap-ai-dev
+      app.kubernetes.io/instance: ai-develop
     includeSelectors: false
 
 # Keep the image/address/artifact placeholders and suspend=true until configured.
