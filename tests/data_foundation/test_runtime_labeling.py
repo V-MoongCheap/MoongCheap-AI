@@ -3,6 +3,7 @@ import json
 import pandas as pd
 
 from moongcheap_ai.data_foundation.backend_contract import build_label_result_payload, validate_backend_response
+from moongcheap_ai.data_foundation.labeling import taxonomy_from_category_facet_rows
 from moongcheap_ai.data_foundation.runtime_job import run_batch
 
 
@@ -40,3 +41,40 @@ def test_runtime_does_not_label_or_submit_unknown_category(tmp_path) -> None:
     assert labeled.loc[0, "label_status"] == "REVIEW"
     assert labeled.loc[0, "label"] == ""
     assert payload["results"] == []
+
+
+def test_empty_runtime_batch_is_a_successful_noop(tmp_path) -> None:
+    taxonomy = {
+        "categories": [{"category_id": "c1", "facets": []}],
+    }
+    path = tmp_path / "taxonomy.json"
+    path.write_text(json.dumps(taxonomy), encoding="utf-8")
+
+    labeled, payload = run_batch(
+        pd.DataFrame(columns=["demand_id", "catalog_id", "category_id", "extra_requirement"]),
+        path,
+        processed_at="2026-01-01T00:00:00+00:00",
+    )
+
+    assert labeled.empty
+    assert payload["results"] == []
+    assert payload["processedAt"] == "2026-01-01T00:00:00+00:00"
+
+
+def test_taxonomy_can_be_built_from_database_category_facet() -> None:
+    frame = pd.DataFrame([{
+        "category_id": "health-functional-food:probiotics",
+        "category_facet": json.dumps({
+            "category_id": "health-functional-food:probiotics",
+            "facets": [{
+                "name": "product_form",
+                "order": 1,
+                "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "캡슐"}],
+            }],
+        }, ensure_ascii=False),
+    }])
+
+    payload = taxonomy_from_category_facet_rows(frame)
+
+    assert payload["version"] == "backend-category-facet"
+    assert payload["categories"][0]["category_id"] == "health-functional-food:probiotics"

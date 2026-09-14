@@ -3,3 +3,4 @@ kind: Kustomization
 
 resources:
   - demand-clustering-job
+  - a-labeling-job

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: moongcheap-ai-postgres-local
+    environment:
+      POSTGRES_DB: moongcheap_ai_local
+      POSTGRES_USER: moongcheap
+      POSTGRES_PASSWORD: moongcheap
+    ports:
+      - "5433:5432"
+    volumes:
+      - moongcheap-ai-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moongcheap -d moongcheap_ai_local"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  moongcheap-ai-postgres-data:

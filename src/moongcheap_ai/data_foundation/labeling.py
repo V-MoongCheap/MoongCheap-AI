@@ -158,6 +158,39 @@ def load_taxonomy(path: Path) -> TaxonomyLoader:
     return TaxonomyLoader.from_path(path)
 
 
+def taxonomy_from_category_facet_rows(frame: pd.DataFrame) -> dict[str, Any]:
+    """Build a taxonomy payload from Backend ``category.facet`` text rows."""
+    categories: dict[str, dict[str, Any]] = {}
+    if "category_facet" not in frame.columns:
+        raise TaxonomyValidationError("database rows do not contain category_facet")
+    for _, row in frame.iterrows():
+        raw = str(row.get("category_facet", "") or "").strip()
+        if not raw:
+            continue
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise TaxonomyValidationError("category.facet contains invalid JSON") from exc
+        category_id = str(row.get("category_id", "") or "").strip()
+        if isinstance(parsed, dict):
+            category_id = str(parsed.get("category_id", category_id)).strip()
+            facets = parsed.get("facets", [])
+        elif isinstance(parsed, list):
+            facets = parsed
+        else:
+            raise TaxonomyValidationError("category.facet must be an object or list")
+        if not category_id:
+            raise TaxonomyValidationError("category.facet row has no category key")
+        candidate = {"category_id": category_id, "facets": facets}
+        previous = categories.get(category_id)
+        if previous is not None and previous != candidate:
+            raise TaxonomyValidationError(f"conflicting category.facet rows: {category_id}")
+        categories[category_id] = candidate
+    if not categories:
+        raise TaxonomyValidationError("no usable category.facet rows")
+    return {"version": "backend-category-facet", "categories": list(categories.values())}
+
+
 def build_product_facet_map(frame: pd.DataFrame) -> dict[str, list[dict[str, Any]]]:
     """Index mapped product facets by source ID and local catalog-seed ID."""
     result: dict[str, list[dict[str, Any]]] = {}

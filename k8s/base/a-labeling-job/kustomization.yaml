@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cronjob.yaml
+  - serviceaccount.yaml
+
+configMapGenerator:
+  - name: a-labeling-config
+    literals:
+      - A_ALIAS_REGISTRY_PATH=/app/config/model1_aliases_reviewed_v2.json
+      - A_BACKEND_HTTP_TIMEOUT_SECONDS=15
