@@ -267,3 +267,54 @@ class BidGuideContractTest(unittest.TestCase):
             if stripped.startswith("import ") or stripped.startswith("from "):
                 self.assertNotIn("fastapi", stripped.lower(), stripped)
         self.assertIsInstance(build_bid_guide(BidGuideRequest.from_dict(valid_payload())), dict)
+
+
+class SupplyCoverageCapTest(unittest.TestCase):
+    """공급 충족률 상한 1.0.
+
+    「AI API Contract」 5절 「Seller Analysis API」 의 예시가 `supply_coverage_ratio: 1.0`
+    과 근거 문장 *"약 1.15이며, 계산 정책의 상한 1.0을 적용했습니다"* 를 함께 적는다.
+    """
+
+    def test_supply_coverage_is_capped_at_one(self):
+        result = handle_bid_guide(
+            valid_payload(total_demand_quantity=130, maximum_supply_quantity=150)
+        )
+        self.assertEqual(result["metrics"]["supply_coverage_ratio"], 1.0)
+
+    def test_cap_is_recorded_in_the_evidence(self):
+        """⛔ 상한을 적용했으면 그 사실을 적는다. 안 적으면 1.15 와 1.0 을 구분할 수 없다."""
+        joined = " ".join(
+            handle_bid_guide(
+                valid_payload(total_demand_quantity=130, maximum_supply_quantity=150)
+            )["calculation_evidence"]
+        )
+        self.assertIn("약 1.15", joined)
+        self.assertIn("계산 정책의 상한 1.0을 적용했습니다", joined)
+
+    def test_uncapped_values_keep_their_wording(self):
+        """상한에 안 걸리면 문장이 달라지지 않는다."""
+        joined = " ".join(
+            handle_bid_guide(
+                valid_payload(total_demand_quantity=130, maximum_supply_quantity=130)
+            )["calculation_evidence"]
+        )
+        self.assertIn("나눈 결과는 1.00입니다", joined)
+        self.assertNotIn("상한", joined)
+
+    def test_moq_attainment_is_not_capped(self):
+        """⛔ 계약이 상한을 말한 것은 공급 충족률뿐이다."""
+        result = handle_bid_guide(
+            valid_payload(total_demand_quantity=1000, minimum_success_quantity=100)
+        )
+        self.assertEqual(result["metrics"]["moq_attainment_ratio"], 10.0)
+
+    def test_status_still_derives_from_the_capped_ratio(self):
+        """상한을 걸어도 `ratio >= 1.0` 동치가 깨지지 않는다."""
+        for supply, expected in ((150, True), (130, True), (129, False)):
+            with self.subTest(supply=supply):
+                metrics = handle_bid_guide(
+                    valid_payload(total_demand_quantity=130, maximum_supply_quantity=supply)
+                )["metrics"]
+                self.assertEqual(metrics["supply_coverage_ratio"] >= 1.0, expected)
+
