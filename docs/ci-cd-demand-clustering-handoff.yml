@@ -22,7 +22,7 @@ kubernetes:
   documentation: k8s/README.md
   namespace_example: ai  # Cloud V2 규약; Namespace와 같은 공간의 Secret/PVC는 인프라가 준비
   service_account_name: demand-clustering-sa  # Cloud 규약: {service-or-component}-sa
-  schedule: "15 * * * *"  # 초기안
+  schedule: "45 * * * *"  # 초기안
   time_zone: Asia/Seoul
   suspend: true
   concurrency_policy: Forbid
