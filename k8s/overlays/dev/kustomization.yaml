@@ -4,7 +4,8 @@ kind: Kustomization
 resources:
   - ../../base
 
-# Cloud V2 namespace. Infrastructure provisions it and the external dependencies.
+# Namespace example from the Cloud V2 design; the GitOps draft uses moongcheap-dev.
+# Infrastructure confirms the namespace and provisions matching Secrets/PVCs.
 namespace: ai
 
 labels:

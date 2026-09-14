@@ -1,7 +1,7 @@
 # Demand Clustering CI/CD Handoff (Part B)
 # 실제 Secret 값은 작성하지 않습니다.
 
-repository: https://github.com/V-MoongCheap/kdt-ai-2-team2-integrated
+repository: https://github.com/V-MoongCheap/MoongCheap-AI
 branch: develop
 
 build_command: "uv sync --project packaging/demand-clustering --locked --extra data --extra dev"
@@ -20,16 +20,19 @@ kubernetes:
   base_path: k8s/base
   dev_example_path: k8s/overlays/dev
   documentation: k8s/README.md
-  namespace_example: ai  # Cloud V2 규약; Namespace와 같은 공간의 Secret/PVC는 인프라가 준비
+  namespace_example: ai  # 설계서 기준 예시; GitOps 초안의 moongcheap-dev와 최종 이름 조율 필요
   service_account_name: demand-clustering-sa  # Cloud 규약: {service-or-component}-sa
   schedule: "45 * * * *"  # 초기안
   time_zone: Asia/Seoul
   suspend: true
   concurrency_policy: Forbid
+  successful_jobs_history_limit: 1
+  failed_jobs_history_limit: 3
   backoff_limit: 0
   restart_policy: Never
   starting_deadline_seconds: 300
   active_deadline_seconds: 1800
+  ttl_seconds_after_finished: 86400
   node_selector:
     workload: backend-ai
     kubernetes.io/os: linux
@@ -43,6 +46,7 @@ helm:
   status: "Cloud GitOps 차트에 이 실행 계약 반영 필요; 현재 AI 저장소는 Kustomize 기준 매니페스트 제공"
 
 application_port: null  # 수요 클러스터링은 1회 실행 후 종료하는 배치
+# Readiness/Liveness/Startup Probe, Deployment replica, Service/Ingress/HPA는 사용하지 않는다.
 health_check_path: ""
 metrics_path: ""
 

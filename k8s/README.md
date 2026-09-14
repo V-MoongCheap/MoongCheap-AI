@@ -23,11 +23,13 @@ k8s/
 └── overlays/dev/kustomization.yaml
 ```
 
-- 개발 Namespace는 Cloud V2 규약의 `ai`다. 인프라가 Namespace와 같은 공간의 Secret/PVC를 준비한다.
+- 개발 Namespace 예시는 Cloud V2 설계서 기준의 `ai`다. 최신 GitOps 초안과 이름이
+  다르므로 실제 배포 Namespace를 조율하고 같은 공간에 Secret/PVC를 준비한다.
 - 매시간 45분, `Asia/Seoul`, `suspend: true`로 시작한다.
 - `concurrencyPolicy: Forbid`, `backoffLimit: 0`, `restartPolicy: Never`다.
   실패한 실행은 즉시 재시도하지 않고 다음 정기 배치에서 최신 DB 상태로 재계산한다.
 - 시작 지연 허용은 5분, Job 실행 제한은 30분이며 초기 제안값이다.
+- 성공/실패 Job 보관 상한은 각각 1개/3개이며, 완료 후 TTL은 24시간이다.
 - CPU requests/limits는 `1`/`2`, 메모리는 `3Gi`/`4Gi`, GPU는 사용하지 않는다.
 - non-root `65534:65534`, 읽기 전용 root, 권한 상승 금지, capabilities 제거를 적용한다.
   `/tmp`만 `emptyDir`로 쓰기 가능하며 초기 한도는 `256Mi`다.
@@ -136,13 +138,23 @@ Dockerfile은 실행 이미지의 내용과 시작 명령을 정하고, Kubernet
 ([Helm values](https://helm.sh/docs/chart_template_guide/values_files/))
 
 2026-09-14 원격 확인 기준 Cloud `develop` (`53bb525`)에는 Helm 차트가 없고,
-`origin/feat/gitops` (`bf3e460`)의 `moongcheap-service` 초안은 Deployment만 렌더링한다.
-이 초안은 CronJob, ConfigMap/`envFrom`, ServiceAccount, 볼륨 및 보안 컨텍스트를
-아직 제공하지 않는다. `values.yaml`에 항목만 추가해도 해당 템플릿이 생기는 것은 아니다.
+`origin/feat/gitops` (`51a650b`)의 `moongcheap-service` 초안은 실행 리소스로
+Deployment를 렌더링한다. `env`, `envFrom`, 자원과 노드 선택 설정은 지원하지만,
+CronJob, ConfigMap 생성, ServiceAccount, 명시적인 `command`/`args`, 볼륨과
+보안 컨텍스트는 아직 지원하지 않는다. `values.yaml`에 항목을 추가할 때는
+해당 값을 사용하는 템플릿도 필요하다.
+([차트 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/51a650b/gitops/charts/moongcheap-service/templates/deployment.yaml))
+
+같은 GitOps 초안의 개발 ApplicationSet은 `destination.namespace: moongcheap-dev`를
+사용한다. 이 저장소의 `ai` 예시와 차이가 있으므로 실제 배포 이름을 확정한 뒤
+CronJob, ConfigMap, ServiceAccount, 외부 Secret/PVC를 모두 같은 Namespace로 맞춘다.
+([개발 ApplicationSet](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/51a650b/gitops/argocd/applicationset-services-dev.yaml))
 
 B는 `demand-clustering-batch`가 종료되는 배치이므로 **CronJob 템플릿이 필요**하다.
 Deployment로 감싸면 완료한 컨테이너가 반복 시작될 수 있다. Cloud 차트에서 배치 유형을
 지원하도록 확장하거나 B용 CronJob 차트로 옮기고 다음 계약을 보존한다.
+현재 ApplicationSet의 `ai` 항목은 하나의 Deployment용 설정이므로 B 배치를
+별도 워크로드로 관리할 수 있도록 차트와 ApplicationSet 구성을 함께 정한다.
 
 | 기존 매니페스트의 항목 | Helm 반영 대상 |
 | --- | --- |
@@ -151,7 +163,7 @@ Deployment로 감싸면 완료한 컨테이너가 반복 시작될 수 있다. C
 | 노드 선택·ServiceAccount·Pod 보안·`restartPolicy: Never`·볼륨 | Job의 Pod 템플릿 |
 | 이미지·명령·환경 변수·Secret 참조·자원·마운트·컨테이너 보안 | Pod의 컨테이너 설정 |
 | Kustomize의 `configMapGenerator` | Helm ConfigMap 템플릿과 일치하는 `envFrom` 참조 |
-| 개발 Namespace `ai` | ArgoCD `destination.namespace` 및 해당 Namespace의 Secret/PVC |
+| 개발 Namespace 예시 `ai` | 최종 합의한 ArgoCD `destination.namespace` 및 해당 Namespace의 Secret/PVC |
 
 HTTP 포트·Service·Ingress·HTTP probe·HPA는 B에 적용하지 않는다. 이 배치는
 PostgreSQL을 조회한 뒤 Backend 내부 API를 호출하므로 `BACKEND_BASE_URL`에는 실제
