@@ -8,6 +8,8 @@
 .env
 .env.*
 !.env.example
+codex_private_handoff/
+docs/private/
 *.pem
 *.key
 
@@ -18,6 +20,7 @@ __pycache__/
 .pytest_cache/
 .pytest_tmp*/
 .venv/
+.venv-*/
 .venv_translation/
 venv/
 .mypy_cache/
