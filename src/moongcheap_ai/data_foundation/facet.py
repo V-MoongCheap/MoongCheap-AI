@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import json
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
-
 
 STOPWORDS = {"건강기능식품", "제품", "기능성", "섭취", "도움을 줄 수 있음", "기준", "규격", "제조"}
 
@@ -122,7 +121,6 @@ def repeated_terms(df: pd.DataFrame, text_columns: list[str], min_documents: int
 
 def structured_distribution(df: pd.DataFrame, fields: list[str]) -> pd.DataFrame:
     rows = []
-    category_col = "raw_category_name" if "raw_category_name" in df.columns else None
     for field in fields:
         if field not in df.columns:
             continue

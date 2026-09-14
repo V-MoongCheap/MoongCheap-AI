@@ -120,9 +120,9 @@ def seed_database(
                 cursor.execute(
                     """
                     INSERT INTO demand
-                        (id, source_key, catalog_id, desired_price_max, desired_price_min,
+                        (id, source_key, catalog_id, pay_method_id, desired_price_max, desired_price_min,
                          quantity, extra_requirement, is_substitutable, label, processed_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NULL, NULL)
+                    VALUES (%s, %s, %s, 1, %s, %s, %s, %s, %s, NULL, NULL)
                     """,
                     (
                         demand_key_to_id[demand_key],

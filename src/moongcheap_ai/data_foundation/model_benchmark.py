@@ -11,11 +11,10 @@ import json
 import math
 import re
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import pandas as pd
-
 
 TOKEN_RE = re.compile(r"[가-힣A-Za-z0-9]+")
 
@@ -116,7 +115,7 @@ def run_benchmark(staging: pd.DataFrame, max_rows: int = 50000) -> tuple[pd.Data
     if len(eligible) > max_rows:
         eligible = eligible.sort_values(["barcode", "source_file", "source_row"]).head(max_rows)
     eligible = eligible.reset_index(drop=True)
-    train_queries, train_groups = _candidate_rows(eligible, train=True)
+    _train_queries, train_groups = _candidate_rows(eligible, train=True)
     test_queries, test_groups = _candidate_rows(eligible, train=False)
 
     names = eligible["product_name_normalized"].tolist()

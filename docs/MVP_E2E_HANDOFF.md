@@ -15,11 +15,11 @@ or infer an exact catalog identity from fuzzy seller text.
 
 ## Run
 
-From `.git_upload_workspace`:
+From the repository root:
 
 ```powershell
 python scripts/e2e/run_mvp_local_e2e.py `
-  --input ../data/processed/demand_5000_v1/clustering_input_grounded_5000_v1.csv `
+  --input data/processed/demand_5000_v1/clustering_input_grounded_5000_v1.csv `
   --offers ../data/processed/domeggook/seller_offers_core.csv `
   --output-dir data/processed/mvp_e2e_v1
 ```

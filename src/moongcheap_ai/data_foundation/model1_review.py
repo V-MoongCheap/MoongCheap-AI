@@ -40,9 +40,9 @@ REGULATED_CANONICAL_PATTERNS = (
     (re.compile(_u(r"\uc6d4\uacbd\uc804")), _u("\uc6d4\uacbd\uc804 \ubd88\ud3b8")),
     (re.compile(_u(r"\uba74\uc5ed\uacfc\ubbfc\ubc18\uc751.*\ud53c\ubd80")), _u("\uba74\uc5ed\uacfc\ubbfc\ubc18\uc751 \ud53c\ubd80 \uc0c1\ud0dc")),
 )
-RECOGNITION_NUMBER_RE = re.compile(r"(?:\uae30\ub2a5\uc131\uc6d0\ub8cc\uc778\uc815\uc81c|\uc778\uc815\uc81c|\uc0dd\ub9ac\ud65c\uc131\uae30\ub2a5\s*)?(\d{4})\s*[-\u2013]\s*(\d+)\s*\ud638?", re.I)
-INTAKE_RE = re.compile(r"(?:(\d+)\s*\uc77c\s*)?(?:(\d+)\s*\ud68c)?", re.I)
-PRICE_RE = re.compile(r"^(?:UNDER_(\d+)|OVER_(\d+)|(\d+)_TO_(\d+))$", re.I)
+RECOGNITION_NUMBER_RE = re.compile(r"(?:\uae30\ub2a5\uc131\uc6d0\ub8cc\uc778\uc815\uc81c|\uc778\uc815\uc81c|\uc0dd\ub9ac\ud65c\uc131\uae30\ub2a5\s*)?(\d{4})\s*[-\u2013]\s*(\d+)\s*\ud638?", re.IGNORECASE)
+INTAKE_RE = re.compile(r"(?:(\d+)\s*\uc77c\s*)?(?:(\d+)\s*\ud68c)?", re.IGNORECASE)
+PRICE_RE = re.compile(r"^(?:UNDER_(\d+)|OVER_(\d+)|(\d+)_TO_(\d+))$", re.IGNORECASE)
 
 
 def normalize_text(value: Any) -> str:
@@ -59,13 +59,13 @@ def normalize_value(facet_id: str, value: Any) -> str:
     if facet_id == "product_form":
         return FORM_MAP.get(text.casefold(), text)
     if facet_id == "functional_ingredients":
-        text = re.sub(r"\s*\((?:" + _u("\ub610\ub294") + r"|or)\s*[^)]*\)", "", text, flags=re.I)
-        text = re.sub(r"\s*\([^)]*(?:" + _u("\uae30\ub2a5\uc131") + r"|" + _u("\uc0dd\ub9ac\ud65c\uc131") + r")[^)]*\)", "", text, flags=re.I)
-        text = re.sub(r"\s*\([^)]*\d{4}\s*[-\u2013]\s*\d+\s*\ud638?[^)]*\)", "", text, flags=re.I)
+        text = re.sub(r"\s*\((?:" + _u("\ub610\ub294") + r"|or)\s*[^)]*\)", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*\([^)]*(?:" + _u("\uae30\ub2a5\uc131") + r"|" + _u("\uc0dd\ub9ac\ud65c\uc131") + r")[^)]*\)", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*\([^)]*\d{4}\s*[-\u2013]\s*\d+\s*\ud638?[^)]*\)", "", text, flags=re.IGNORECASE)
     if facet_id == "regulated_function":
-        text = re.sub(_u(r"\(\s*\uad6d\ubb38\s*\)"), "", text, flags=re.I)
-        text = re.sub(_u(r"\(\s*\uc601\ubb38\s*\).*"), "", text, flags=re.I)
-        text = re.sub(r"\s+May help.*$", "", text, flags=re.I)
+        text = re.sub(_u(r"\(\s*\uad6d\ubb38\s*\)"), "", text, flags=re.IGNORECASE)
+        text = re.sub(_u(r"\(\s*\uc601\ubb38\s*\).*"), "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s+May help.*$", "", text, flags=re.IGNORECASE)
         text = re.sub(r"\s*\([^)]*\)", "", text)
     return text.strip()
 
@@ -97,7 +97,7 @@ def review_candidates(candidates: pd.DataFrame, inputs: pd.DataFrame) -> pd.Data
         category_rows = input_frame[input_frame["category_key"].astype(str).eq(category)] if "category_key" in input_frame else input_frame.iloc[0:0]
         category_normalized = normalized_input.loc[category_rows.index]
         needle = normalize_text(raw_value)
-        matching_rows = category_rows[category_normalized.map(lambda value: needle in value if needle else False).any(axis=1)] if text_columns and not category_rows.empty else category_rows.iloc[0:0]
+        matching_rows = category_rows[category_normalized.map(lambda value, search=needle: search in value if search else False).any(axis=1)] if text_columns and not category_rows.empty else category_rows.iloc[0:0]
         evidence_matches = _contains(str(candidate.get("source_text", "")), normalize_text(raw_value))
         reasons: list[str] = []
         status = "ACCEPT_CANDIDATE"
@@ -111,7 +111,7 @@ def review_candidates(candidates: pd.DataFrame, inputs: pd.DataFrame) -> pd.Data
         if not evidence_matches: status, reasons = ("REVIEW_REQUIRED" if status != "REJECT" else status), reasons + ["evidence_text_mismatch"]
         if len(matching_rows) == 0: status, reasons = "REJECT", reasons + ["no_matching_input_row"]
         elif len(matching_rows) < 2 and status == "ACCEPT_CANDIDATE": status, reasons = "REVIEW_REQUIRED", reasons + ["single_observed_input_row"]
-        rows.append({**candidate.to_dict(), "canonical_facet_id": facet_id, "normalized_value": normalized, "review_scope": scope, "input_match_count": int(len(matching_rows)), "evidence_text_matches_value": bool(evidence_matches), "review_status": status, "review_reasons": "|".join(dict.fromkeys(reasons)) or "passes_basic_gates"})
+        rows.append({**candidate.to_dict(), "canonical_facet_id": facet_id, "normalized_value": normalized, "review_scope": scope, "input_match_count": len(matching_rows), "evidence_text_matches_value": bool(evidence_matches), "review_status": status, "review_reasons": "|".join(dict.fromkeys(reasons)) or "passes_basic_gates"})
     return pd.DataFrame(rows)
 
 
@@ -153,8 +153,8 @@ def collapse_same_model_candidates(normalized: pd.DataFrame) -> pd.DataFrame:
             row[column] = " | ".join(values)
         row["source_product_id"] = " | ".join(product_ids)
         row["source_product_ids"] = row["source_product_id"]
-        row["candidate_row_count"] = int(len(group))
-        row["evidence_product_count"] = int(len(product_ids))
+        row["candidate_row_count"] = len(group)
+        row["evidence_product_count"] = len(product_ids)
         rows.append(row)
     return pd.DataFrame(rows)
 

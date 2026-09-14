@@ -17,7 +17,6 @@ from moongcheap_ai.data_foundation.model1 import (
     sample_products,
 )
 
-
 MODEL_OUTPUT_COLUMNS = [
     "category_key", "category_name", "facet_id_candidate", "name", "definition",
     "value", "alias", "source_product_id", "source_field", "source_text", "status",

@@ -1,10 +1,20 @@
 import pandas as pd
 import pytest
 
-from moongcheap_ai.data_foundation.labeling import TaxonomyLoader, TaxonomyValidationError, build_product_facet_map, label_demands
-from moongcheap_ai.data_foundation.facet_codebook import build_clustering_input, load_codebook
-from moongcheap_ai.data_foundation.demand_label_comparison import _apply_model_result, _normalise_model_facet_values
-
+from moongcheap_ai.data_foundation.demand_label_comparison import (
+    _apply_model_result,
+    _normalise_model_facet_values,
+)
+from moongcheap_ai.data_foundation.facet_codebook import (
+    build_clustering_input,
+    load_codebook,
+)
+from moongcheap_ai.data_foundation.labeling import (
+    TaxonomyLoader,
+    TaxonomyValidationError,
+    build_product_facet_map,
+    label_demands,
+)
 
 TAXONOMY = {"categories": [{"category_id": "C1", "facets": [{"name": "sugar_type", "order": 1, "values": [
     {"code": 0, "value": "ALL", "aliases": []}, {"code": 2, "value": "sugar_free", "aliases": ["무설탕"]}
@@ -32,6 +42,12 @@ def test_duplicate_value_codes_are_rejected() -> None:
     invalid = {"categories": [{"category_id": "C1", "facets": [{"name": "f", "values": [{"code": 0}, {"code": 0}]}]}]}
     with pytest.raises(TaxonomyValidationError):
         TaxonomyLoader(invalid)
+
+
+def test_malformed_taxonomy_types_raise_domain_validation_error() -> None:
+    for invalid in [None, [], {"categories": [None]}, {"categories": [{"category_id": "C1", "facets": [None]}]}]:
+        with pytest.raises(TaxonomyValidationError):
+            TaxonomyLoader(invalid)
 
 
 def test_non_contiguous_facet_orders_are_rejected() -> None:

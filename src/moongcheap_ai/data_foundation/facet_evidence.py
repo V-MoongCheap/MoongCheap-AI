@@ -8,12 +8,10 @@ from __future__ import annotations
 
 import json
 import re
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
-
 
 UNIFIED_COLUMNS = [
     "evidence_id", "category", "service_category", "source", "source_type",
@@ -22,8 +20,8 @@ UNIFIED_COLUMNS = [
     "license_status", "local_only",
 ]
 
-HEALTH_TERMS = re.compile(r"건강|건기식|영양|비타민|미네랄|프로바이오틱|유산균|홍삼|인삼|오메가|콜라겐|단백질|루테인|마그네슘|supplement|vitamin|probiotic|collagen|protein|ginseng|omega|lutein|保健|维生素|益生菌|胶原蛋白|蛋白质|人参|鱼油|叶黄素|营养|膳食", re.I)
-MEDICAL_TERMS = re.compile(r"질병|질환|진단|치료|처방|부작용|완치|암|당뇨 치료|medical|diagnos|cure|treat", re.I)
+HEALTH_TERMS = re.compile(r"건강|건기식|영양|비타민|미네랄|프로바이오틱|유산균|홍삼|인삼|오메가|콜라겐|단백질|루테인|마그네슘|supplement|vitamin|probiotic|collagen|protein|ginseng|omega|lutein|保健|维生素|益生菌|胶原蛋白|蛋白质|人参|鱼油|叶黄素|营养|膳食", re.IGNORECASE)
+MEDICAL_TERMS = re.compile(r"질병|질환|진단|치료|처방|부작용|완치|암|당뇨 치료|medical|diagnos|cure|treat", re.IGNORECASE)
 ATTRIBUTE_PATTERNS: dict[str, list[tuple[str, str]]] = {
     "product_form": [("tablet", r"정제|타블렛|tablet"), ("capsule", r"캡슐|capsule"), ("powder", r"분말|가루|powder"), ("liquid", r"액상|액체|liquid"), ("stick", r"스틱|stick")],
     "intake_frequency": [("once_daily", r"하루s*(한|1)s*번|1일s*1회|once a day"), ("multiple_daily", r"하루s*(두|2)s*번|1일s*[2-9]회")],
@@ -82,7 +80,7 @@ def _extract_text_evidence(source: str, source_type: str, frame: pd.DataFrame, t
             continue
         for attribute, patterns in ATTRIBUTE_PATTERNS.items():
             for value, pattern in patterns:
-                if re.search(pattern, text, re.I):
+                if re.search(pattern, text, re.IGNORECASE):
                     rows.append(_row(source, source_type, item.get(id_column, ""), item.get(product_column, ""), item.get(category_column, ""), text, attribute, value, term=value, license_status=license_status))
     return pd.DataFrame(rows, columns=UNIFIED_COLUMNS) if rows else _empty()
 
@@ -181,7 +179,7 @@ def build_kuaisearch(directory: Path, query_output: Path | None = None, translat
                 text = f"{translation_map.get(query, '') or query} | {_text(item.get('item_title'))}"
                 for attribute, patterns in ATTRIBUTE_PATTERNS.items():
                     for value, pattern in patterns:
-                        if re.search(pattern, text, re.I):
+                        if re.search(pattern, text, re.IGNORECASE):
                             rows.append(_row("kuaisearch", "FOREIGN_CONSUMER_SEARCH_REFERENCE", record.get("session_id"), item_id, "health-functional-food", text, attribute, value, term=value, behavior=behavior, license_status="MIT"))
     if query_output is not None:
         query_output.parent.mkdir(parents=True, exist_ok=True)
@@ -229,7 +227,7 @@ def build_naver_trends(path: Path) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=UNIFIED_COLUMNS) if rows else _empty()
 
 
-REVIEW_MEDICAL_TERMS = re.compile(r"효과가 있다|효과 봤|치료|완치|질환|병이|통증이 좋아|면역력이 좋아|혈압이 내려|혈당이 내려|medical|diagnos|cure|treat", re.I)
+REVIEW_MEDICAL_TERMS = re.compile(r"효과가 있다|효과 봤|치료|완치|질환|병이|통증이 좋아|면역력이 좋아|혈압이 내려|혈당이 내려|medical|diagnos|cure|treat", re.IGNORECASE)
 REVIEW_ATTRIBUTE_PATTERNS = {
     "product_form": [("tablet", r"정제|알약|tablet"), ("capsule", r"캡슐|capsule"), ("powder", r"분말|가루|powder"), ("liquid", r"액상|액체|liquid"), ("stick", r"스틱|stick")],
     "tablet_size": [("small", r"알이 작|작은 알|작아서|작은 정"), ("large", r"알이 크|큰 알|커서")],
@@ -282,7 +280,7 @@ def build_review_evidence(path: Path, source: str, max_reviews_per_product: int 
                 continue
             for attribute, patterns in REVIEW_ATTRIBUTE_PATTERNS.items():
                 for value, pattern in patterns:
-                    if re.search(pattern, sentence, re.I):
+                    if re.search(pattern, sentence, re.IGNORECASE):
                         rows.append(_row(source, "KOREAN_HFF_RAW_REVIEW", f"{review_id}:{sentence_index}", product_id, "health-functional-food", sentence, attribute, value, term=sentence, license_status="INTERNAL_ONLY_PUBLIC_SOURCE"))
     evidence = pd.DataFrame(rows, columns=UNIFIED_COLUMNS) if rows else _empty()
     return evidence, {
@@ -440,7 +438,6 @@ def run_pipeline(root: Path, output_dir: Path, enable_reviews: bool = False, max
     evidence.append(seller_frame)
     statuses.append({"source": "domeggook", "source_type": "SELLER_PRODUCT_EVIDENCE", "status": "AVAILABLE" if seller.exists() else "NOT_ACQUIRED", "rows": len(seller_frame)})
 
-    kuai = root / "data/raw/consumer_reference/kuaisearch"
     kuai_translation = root / "data/interim/facet_evidence/kuaiseach_health_queries_ko_reviewed_v27.parquet"
     kuai_frame = build_kuaisearch_reference(kuai_translation)
     evidence.append(kuai_frame)

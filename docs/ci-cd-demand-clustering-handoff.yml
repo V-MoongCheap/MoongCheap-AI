@@ -1,7 +1,7 @@
 # Demand Clustering CI/CD Handoff (Part B)
 # 실제 Secret 값은 작성하지 않습니다.
 
-repository: https://github.com/V-MoongCheap/kdt-ai-2-team2-integrated
+repository: https://github.com/V-MoongCheap/MoongCheap-AI
 branch: develop
 
 build_command: "uv sync --project packaging/demand-clustering --locked --extra data --extra dev"

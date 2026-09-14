@@ -12,7 +12,7 @@ MFDS와 판매자 공고는 상품 속성의 주 근거다. 소비자 검색어�
 
 ## 파셋 도출에서 제외하는 데이터
 
-`data/synthetic/consumer_reference/grounded_demand_v2_1000.csv`와 `F:\downloadF\demand_board_snapshot_5000.json`은 구매 요청 생성, 수요 라벨링, 클러스터링 검증에 사용한다. 현재 Model 1 파셋 도출 입력에는 넣지 않는다.
+`data/synthetic/consumer_reference/grounded_demand_v2_1000.csv`와 `data/synthetic/consumer_reference/demand_board_snapshot_5000.json`은 구매 요청 생성, 수요 라벨링, 클러스터링 검증에 사용한다. 현재 Model 1 파셋 도출 입력에는 넣지 않는다.
 
 가상 구매 요청의 자연어 조건, 참여자 수, 시뮬레이션 가격, 상태값은 실제 상품의 고유 속성이나 실제 시장 수요량을 의미하지 않기 때문이다.
 

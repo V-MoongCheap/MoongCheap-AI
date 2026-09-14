@@ -36,6 +36,8 @@ CREATE TABLE demand (
     demand_board_id BIGINT,
     member_id BIGINT NOT NULL DEFAULT 1,
     catalog_id BIGINT NOT NULL REFERENCES product_catalog(id),
+    -- ERD v5 compatibility; payment data is outside this local labeling fixture.
+    pay_method_id BIGINT NOT NULL DEFAULT 1,
     desired_price_max INTEGER NOT NULL,
     desired_price_min INTEGER NOT NULL,
     desire_end_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '7 days'),

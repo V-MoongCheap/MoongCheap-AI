@@ -7,14 +7,14 @@ The base project does not install a model runtime. Install the optional runtime 
 From the repository root:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r .git_upload_workspace\requirements-model1-hf.txt
-.\.venv\Scripts\python.exe .git_upload_workspace\scripts\model1\check_hf_environment.py
+.\.venv\Scripts\python.exe -m pip install -r requirements-model1-hf.txt
+.\.venv\Scripts\python.exe scripts\model1\check_hf_environment.py
 ```
 
 The PowerShell helper is equivalent:
 
 ```powershell
-.git_upload_workspace\scripts\model1\setup_hf_environment.ps1
+scripts\model1\setup_hf_environment.ps1
 ```
 
 ## Model cache and authentication
@@ -22,7 +22,7 @@ The PowerShell helper is equivalent:
 Set `HF_HOME` to a local cache directory when the default user cache is not suitable. `HF_TOKEN` is needed only for gated or private models. Never commit either value.
 
 ```powershell
-$env:HF_HOME = "F:\hf-cache"
+$env:HF_HOME = ".hf-cache"
 $env:HF_TOKEN = "<token only when required>"
 ```
 
@@ -33,9 +33,9 @@ Public models do not require a token. Model weights are downloaded on first use 
 The following models are candidates, not an automatic production choice:
 
 ```powershell
-$env:PYTHONPATH = "F:\kt\kt\integration_project\.git_upload_workspace\src;F:\kt\kt\integration_project\.git_upload_workspace"
+$env:PYTHONPATH = "src;."
 
-python .git_upload_workspace\scripts\model1\run_multisource_facet_discovery.py `
+python scripts\model1\run_multisource_facet_discovery.py `
   --provider transformers `
   --models "yanolja/YanoljaNEXT-EEVE-Instruct-7B-v2-Preview" `
   --smoke-only `
@@ -43,7 +43,7 @@ python .git_upload_workspace\scripts\model1\run_multisource_facet_discovery.py `
   --max-sellers-per-category 4 `
   --max-queries-per-category 2 `
   --batch-size 8 `
-  --output-dir .git_upload_workspace\data\processed\model1_eeve7b_smoke
+  --output-dir data\processed\model1_eeve7b_smoke
 ```
 
 For another candidate, replace `--models` with:

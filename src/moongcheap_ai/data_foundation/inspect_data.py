@@ -44,6 +44,6 @@ def inspect(root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
             sample = read_sample(root / entry["path"])
             entry.update({"columns": [str(c) for c in sample.columns], "sample_rows": len(sample), "null_rate": sample.isna().mean().round(4).to_dict()})
             samples.append({"path": entry["path"], "columns": entry["columns"], "rows": sample.to_dict("records")})
-        except Exception as exc:
+        except (OSError, ValueError, TypeError, ImportError, zipfile.BadZipFile, pd.errors.ParserError) as exc:
             entry["read_error"] = str(exc)
     return files, samples

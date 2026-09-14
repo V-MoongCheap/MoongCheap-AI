@@ -8,7 +8,6 @@ from typing import Any
 
 import pandas as pd
 
-
 RULES = [
     ("PROBIOTICS", "유산균·프로바이오틱스", ("프로바이오틱", "유산균")),
     ("RED_GINSENG", "홍삼·인삼", ("홍삼", "인삼")),
@@ -39,10 +38,18 @@ def classify_service_group(row: pd.Series) -> tuple[str, str, float]:
 def build_category_v2(frame: pd.DataFrame, output_dir: Path) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     data = frame.fillna("").copy()
+    for column in ("source_product_id", "product_type", "functional_ingredients", "main_functionality", "name"):
+        if column not in data.columns:
+            data[column] = ""
     for column in data.columns:
         data[column] = data[column].map(_text)
     classifications = [classify_service_group(row) for _, row in data.iterrows()]
-    data["service_group_key"], data["service_group_name"], data["mapping_confidence"] = zip(*classifications)
+    if classifications:
+        data["service_group_key"], data["service_group_name"], data["mapping_confidence"] = zip(*classifications)
+    else:
+        data["service_group_key"] = pd.Series(dtype=str)
+        data["service_group_name"] = pd.Series(dtype=str)
+        data["mapping_confidence"] = pd.Series(dtype=float)
 
     source_group = data.groupby("product_type", dropna=False, sort=True).agg(product_count=("source_product_id", "size"), service_category_candidate_key=("service_group_key", "first"), service_category_name=("service_group_name", "first"), confidence=("mapping_confidence", "mean")).reset_index().rename(columns={"product_type": "source_category"})
     source_group["mapping_reason"] = "product name + functional ingredient + regulated function keyword candidate"
@@ -71,7 +78,6 @@ def build_category_v2(frame: pd.DataFrame, output_dir: Path) -> dict[str, Any]:
     (output_dir / "category_quality_report_v2.md").write_text("\n".join(quality), encoding="utf-8")
 
     validation = []
-    names = tree["category_name"].tolist()
     for _, row in tree.iterrows():
         issues = []
         if row["depth"] > 1 and row["parent_candidate_key"] not in set(tree["category_candidate_key"]): issues.append("parent_missing")

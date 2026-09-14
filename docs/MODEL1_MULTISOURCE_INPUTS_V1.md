@@ -9,7 +9,7 @@ Model 1은 원본 파일을 직접 모델에 넘기지 않는다. 각 Source Loa
 | MFDS_PRODUCT | `data/interim/facet_discovery/i0030_products_clean_dedup.csv` | 상품의 규제·제형·원료 사실 | `product_name`, `product_form`, `functional_ingredients`, `regulated_function` |
 | SELLER_LISTING | `data/processed/domeggook/seller_offers_core.csv` | 판매 공고의 상품 표현·가격·MOQ | `product_name`, `package_spec`, `ingredients_raw`, `functionality_raw`, `intake_raw`, `base_unit_price`, `moq` |
 | GROUNDED_DEMAND_SYNTHETIC | `data/synthetic/consumer_reference/grounded_demand_v2_1000.csv` | 상품 데이터에 근거한 가상 구매 요청 | `catalog_id`, `extra_requirement`, `facet_requirements`, `price_option`, `quantity` |
-| DEMAND_BOARD_SYNTHETIC | `F:\downloadF\demand_board_snapshot_5000.json` | 가상 수요 보드의 조건 집계 | `catalogId`, `priceMin`, `priceMax`, `participantCount`, `status` |
+| DEMAND_BOARD_SYNTHETIC | `data/synthetic/consumer_reference/demand_board_snapshot_5000.json` | 가상 수요 보드의 조건 집계 | `catalogId`, `priceMin`, `priceMax`, `participantCount`, `status` |
 | CONSUMER_SEARCH | `data/interim/facet_evidence/kuaiseach_health_queries_ko_reviewed_v27.parquet` | 번역된 검색 표현·관심 신호 | `query_translated`, `source_record_id` |
 
 ## 공통 입력 컬럼

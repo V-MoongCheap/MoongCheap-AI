@@ -6,16 +6,23 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import pandas as pd
 from dotenv import load_dotenv
 
 from ..mvp_pipeline import ReviewedAliasMatcher, _apply_aliases
 from .backend_contract import build_label_result_payload, post_label_results
-from .labeling import TaxonomyLoader, build_product_facet_map, label_demands, load_taxonomy, taxonomy_from_category_facet_rows
+from .labeling import (
+    TaxonomyLoader,
+    build_product_facet_map,
+    label_demands,
+    load_taxonomy,
+    taxonomy_from_category_facet_rows,
+)
 from .postgres_reader import open_read_only_postgres, read_unprocessed_demands
 from .postgres_writer import open_postgres, write_label_results
 
@@ -36,7 +43,7 @@ def run_batch(
     alias_registry_path: Path | None = None,
     processed_at: str | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    timestamp = processed_at or datetime.now(timezone.utc).isoformat()
+    timestamp = processed_at or datetime.now(UTC).isoformat()
     if demands.empty:
         empty = demands.copy()
         for column in ("demand_id", "catalog_id", "category_id", "label", "facet_values", "label_status"):

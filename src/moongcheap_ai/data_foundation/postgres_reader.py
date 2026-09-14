@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Any, Protocol
+from types import TracebackType
+from typing import Any, Protocol, Self
 
 import pandas as pd
-
 
 DEFAULT_DEMANDS_SQL = """
 SELECT
@@ -33,8 +33,8 @@ ORDER BY d.id
 class Cursor(Protocol):
     description: Sequence[Any] | None
 
-    def __enter__(self) -> "Cursor": ...
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> None: ...
     def execute(self, query: str, params: Mapping[str, Any] | None = None) -> Any: ...
     def fetchall(self) -> Sequence[Any]: ...
 

@@ -8,7 +8,7 @@ import pandas as pd
 
 def build_observed_kan(staging: pd.DataFrame, output: Path) -> dict[str, int]:
     rows = []
-    if not staging.empty:
+    if not staging.empty and "kan_code" in staging.columns:
         for code, group in staging.groupby("kan_code", dropna=False, sort=True):
             code = str(code or "")
             if not code: continue
@@ -21,7 +21,7 @@ def build_observed_kan(staging: pd.DataFrame, output: Path) -> dict[str, int]:
 def build_aihub_category_hierarchy(staging: pd.DataFrame, output: Path) -> dict[str, int]:
     """Create an observed hierarchy from preserved AI-Hub source paths."""
     nodes: dict[str, dict] = {}
-    if not staging.empty and "source_category_path" in staging:
+    if not staging.empty and {"source_category_path", "kan_code"}.issubset(staging.columns):
         grouped = staging.groupby("source_category_path", dropna=False, sort=True)
         for raw_path, group in grouped:
             path = str(raw_path or "").strip()
@@ -43,7 +43,7 @@ def build_aihub_category_hierarchy(staging: pd.DataFrame, output: Path) -> dict[
                     "observed_only": True,
                     "status": "DRAFT",
                 })
-                node["observed_row_count"] += int(len(group))
+                node["observed_row_count"] += len(group)
                 node["observed_kan_codes"].update(set(group["kan_code"].astype(str).loc[lambda values: values.ne("")]))
     rows = []
     for node in nodes.values():

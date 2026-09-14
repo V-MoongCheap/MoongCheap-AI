@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from datetime import datetime
-from typing import Any, Protocol
-
+from types import TracebackType
+from typing import Any, Protocol, Self
 
 UPDATE_LABEL_SQL = """
 UPDATE demand
@@ -22,8 +22,8 @@ WHERE id = %(demand_id)s
 
 
 class Cursor(Protocol):
-    def __enter__(self) -> "Cursor": ...
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> None: ...
     def execute(self, query: str, params: Mapping[str, Any] | None = None) -> Any: ...
 
 

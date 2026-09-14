@@ -1,9 +1,13 @@
 """Normalize Model 1 candidates and apply evidence-backed product mapping."""
+
 from __future__ import annotations
+
 import re
 import unicodedata
 from typing import Any
+
 import pandas as pd
+
 from .category_v2_1 import classify_v2_1
 
 CANONICAL_FACETS = {"form": ("product_form", "제품 형태"), "product form": ("product_form", "제품 형태"), "제품 형태": ("product_form", "제품 형태"), "functional ingredients": ("functional_ingredients", "기능성 성분"), "기능성 성분": ("functional_ingredients", "기능성 성분"), "probiotic strain": ("probiotic_strain", "프로바이오틱스 균주"), "프로바이오틱스 균주": ("probiotic_strain", "프로바이오틱스 균주"), "regulated function": ("regulated_function", "규제 기능"), "규제 기능": ("regulated_function", "규제 기능")}
@@ -61,7 +65,13 @@ def normalize_candidates(review: pd.DataFrame) -> pd.DataFrame:
 
 def map_products(products: pd.DataFrame, candidates: pd.DataFrame) -> pd.DataFrame:
     columns = ["source_product_id", "product_name", "category_key", "category_name", "facet_id", "facet_name", "value", "source_field", "mapping_status", "mapping_method"]
+    required_candidate_columns = {"category_key", "facet_id", "facet_name", "value"}
+    if products.empty or candidates.empty or not required_candidate_columns.issubset(candidates.columns):
+        return pd.DataFrame(columns=columns)
     data = products.fillna("").copy()
+    for column in ("source_product_id", "name", "product_type"):
+        if column not in data.columns:
+            data[column] = ""
     classified = data.apply(classify_v2_1, axis=1, result_type="expand")
     data["category_key"] = [f"health-functional-food:{key.lower()}" if row["product_type"] else "UNMAPPED" for (_, row), key in zip(data.iterrows(), classified[0])]
     data["category_name"] = classified[1].values

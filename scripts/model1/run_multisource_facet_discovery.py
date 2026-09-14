@@ -13,13 +13,11 @@ from typing import Any
 import pandas as pd
 
 from moongcheap_ai.data_foundation.model1 import (
-    MODEL_OUTPUT_COLUMNS,
     ModelCallError,
     create_model_adapter,
     parse_model_output,
     sample_products,
 )
-
 
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "facet_discovery_multisource_v1.txt"
 SMOKE_CATEGORY_KEYS = {
@@ -27,6 +25,7 @@ SMOKE_CATEGORY_KEYS = {
     "health-functional-food:probiotics",
     "health-functional-food:skin_collagen",
 }
+CATEGORY_KEYS = SMOKE_CATEGORY_KEYS
 SOURCE_COLUMNS = [
     "category_key", "category_name", "source_product_id", "product_name",
     "source_category", "product_form", "functional_ingredients",
@@ -203,13 +202,23 @@ def build_multisource_input(paths: dict[str, Path], max_products_per_category: i
 
 def parse_reasoned_output(payload: dict[str, Any], input_frame: pd.DataFrame) -> tuple[pd.DataFrame, list[dict[str, str]]]:
     parsed, failures = parse_model_output(payload, input_frame)
+    # Keep the multi-source contract stable: malformed top-level facet entries
+    # are schema failures, while the provider-neutral parser remains granular.
+    failures = [
+        {**failure, "failure_type": "SCHEMA_VALIDATION_FAILED"}
+        if failure.get("failure_type") == "INVALID_FACET"
+        else failure
+        for failure in failures
+    ]
     if parsed.empty:
         return parsed, failures
-    reasons = {str(item.get("name", "")): _text(item.get("selection_reason") or item.get("reason")) for item in payload.get("facets", [])}
+    facets = [item for item in payload.get("facets", []) if isinstance(item, dict)]
+    reasons = {str(item.get("name", "")): _text(item.get("selection_reason") or item.get("reason")) for item in facets}
     value_reasons = {
         (str(item.get("name", "")), str(value.get("value", ""))): _text(value.get("value_reason"))
-        for item in payload.get("facets", [])
+        for item in facets
         for value in item.get("values", [])
+        if isinstance(value, dict)
     }
     source_types = dict(zip(input_frame["source_product_id"].astype(str), input_frame["source_type"].astype(str)))
     parsed["selection_reason"] = parsed["name"].map(reasons).fillna("")
@@ -232,7 +241,7 @@ def add_data_selection_reason(candidates: pd.DataFrame, input_data: pd.DataFrame
         category_key, value = key
         value_norm = _normalize(value)
         category_rows = input_data[input_data["category_key"].eq(category_key)]
-        mask = category_rows[text_columns].astype(str).apply(lambda column: column.map(_normalize).str.contains(re.escape(value_norm), regex=True, na=False)).any(axis=1) if value_norm else pd.Series(False, index=category_rows.index)
+        mask = category_rows[text_columns].astype(str).apply(lambda column, needle=value_norm: column.map(_normalize).str.contains(re.escape(needle), regex=True, na=False)).any(axis=1) if value_norm else pd.Series(False, index=category_rows.index)
         observed = category_rows[mask]
         observed_types = sorted(observed["source_type"].drop_duplicates().tolist())
         observed_cache[key] = (len(observed), observed_types)
@@ -310,7 +319,7 @@ def main() -> None:
     parser.add_argument("--products", type=Path, default=Path("data/interim/facet_discovery/i0030_products_clean_dedup.csv"))
     parser.add_argument("--sellers", type=Path, default=Path("data/processed/domeggook/seller_offers_core.csv"))
     parser.add_argument("--demands", type=Path, default=Path("data/synthetic/consumer_reference/grounded_demand_v2_1000.csv"))
-    parser.add_argument("--boards", type=Path, default=Path(r"F:\downloadF\demand_board_snapshot_5000.json"))
+    parser.add_argument("--boards", type=Path, default=Path("data/synthetic/consumer_reference/demand_board_snapshot_5000.json"))
     parser.add_argument("--queries", type=Path, default=Path("data/interim/facet_evidence/kuaiseach_health_queries_ko_reviewed_v27.parquet"))
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed/model1_multisource_v1"))
     parser.add_argument("--models", default="qwen3:4b,gemma3:4b,llama3.2:3b,exaone3.5:2.4b-instruct-q4_K_M,phi4-mini")

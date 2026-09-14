@@ -8,7 +8,6 @@ from typing import Any
 
 import pandas as pd
 
-
 FACET_FIELDS = {
     "product_form": "제품 형태",
     "functional_ingredients": "기능성 원료",

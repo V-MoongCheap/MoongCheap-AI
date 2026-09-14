@@ -1,6 +1,9 @@
 import pandas as pd
 
-from moongcheap_ai.data_foundation.category_v2_1 import build_category_v2_1, classify_v2_1
+from moongcheap_ai.data_foundation.category_v2_1 import (
+    build_category_v2_1,
+    classify_v2_1,
+)
 
 
 def test_v21_promotes_only_approved_other_candidates():
@@ -25,3 +28,10 @@ def test_v21_keeps_ids_blank_and_retains_classification_when_source_category_is_
     assert tree["category_candidate_key"].str.contains("skin_collagen").any()
     validation = pd.read_csv(tmp_path / "category_validation_report_v2_1.csv", dtype=str).fillna("")
     assert validation.loc[validation["category_name"] == "피부·콜라겐", "representative_product_names"].iloc[0] == "콜라겐"
+
+
+def test_v21_handles_empty_and_partial_input(tmp_path):
+    empty_result = build_category_v2_1(pd.DataFrame(), tmp_path / "empty")
+    partial_result = build_category_v2_1(pd.DataFrame([{"source_product_id": "1"}]), tmp_path / "partial")
+    assert empty_result["category_count"] == 0
+    assert partial_result["category_count"] == 1

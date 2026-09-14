@@ -24,13 +24,20 @@ NO_REQUIREMENT_PHRASES = {"조건 없음", "조건없음", "상관 없음", "상
 
 class TaxonomyLoader:
     def __init__(self, taxonomy: dict[str, Any]) -> None:
+        if not isinstance(taxonomy, dict):
+            raise TaxonomyValidationError("taxonomy root must be an object")
         self.taxonomy = taxonomy
         self.categories: dict[str, dict[str, Any]] = {}
         self.root_category: dict[str, Any] | None = None
         if taxonomy.get("facets"):
             self._validate_category({"category_id": "__root__", "facets": taxonomy["facets"]})
             self.root_category = {"category_id": "__root__", "facets": taxonomy["facets"]}
-        for category in taxonomy.get("categories", []):
+        categories = taxonomy.get("categories", [])
+        if not isinstance(categories, list):
+            raise TaxonomyValidationError("taxonomy categories must be a list")
+        for category in categories:
+            if not isinstance(category, dict):
+                raise TaxonomyValidationError("taxonomy category must be an object")
             category_id = str(category.get("category_id", "")).strip()
             if not category_id:
                 continue
@@ -40,7 +47,7 @@ class TaxonomyLoader:
             self.categories[category_id] = category
 
     @classmethod
-    def from_path(cls, path: Path) -> "TaxonomyLoader":
+    def from_path(cls, path: Path) -> TaxonomyLoader:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -56,6 +63,8 @@ class TaxonomyLoader:
         if not isinstance(facets, list):
             raise TaxonomyValidationError("category facets must be a list")
         for index, facet in enumerate(facets, 1):
+            if not isinstance(facet, dict):
+                raise TaxonomyValidationError("taxonomy facet must be an object")
             name = str(facet.get("name", "")).strip()
             if not name or name in seen_facets:
                 raise TaxonomyValidationError(f"invalid or duplicate facet: {name}")
@@ -73,6 +82,8 @@ class TaxonomyLoader:
             if not isinstance(values, list) or not values:
                 raise TaxonomyValidationError(f"facet has no values: {name}")
             for value in values:
+                if not isinstance(value, dict):
+                    raise TaxonomyValidationError(f"taxonomy value must be an object: {name}")
                 try:
                     code = int(value["code"])
                 except (KeyError, TypeError, ValueError) as exc:
