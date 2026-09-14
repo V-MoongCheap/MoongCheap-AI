@@ -16,7 +16,11 @@ from typing import Any
 
 import pandas as pd
 
-from .data_foundation.labeling import build_product_facet_map, label_demands, load_taxonomy
+from .data_foundation.labeling import (
+    build_product_facet_map,
+    label_demands,
+    load_taxonomy,
+)
 from .demand_clustering.baseline import cluster_demands, summarize_clusters
 
 
@@ -47,43 +51,60 @@ class ReviewedAliasMatcher:
             for surface in alias.get("surfaces", []):
                 candidate = " ".join(str(surface or "").casefold().split())
                 if candidate and candidate in normalized:
-                    matches.append({
-                        "facet_name": alias["facet_name"],
-                        "canonical_value": alias["canonical_value"],
-                        "code": int(local["code"]),
-                        "value": local.get("value", ""),
-                        "matched_alias": surface,
-                        "surface_length": len(candidate),
-                    })
-        matches.sort(key=lambda item: (-item["surface_length"], item["facet_name"], item["code"]))
+                    matches.append(
+                        {
+                            "facet_name": alias["facet_name"],
+                            "canonical_value": alias["canonical_value"],
+                            "code": int(local["code"]),
+                            "value": local.get("value", ""),
+                            "matched_alias": surface,
+                            "surface_length": len(candidate),
+                        }
+                    )
+        matches.sort(
+            key=lambda item: (-item["surface_length"], item["facet_name"], item["code"])
+        )
         return matches
 
 
-def _apply_aliases(frame: pd.DataFrame, matcher: ReviewedAliasMatcher) -> tuple[pd.DataFrame, int, int, int]:
+def _apply_aliases(
+    frame: pd.DataFrame, matcher: ReviewedAliasMatcher
+) -> tuple[pd.DataFrame, int, int, int]:
     output = frame.copy()
     alias_hits = 0
     conflicts = 0
     corrected_hits = 0
     row_conflicts: list[bool] = []
     for index, row in output.iterrows():
-        matches = matcher.resolve(str(row.get("category_id", "")), row.get("extra_requirement", ""))
+        matches = matcher.resolve(
+            str(row.get("category_id", "")), row.get("extra_requirement", "")
+        )
         if not matches:
             row_conflicts.append(False)
             continue
         chosen_by_facet: dict[str, dict[str, Any]] = {}
         current_row_conflict = False
         for match in matches:
-            if match["facet_name"] in chosen_by_facet and chosen_by_facet[match["facet_name"]]["code"] != match["code"]:
+            if (
+                match["facet_name"] in chosen_by_facet
+                and chosen_by_facet[match["facet_name"]]["code"] != match["code"]
+            ):
                 conflicts += 1
                 current_row_conflict = True
                 continue
             chosen_by_facet[match["facet_name"]] = match
         current = json.loads(str(row.get("facet_values", "{}") or "{}"))
         for facet_name, match in chosen_by_facet.items():
-            current[facet_name] = {"code": match["code"], "value": match["value"], "matched_alias": match["matched_alias"]}
+            current[facet_name] = {
+                "code": match["code"],
+                "value": match["value"],
+                "matched_alias": match["matched_alias"],
+            }
             alias_hits += 1
             corrected_hits += int(match["canonical_value"] != "")
-        output.at[index, "facet_values"] = json.dumps(current, ensure_ascii=False, separators=(",", ":"))
+        output.at[index, "facet_values"] = json.dumps(
+            current, ensure_ascii=False, separators=(",", ":")
+        )
         row_conflicts.append(current_row_conflict)
         # The taxonomy loader already encoded the canonical facet order. Replace only
         # the affected code positions through the existing label where possible.
@@ -120,9 +141,13 @@ def label_batch(
     if limit is not None:
         pending = pending.head(limit)
     loader = load_taxonomy(taxonomy_path)
-    labeled = label_demands(pending, loader, product_facet_map=_load_product_facets(product_facets_path))
+    labeled = label_demands(
+        pending, loader, product_facet_map=_load_product_facets(product_facets_path)
+    )
     matcher = ReviewedAliasMatcher(alias_registry_path)
-    labeled, alias_hits, corrected_hits, alias_conflicts = _apply_aliases(labeled, matcher)
+    labeled, alias_hits, corrected_hits, alias_conflicts = _apply_aliases(
+        labeled, matcher
+    )
     now = datetime.now(timezone.utc).isoformat()
     statuses: list[str] = []
     for _, row in labeled.iterrows():
@@ -136,7 +161,11 @@ def label_batch(
     labeled["pipeline_status"] = statuses
     labeled["taxonomy_version"] = "v2.2"
     labeled["alias_registry_version"] = matcher.version
-    labeled["processed_at"] = labeled["pipeline_status"].isin({"RESOLVED", "PARTIALLY_RESOLVED"}).map(lambda ok: now if ok else "")
+    labeled["processed_at"] = (
+        labeled["pipeline_status"]
+        .isin({"RESOLVED", "PARTIALLY_RESOLVED"})
+        .map(lambda ok: now if ok else "")
+    )
     labeled = labeled.drop(columns=["_alias_conflict"], errors="ignore")
     summary = {
         "scanned": len(source),
@@ -170,21 +199,73 @@ def run_local_e2e(
     source = pd.read_csv(input_path, dtype=str).fillna("")
     if cluster_only:
         labeled = source
-        label_summary = {"scanned": len(source), "skipped": 0, "resolved": len(source), "partial": 0, "unresolved": 0, "conflicts": 0, "failed": 0, "alias_hits": 0, "corrected_alias_hits": 0, "taxonomy_version": "v2.2", "elapsed_seconds": 0.0}
+        label_summary = {
+            "scanned": len(source),
+            "skipped": 0,
+            "resolved": len(source),
+            "partial": 0,
+            "unresolved": 0,
+            "conflicts": 0,
+            "failed": 0,
+            "alias_hits": 0,
+            "corrected_alias_hits": 0,
+            "taxonomy_version": "v2.2",
+            "elapsed_seconds": 0.0,
+        }
     else:
-        labeled, label_summary = label_batch(source, taxonomy_path, alias_registry_path, product_facets_path=product_facets_path, limit=limit)
-    labeled.to_csv(output_dir / "demand_labeled_v2_2.csv", index=False, encoding="utf-8-sig")
-    eligible = labeled[labeled["pipeline_status"].isin({"RESOLVED", "PARTIALLY_RESOLVED"})].copy() if "pipeline_status" in labeled else labeled
-    clustered = cluster_demands(eligible) if not label_only and not eligible.empty else eligible.assign(cluster_id=pd.Series(dtype=str))
-    clusters = summarize_clusters(clustered) if not label_only and not clustered.empty else pd.DataFrame()
-    clustered.to_csv(output_dir / "clustering_input_v2_2.csv", index=False, encoding="utf-8-sig")
-    clustered.to_csv(output_dir / "demand_clusters_v2_2.csv", index=False, encoding="utf-8-sig")
-    clusters.to_csv(output_dir / "demand_cluster_summary_v2_2.csv", index=False, encoding="utf-8-sig")
+        labeled, label_summary = label_batch(
+            source,
+            taxonomy_path,
+            alias_registry_path,
+            product_facets_path=product_facets_path,
+            limit=limit,
+        )
+    labeled.to_csv(
+        output_dir / "demand_labeled_v2_2.csv", index=False, encoding="utf-8-sig"
+    )
+    eligible = (
+        labeled[
+            labeled["pipeline_status"].isin({"RESOLVED", "PARTIALLY_RESOLVED"})
+        ].copy()
+        if "pipeline_status" in labeled
+        else labeled
+    )
+    clustered = (
+        cluster_demands(eligible)
+        if not label_only and not eligible.empty
+        else eligible.assign(cluster_id=pd.Series(dtype=str))
+    )
+    clusters = (
+        summarize_clusters(clustered)
+        if not label_only and not clustered.empty
+        else pd.DataFrame()
+    )
+    clustered.to_csv(
+        output_dir / "clustering_input_v2_2.csv", index=False, encoding="utf-8-sig"
+    )
+    clustered.to_csv(
+        output_dir / "demand_clusters_v2_2.csv", index=False, encoding="utf-8-sig"
+    )
+    clusters.to_csv(
+        output_dir / "demand_cluster_summary_v2_2.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
     cluster_summary = {
         "processed": 0 if label_only else len(eligible),
         "joined_existing": 0,
         "created_new": 0 if label_only else int(len(clusters)),
-        "substitute_joined": 0 if label_only else int(eligible.get("is_substitutable", pd.Series(dtype=str)).astype(str).str.casefold().isin({"true", "1", "yes", "y"}).sum()) if not eligible.empty else 0,
+        "substitute_joined": 0
+        if label_only
+        else int(
+            eligible.get("is_substitutable", pd.Series(dtype=str))
+            .astype(str)
+            .str.casefold()
+            .isin({"true", "1", "yes", "y"})
+            .sum()
+        )
+        if not eligible.empty
+        else 0,
         "skipped": len(labeled) - len(eligible),
         "failed": 0,
         "elapsed_seconds": round(time.perf_counter() - started, 6),
@@ -195,16 +276,24 @@ def run_local_e2e(
         "labeling": label_summary,
         "clustering": cluster_summary,
         "total_elapsed_seconds": round(time.perf_counter() - started, 6),
-        "outputs": {"labeled": str(output_dir / "demand_labeled_v2_2.csv"), "clustering_input": str(output_dir / "clustering_input_v2_2.csv"), "clusters": str(output_dir / "demand_cluster_summary_v2_2.csv")},
+        "outputs": {
+            "labeled": str(output_dir / "demand_labeled_v2_2.csv"),
+            "clustering_input": str(output_dir / "clustering_input_v2_2.csv"),
+            "clusters": str(output_dir / "demand_cluster_summary_v2_2.csv"),
+        },
         "database": "NOT_CONNECTED_CSV_DRY_RUN",
         "backend_write": "NOT_PERFORMED_DRY_RUN",
     }
-    (output_dir / "mvp_e2e_summary_v2_2.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "mvp_e2e_summary_v2_2.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     return result
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the V2.2 local A -> B MVP pipeline")
+    parser = argparse.ArgumentParser(
+        description="Run the V2.2 local A -> B MVP pipeline"
+    )
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--taxonomy", type=Path, default=DEFAULT_TAXONOMY)
@@ -222,7 +311,16 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("input CSV must exist")
     if args.label_only and args.cluster_only:
         parser.error("--label-only and --cluster-only cannot be combined")
-    result = run_local_e2e(args.input, args.output_dir, taxonomy_path=args.taxonomy, alias_registry_path=args.alias_registry, product_facets_path=args.product_facets, limit=args.limit, cluster_only=args.cluster_only, label_only=args.label_only)
+    result = run_local_e2e(
+        args.input,
+        args.output_dir,
+        taxonomy_path=args.taxonomy,
+        alias_registry_path=args.alias_registry,
+        product_facets_path=args.product_facets,
+        limit=args.limit,
+        cluster_only=args.cluster_only,
+        label_only=args.label_only,
+    )
     print(json.dumps(result, ensure_ascii=False))
     return 0
 

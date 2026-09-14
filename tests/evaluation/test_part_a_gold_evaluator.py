@@ -61,4 +61,3 @@ def test_evaluator_writes_partitioned_summary(tmp_path: Path) -> None:
     assert (tmp_path / "part_a_v2_2_gold_evaluation_results.csv").exists()
     assert (tmp_path / "part_a_v2_2_gold_evaluation_summary.json").exists()
     assert (tmp_path / "part_a_v2_2_gold_evaluation.md").exists()
-

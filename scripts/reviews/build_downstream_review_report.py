@@ -14,28 +14,60 @@ def _count(path: Path, minimum: int) -> int:
 
 
 def build_report(before_dir: Path, after_dir: Path, output: Path) -> dict[str, int]:
-    before = pd.read_csv(before_dir / "facet_cross_source_evidence.csv") if (before_dir / "facet_cross_source_evidence.csv").exists() else pd.DataFrame()
+    before = (
+        pd.read_csv(before_dir / "facet_cross_source_evidence.csv")
+        if (before_dir / "facet_cross_source_evidence.csv").exists()
+        else pd.DataFrame()
+    )
     after = pd.read_csv(after_dir / "facet_cross_source_evidence.csv")
     evidence = pd.read_parquet(after_dir / "facet_evidence_unified.parquet")
     review = pd.read_csv(after_dir / "facet_review_queue_v2.csv")
-    nutrime = review.get("nutrime_review_evidence_count", pd.Series(0, index=review.index))
-    chongkundang = review.get("chongkundang_review_evidence_count", pd.Series(0, index=review.index))
-    lgu_purchase_evidence_rows = int((evidence["source_type"] == "KOREAN_HFF_PURCHASE_AGGREGATE").sum())
-    source_pair = evidence[evidence["source_type"].eq("KOREAN_HFF_RAW_REVIEW")].groupby(["normalized_attribute", "normalized_value"])["source"].nunique()
+    nutrime = review.get(
+        "nutrime_review_evidence_count", pd.Series(0, index=review.index)
+    )
+    chongkundang = review.get(
+        "chongkundang_review_evidence_count", pd.Series(0, index=review.index)
+    )
+    lgu_purchase_evidence_rows = int(
+        (evidence["source_type"] == "KOREAN_HFF_PURCHASE_AGGREGATE").sum()
+    )
+    source_pair = (
+        evidence[evidence["source_type"].eq("KOREAN_HFF_RAW_REVIEW")]
+        .groupby(["normalized_attribute", "normalized_value"])["source"]
+        .nunique()
+    )
     combinations = {
-        "MFDS + Review": int(((review["mfds_support"] > 0) & ((nutrime > 0) | (chongkundang > 0))).sum()),
-        "Seller + Review": int(((review["seller_support"] > 0) & ((nutrime > 0) | (chongkundang > 0))).sum()),
-        "MFDS + Seller + Review": int(((review["mfds_support"] > 0) & (review["seller_support"] > 0) & ((nutrime > 0) | (chongkundang > 0))).sum()),
+        "MFDS + Review": int(
+            ((review["mfds_support"] > 0) & ((nutrime > 0) | (chongkundang > 0))).sum()
+        ),
+        "Seller + Review": int(
+            (
+                (review["seller_support"] > 0) & ((nutrime > 0) | (chongkundang > 0))
+            ).sum()
+        ),
+        "MFDS + Seller + Review": int(
+            (
+                (review["mfds_support"] > 0)
+                & (review["seller_support"] > 0)
+                & ((nutrime > 0) | (chongkundang > 0))
+            ).sum()
+        ),
         "Review Source 2": int((source_pair >= 2).sum()),
     }
     metrics = {
         "before_candidates": len(before),
         "after_candidates": len(after),
-        "before_source_2plus": _count(before_dir / "facet_cross_source_evidence.csv", 2),
+        "before_source_2plus": _count(
+            before_dir / "facet_cross_source_evidence.csv", 2
+        ),
         "after_source_2plus": int((after["source_count"] >= 2).sum()),
-        "before_source_3plus": _count(before_dir / "facet_cross_source_evidence.csv", 3),
+        "before_source_3plus": _count(
+            before_dir / "facet_cross_source_evidence.csv", 3
+        ),
         "after_source_3plus": int((after["source_count"] >= 3).sum()),
-        "review_evidence_rows": int((evidence["source_type"] == "KOREAN_HFF_RAW_REVIEW").sum()),
+        "review_evidence_rows": int(
+            (evidence["source_type"] == "KOREAN_HFF_RAW_REVIEW").sum()
+        ),
         "review_candidate_rows": int((review["review_source_count"] > 0).sum()),
         "human_review_queue_rows": len(review),
         "lgu_purchase_evidence_rows": lgu_purchase_evidence_rows,
@@ -98,8 +130,18 @@ def build_report(before_dir: Path, after_dir: Path, output: Path) -> dict[str, i
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--before-dir", type=Path, default=Path(".. /data/interim/facet_evidence_v2".replace(" ", "")))
-    parser.add_argument("--after-dir", type=Path, default=Path("data/interim/facet_evidence_v3"))
-    parser.add_argument("--output", type=Path, default=Path("reports/model1_consumer_evidence_report.md"))
+    parser.add_argument(
+        "--before-dir",
+        type=Path,
+        default=Path(".. /data/interim/facet_evidence_v2".replace(" ", "")),
+    )
+    parser.add_argument(
+        "--after-dir", type=Path, default=Path("data/interim/facet_evidence_v3")
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("reports/model1_consumer_evidence_report.md"),
+    )
     args = parser.parse_args()
     print(build_report(args.before_dir, args.after_dir, args.output))
