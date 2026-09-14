@@ -1,0 +1,8 @@
+# Optional Python 3.12 environment for models whose remote code requires
+# Transformers 5.x (currently EXAONE 3.5 and LFM2.5 Korean).
+transformers==5.7.0
+accelerate>=1.2,<2
+huggingface-hub>=1.5,<2
+safetensors>=0.4,<1
+torch>=2.5,<3
+sentencepiece>=0.2,<1

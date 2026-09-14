@@ -57,3 +57,23 @@ Do not download several large models at once. Run one model, preserve its output
 ## Kimi and OpenAI-compatible providers
 
 Kimi is not installed by this runtime. It should be tested through an official API or a GPU inference server using the exact model ID and endpoint supplied by the provider. Put the API key in an environment variable and pass only the variable name with `--api-key-env`; never put the key in a command saved to a file, report, or Git.
+
+## Candidate-specific environment
+
+The base project environment uses Transformers 4.x for the normal Model 1 runtime. The following locally cached candidates require Transformers 5.x remote-code compatibility:
+
+- `LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct`
+- `sh-024/LFM2.5-1.2B-Instruct-Korean`
+
+Create a separate Python 3.12 environment for these candidates:
+
+```bash
+python3.12 -m venv .venv-model-lfm
+.venv-model-lfm/bin/python -m pip install -r requirements-model1-hf-v5.txt
+TOKENIZERS_PARALLELISM=false .venv-model-lfm/bin/python \
+  scripts/model1/run_hf_candidate_smoke.py \
+  --model LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct \
+  --model sh-024/LFM2.5-1.2B-Instruct-Korean
+```
+
+This environment is optional and must not replace the base project environment. The smoke script checks loading and bounded generation only; it does not establish model quality.
