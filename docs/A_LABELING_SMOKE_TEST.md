@@ -97,3 +97,22 @@ DB updatedCount: 0
 - ECR Push 및 ArgoCD 배포
 
 위 항목은 Cloud GitOps/운영 환경 권한이 필요하다.
+
+## ERD v5 Mock 재검증
+
+ERD v5 원본을 `docs/erd/v5/`에 저장한 뒤 로컬 Mock schema를 재생성하여 다시 실행했다.
+`demand.pay_method_id`는 결제 파트가 없는 로컬 fixture에서 기본값 `1`로만 채우며, Part A는 이 값을 읽거나 변경하지 않는다.
+
+```text
+category: 17
+product_catalog: 1,024
+demand: 5,000
+
+첫 실행 updatedCount: 5,000
+재실행 updatedCount: 0
+processed_at 저장: 5,000
+빈 label: 0
+전체 pytest: 492 passed, 26 skipped
+```
+
+실제 DB 계정, Secret, 네트워크, CronJob 실행은 아직 확정되지 않았으므로 위 결과는 ERD v5 구조를 반영한 로컬 Mock 검증 결과다.
