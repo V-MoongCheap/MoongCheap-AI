@@ -96,15 +96,21 @@ def _build_compact_prompt(
         "product_form",
         "functional_ingredients",
         "intake_method",
-        "evidence_text",
     )
     for product in products:
-        compact_rows.append({key: str(product.get(key, ""))[:240] for key in keep})
+        compact_rows.append({key: str(product.get(key, ""))[:120] for key in keep})
     instruction = (
-        "Return JSON only in the required category_key/category_name/facets shape. "
-        "Use only observed product facts. Return at most 2 facets and 1 value per facet. "
-        "Use exactly 1 evidence item per facet. Keep definition and both reasons under 8 words. "
-        "Never invent IDs, values, prices, popularity, or medical claims."
+        "Return JSON only; no markdown, no explanation. Use exactly this shape: "
+        '{"category_key":"...","category_name":"...","facets":['
+        '{"facet_id_candidate":"...","name":"...","definition":"...",'
+        '"selection_reason":"...","values":[{"value":"...",'
+        '"aliases":[],"value_reason":"..."}],"evidence":['
+        '{"source_product_id":"...","source_field":"...",'
+        '"source_text":"..."}]}]}. '
+        "Use only observed product facts. Return at most 1 facet and 1 value. "
+        "Use exactly 1 evidence item per facet; source_text must be one short field value, "
+        "not a sentence. Copy source_product_id exactly from the input. "
+        "Keep all strings under 60 characters. Never invent IDs, values, prices, or medical claims."
     )
     return f"{instruction}\nPrompt version: {prompt_version}\nTarget category_key: {category}\nEvidence:\n{json.dumps(compact_rows, ensure_ascii=False)}"
 
