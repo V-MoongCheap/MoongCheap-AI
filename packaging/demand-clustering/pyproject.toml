@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 demand-clustering-batch = "moongcheap_ai.demand_clustering.runtime_job:main"
+a-labeling-batch = "moongcheap_ai.data_foundation.runtime_job:main"
 
 [project.optional-dependencies]
 data = [
