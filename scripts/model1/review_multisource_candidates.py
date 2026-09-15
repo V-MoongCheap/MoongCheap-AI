@@ -14,6 +14,11 @@ def main() -> None:
     parser.add_argument("--candidates", type=Path, default=Path("data/processed/model1_multisource_v1/multisource_model_candidates_v1.csv"))
     parser.add_argument("--input", type=Path, default=Path("data/processed/model1_multisource_v1/multisource_model_input_v1.jsonl"))
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed/model1_multisource_v1"))
+    parser.add_argument(
+        "--model",
+        default="",
+        help="model identifier to inject when the candidate CSV has no model column",
+    )
     parser.add_argument("--refresh-review", action="store_true", help="rebuild the review CSV; otherwise reuse an existing open review file")
     args = parser.parse_args()
     reviewed_path = args.output_dir / "multisource_candidate_review_v1.csv"
@@ -21,7 +26,14 @@ def main() -> None:
         result = write_review_artifacts(args.candidates, args.input, args.output_dir)
     else:
         result = {"rows": len(pd.read_csv(reviewed_path)), "status_counts": "reused_existing_review"}
-    normalized = normalize_review_candidates(pd.read_csv(reviewed_path).fillna(""))
+    reviewed = pd.read_csv(reviewed_path).fillna("")
+    if "model" not in reviewed.columns:
+        if not args.model:
+            raise ValueError(
+                "candidate CSV has no 'model' column; provide --model so review grouping is deterministic"
+            )
+        reviewed["model"] = args.model
+    normalized = normalize_review_candidates(reviewed)
     normalized["category_name"] = normalized.apply(lambda row: display_category_name(row.get("category_key"), row.get("category_name")), axis=1)
     evidence_columns = [
         "model", "category_key", "category_name", "name", "value", "source_product_id",
