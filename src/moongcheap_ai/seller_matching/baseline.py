@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 import re
+import math
 
 import pandas as pd
 
 
 def _number(value: object, default: float = 0.0) -> float:
     try:
-        return float(value)
+        number = float(value)
+        return number if math.isfinite(number) else default
     except (TypeError, ValueError):
         return default
+
+
+def _text(value: object) -> str:
+    """Missing scalar values are not category tokens."""
+    if value is None or pd.isna(value):
+        return ""
+    return str(value).strip().casefold()
 
 
 def _cluster_needles(cluster: pd.Series) -> set[str]:
@@ -23,8 +32,8 @@ def _cluster_needles(cluster: pd.Series) -> set[str]:
        한글 수요 라벨이 항상 함께 들어온다. 그것을 버리지 않는다.
     """
     values = {
-        str(cluster.get("label", "")).casefold(),
-        str(cluster.get("category_id", "")).rsplit(":", 1)[-1].casefold(),
+        _text(cluster.get("label", "")),
+        _text(cluster.get("category_id", "")).rsplit(":", 1)[-1],
     }
     values |= {re.sub(r"[_-]", " ", value) for value in values}
     return {value for value in values if value}
@@ -50,9 +59,9 @@ def match_offers(clusters: pd.DataFrame, offers: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for _, cluster in clusters.iterrows():
         needles = _cluster_needles(cluster)
-        quantity = _number(cluster.get("total_quantity"), 1)
+        quantity = _number(cluster.get("total_quantity"), 0)
         for _, offer in offers.iterrows():
-            text = " ".join(str(offer.get(column, "")) for column in ("category_leaf", "category_l2", "title", "semantic_text")).casefold()
+            text = " ".join(_text(offer.get(column, "")) for column in ("category_leaf", "category_l2", "title", "semantic_text"))
             category_hit = any(needle in text for needle in needles)
             moq = _number(offer.get("moq"), 0)
             price = _number(offer.get("min_unit_price"), _number(offer.get("base_unit_price"), 0))

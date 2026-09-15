@@ -90,3 +90,24 @@ def test_reason_names_the_failed_checks() -> None:
     offers = _offer(category_leaf="자동차 타이어", title="타이어").drop(columns=["min_unit_price"])
     reason = match_offers(_cluster(), offers).loc[0, "reason"]
     assert "failed:" in reason and "category" in reason and "price" in reason
+
+
+def test_missing_label_and_category_are_not_matching_tokens() -> None:
+    for value in (float("nan"), pd.NA, None, "   "):
+        result = match_offers(_cluster(label=value), _offer(category_leaf=value, title="자동차 타이어"))
+        assert not bool(result.loc[0, "category_match"])
+        assert result.loc[0, "match_status"] == "REVIEW"
+
+
+def test_nonfinite_price_without_fallback_is_not_available() -> None:
+    for value in (float("inf"), float("-inf"), float("nan")):
+        result = match_offers(_cluster(), _offer(min_unit_price=value))
+        assert not bool(result.loc[0, "price_available"])
+        assert result.loc[0, "match_status"] == "REVIEW"
+
+
+def test_missing_or_nonfinite_quantity_does_not_satisfy_moq() -> None:
+    for value in (None, float("nan"), float("inf"), 0, -1):
+        result = match_offers(_cluster(total_quantity=value), _offer())
+        assert not bool(result.loc[0, "moq_ok"])
+        assert result.loc[0, "match_status"] == "REVIEW"
