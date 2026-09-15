@@ -7,15 +7,15 @@ clusters, embeddings, seller matches, or call an LLM.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import pandas as pd
 
 from ..demand_constraints import DemandConstraintParser
 from .labeling import TaxonomyLoader
-
 
 RUNTIME_VERSION = "part-a-runtime.v2.2"
 STATUSES = {
@@ -116,7 +116,7 @@ def run_part_a_batch(
         source = source[source["processed_at"].astype(str).str.strip().eq("")].copy()
     catalog_map = _category_map(catalog) if catalog is not None else None
     rows: list[dict[str, Any]] = []
-    now = processed_at or datetime.now(timezone.utc).isoformat()
+    now = processed_at or datetime.now(UTC).isoformat()
     for raw in source.to_dict(orient="records"):
         row = dict(raw)
         try:
@@ -226,7 +226,7 @@ def run_part_a_batch(
                 "parserVersion": RUNTIME_VERSION,
                 "processed_at": now,
             })
-        except Exception as error:  # isolate one malformed demand from the batch
+        except (KeyError, TypeError, ValueError, IndexError) as error:
             row.update({
                 "taxonomyVersion": str(payload.get("version", "v2.2")),
                 "status": "REVIEW",

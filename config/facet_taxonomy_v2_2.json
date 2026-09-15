@@ -1635,12 +1635,6 @@
               "status": "PROVISIONAL"
             },
             {
-              "code": 5,
-              "value": "11일 1회",
-              "aliases": [],
-              "status": "PROVISIONAL"
-            },
-            {
               "code": 6,
               "value": "1일 5회",
               "aliases": [],
@@ -2138,12 +2132,6 @@
             {
               "code": 4,
               "value": "판토텐산, 비오틴",
-              "aliases": [],
-              "status": "PROVISIONAL"
-            },
-            {
-              "code": 5,
-              "value": "비오틴, 판토텐산",
               "aliases": [],
               "status": "PROVISIONAL"
             },

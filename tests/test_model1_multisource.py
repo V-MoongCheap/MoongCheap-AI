@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 MODULE_PATH = Path(__file__).parents[1] / "scripts" / "model1" / "run_multisource_facet_discovery.py"
 SPEC = importlib.util.spec_from_file_location("model1_multisource", MODULE_PATH)
 MODULE = importlib.util.module_from_spec(SPEC)

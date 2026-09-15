@@ -7,7 +7,6 @@ from typing import Any
 
 import requests
 
-
 SCHEMA_VERSION = "demand-label-result.v0.1"
 
 
@@ -71,6 +70,6 @@ def post_label_results(
         raise RuntimeError(f"Backend label request failed with HTTP {response.status_code}: {detail}")
     result = response.json()
     if not isinstance(result, Mapping):
-        raise ValueError("Backend label response must be an object")
+        raise TypeError("Backend label response must be an object")
     validate_backend_response(result, len(payload.get("results", [])))
     return result

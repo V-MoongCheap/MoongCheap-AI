@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 from .extractor import (
     ConstraintExtractor,
@@ -446,6 +446,204 @@ class ConstraintInputPolicy:
             clauses=(text,),
         )
 
+    @staticmethod
+    def _requirement_type(text: str) -> str | None:
+        """Classify the small, explicit requirement clauses used by the UI.
+
+        The frozen extractor intentionally rejects ambiguous prose.  These
+        clauses are still deterministic: the user names a taxonomy value and
+        attaches one of the explicit requirement markers to it.
+        """
+
+        value = text.strip()
+        if re.search(
+            r"(?:제외|금지|빼|없는\s*제품|안\s*들어간|포함되지\s*않은|피하고)",
+            value,
+        ):
+            return "EXCLUDE"
+        if re.search(
+            r"(?:선호|좋겠|좋을|중요하게\s*보|중요하게\s*봐|먼저\s*보|먼저\s*봐|우선|있으면\s*좋)",
+            value,
+        ):
+            return "PREFER"
+        if re.search(r"(?:필수|반드시|꼭|무조건|이어야|여야)", value):
+            return "MUST"
+        if re.search(r"포함된\s*제품을\s*찾", value):
+            return "MUST"
+        return None
+
+    def _typed_requirement_result(
+        self,
+        category_id: str,
+        text: str,
+        facets: tuple[MatchedFacet, ...],
+        constraint_type: str,
+    ) -> ExtractionResult:
+        base = self._preference_result(
+            category_id,
+            text,
+            facets,
+            polarity_source=f"EXPLICIT_{constraint_type}_FRAME",
+            modality_scope="EXPLICIT_REQUIREMENT_FRAME",
+        )
+        operation = {
+            "MUST": "KEEP_NAMED",
+            "PREFER": "RANK_NAMED",
+            "EXCLUDE": "REMOVE_NAMED",
+        }[constraint_type]
+        constraints = tuple(
+            replace(
+                item,
+                constraint_type=constraint_type,
+                proof=(
+                    replace(item.proof, set_operation=operation)
+                    if item.proof is not None
+                    else None
+                ),
+            )
+            for item in base.constraints
+        )
+        return replace(base, constraints=constraints)
+
+    def _explicit_requirement_result(
+        self, category_id: str, text: str
+    ) -> ExtractionResult | None:
+        """Parse explicit value + marker clauses rejected by older proof rules."""
+
+        normalized = text.strip().rstrip(".!?")
+        if re.search(
+            r"(?:반드시|필수|꼭)\s*포함하고.{0,40}같은\s*조합.{0,12}제외",
+            normalized,
+        ):
+            return ExtractionResult(
+                status="CONFLICT",
+                constraints=(),
+                warnings=("CONFLICTING_EXPLICIT_REQUIREMENTS",),
+                clauses=(text,),
+            )
+        separator = (
+            r"\s*(?:이고|이며|그리고)\s*"
+            if re.search(r"(?:이고|이며|그리고)", normalized)
+            else r"\s*,\s*"
+        )
+        clauses = [
+            item.strip()
+            for item in re.split(separator, normalized)
+            if item.strip()
+        ]
+        typed: list[tuple[str, MatchedFacet]] = []
+        for clause in clauses:
+            requirement_type = self._requirement_type(clause)
+            if requirement_type is None:
+                continue
+            facets, _ = self.resolved_sentence_facets(category_id, clause)
+            if not facets:
+                # Product-labelled values are often mentioned without the
+                # taxonomy suffix, e.g. ``원료명이 포함된 제품`` versus the
+                # canonical ``원료명 제품``. Keep this fallback limited to
+                # explicit requirement clauses.
+                normalized_clause = normalize(clause)
+                loose: list[MatchedFacet] = []
+                for facet_values in self.matcher.values.get(category_id, {}).values():
+                    for facet in facet_values:
+                        candidates = (
+                            normalize(facet.value),
+                            re.sub(r"\s*제품$", "", normalize(facet.value)),
+                        )
+                        if any(
+                            len(candidate) > 1 and candidate in normalized_clause
+                            for candidate in candidates
+                        ):
+                            loose.append(facet)
+                facets = tuple(dict.fromkeys(loose))
+            for facet in facets:
+                typed.append((requirement_type, facet))
+        if not typed:
+            return None
+
+        by_value: dict[tuple[str, int], set[str]] = {}
+        for requirement_type, facet in typed:
+            by_value.setdefault((facet.facet_name, facet.value_code), set()).add(
+                requirement_type
+            )
+        if any({"MUST", "EXCLUDE"} <= types for types in by_value.values()):
+            return ExtractionResult(
+                status="CONFLICT",
+                constraints=(),
+                warnings=("CONFLICTING_EXPLICIT_REQUIREMENTS",),
+                clauses=(text,),
+            )
+        if (
+            any(requirement_type == "MUST" for requirement_type, _ in typed)
+            and re.search(r"(?:다른|같은)\s+[^.!?]{0,20}제외", text)
+        ):
+            return ExtractionResult(
+                status="CONFLICT",
+                constraints=(),
+                warnings=("CONFLICTING_EXPLICIT_REQUIREMENTS",),
+                clauses=(text,),
+            )
+
+        constraints: list[FacetConstraint] = []
+        for requirement_type, facet in typed:
+            result = self._typed_requirement_result(
+                category_id, text, (facet,), requirement_type
+            )
+            constraints.extend(result.constraints)
+        return ExtractionResult(
+            status="PARSED",
+            constraints=tuple(constraints),
+            warnings=(),
+            clauses=(text,),
+        )
+
+    def _explicit_any_of_group(
+        self, category_id: str, text: str
+    ) -> PreferenceGroup | None:
+        normalized = text.strip().rstrip(".!?")
+        if not re.search(r"(?:또는|혹은)", normalized):
+            return None
+        branches = [
+            item.strip()
+            for item in re.split(r"\s*(?:또는|혹은)\s*", normalized, maxsplit=1)
+        ]
+        if len(branches) != 2:
+            return None
+        right = re.sub(r"\s*(?:중\s*)?하나면?.*$", "", branches[1]).strip()
+        members: list[FacetConstraint] = []
+        for branch in (branches[0], right):
+            facet, _ = self.resolved_exact_match(category_id, branch)
+            if facet is None:
+                matched, _ = self.resolved_sentence_facets(category_id, branch)
+                if len(matched) == 1:
+                    facet = matched[0]
+            if facet is None:
+                return None
+            members.extend(
+                self._typed_requirement_result(
+                    category_id,
+                    text,
+                    (facet,),
+                    "PREFER",
+                ).constraints
+            )
+        return PreferenceGroup(
+            group_id="alternative-preference-1",
+            operator="ANY_OF",
+            aggregation="MAX",
+            members=tuple(members),
+        )
+
+    @staticmethod
+    def _consumer_experience_passthrough(text: str) -> bool:
+        return bool(
+            re.search(r"(?:휴대|삼키|포장|개별\s*포장|보관|맛|향|소화|속|섞)", text)
+            and re.search(r"(?:편하|좋겠|좋을|원하|바라|싶)", text)
+            and not re.search(
+                r"(?:필수|반드시|꼭|제외|금지|없는\s*제품|포함|선택)", text
+            )
+        )
+
     def alternative_preference_group(
         self, category_id: str, text: str
     ) -> PreferenceGroup | None:
@@ -757,6 +955,65 @@ class ConstraintInputPolicy:
         interpreted = baseline
         method = "V042_LANGUAGE_PROOF"
         taxonomy_equivalences: tuple[TaxonomyEquivalence, ...] = ()
+        preference_groups: tuple[PreferenceGroup, ...] = ()
+        semantic_preferences: tuple[str, ...] = ()
+        # These explicit input-channel forms carry enough user intent to be
+        # structured even when the older sentence-proof extractor declines
+        # them. Consumer-experience wording remains semantic text instead of
+        # being forced into a product facet.
+        if self._consumer_experience_passthrough(value):
+            interpreted = ExtractionResult("PASSTHROUGH", (), (), (value,))
+            semantic_preferences = (value,)
+            method = "CONSUMER_EXPERIENCE_PASSTHROUGH"
+        elif baseline.status == "REVIEW" and (
+            explicit_group := self._explicit_any_of_group(category_id, value)
+        ):
+            interpreted = ExtractionResult("PARSED", (), (), (value,))
+            preference_groups = (explicit_group,)
+            method = "EXPLICIT_ALTERNATIVE_PREFERENCE_GROUP"
+        elif explicit_result := self._explicit_requirement_result(category_id, value):
+            # A conflict must override a parsed removal from the legacy
+            # extractor. Other explicit recovery is only applied when the
+            # legacy proof gate returned REVIEW; this preserves established
+            # behavior for already-covered fixtures.
+            reported_or_negated = re.search(
+                r"(?:말고|하지\s*말고|라고|말씀|선생님|의사|누가|들었)",
+                value,
+            )
+            direct_exclusion = re.search(
+                r"(?:없는\s*제품|안\s*들어간.*(?:찾|골라|선택))", value
+            )
+            recoverable_frame = re.search(
+                r"(?:포함\s*여부를\s*(?:중요하게|먼저)\s*(?:보|봐)|"
+                r"포함은\s*(?:필수|선호)|"
+                r"포함된\s*제품을\s*찾)",
+                value,
+            )
+            simple_conflict = (
+                explicit_result.status == "CONFLICT"
+                and (
+                    re.search(
+                        r"(?:필수|반드시|꼭).{0,30}포함.{0,30}(?:제외|금지)",
+                        value,
+                    )
+                    or re.search(r"(?:다른|같은)\s+[^.!?]{0,20}제외", value)
+                )
+                and not re.search(
+                    r"(?:가능하면|생각해보니|최종|빼지\s*말|비교|결정|추천|말씀|선생님)",
+                    value,
+                )
+            )
+            if (
+                simple_conflict
+                or (
+                    baseline.status == "REVIEW"
+                    and not reported_or_negated
+                    and recoverable_frame
+                )
+                or (explicit_result.status == "PARSED" and direct_exclusion)
+            ):
+                interpreted = explicit_result
+                method = "EXPLICIT_REQUIREMENT_FRAME"
         if self.classifier.input_channel_default_prefer_exact_value:
             if self.classifier.input_channel_equivalent_taxonomy_codes:
                 exact, equivalence = self.resolved_exact_match(category_id, value)
@@ -803,8 +1060,6 @@ class ConstraintInputPolicy:
                 )
                 method = "EXPLICIT_SOFT_PREFERENCE_FRAME"
 
-        preference_groups: tuple[PreferenceGroup, ...] = ()
-        semantic_preferences: tuple[str, ...] = ()
         diagnostic_code = None
         if interpreted.status == "REVIEW" and self.classifier.input_channel_lexical_aversion_frame:
             if self.classifier.input_channel_equivalent_taxonomy_codes:
