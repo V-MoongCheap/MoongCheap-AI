@@ -10,6 +10,7 @@ from moongcheap_ai.data_foundation.postgres_writer import UPDATE_LABEL_SQL, writ
 class FakeCursor:
     def __init__(self, connection: "FakeConnection") -> None:
         self.connection = connection
+        self.rowcount = 0
 
     def __enter__(self) -> "FakeCursor":
         return self
@@ -21,11 +22,13 @@ class FakeCursor:
         if self.connection.fail:
             raise RuntimeError("write failed")
         self.connection.executed.append((query, params))
+        self.rowcount = self.connection.rowcount
 
 
 class FakeConnection:
-    def __init__(self, *, fail: bool = False) -> None:
+    def __init__(self, *, fail: bool = False, rowcount: int = 1) -> None:
         self.fail = fail
+        self.rowcount = rowcount
         self.executed: list[tuple[str, dict[str, Any] | None]] = []
         self.committed = False
         self.rolled_back = False
@@ -81,3 +84,13 @@ def test_writer_requires_demand_id() -> None:
             [{"label": "1", "label_status": "LABELED"}],
             processed_at="2026-09-14T00:00:00+00:00",
         )
+
+
+def test_writer_returns_database_affected_count() -> None:
+    count = write_label_results(
+        FakeConnection(rowcount=0),
+        [{"demand_id": "already-processed", "label": "1", "label_status": "LABELED"}],
+        processed_at="2026-09-14T00:00:00+00:00",
+    )
+
+    assert count == 0

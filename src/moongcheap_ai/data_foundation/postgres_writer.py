@@ -59,15 +59,21 @@ def write_label_results(
             "processed_at": timestamp,
         })
 
+    updated_count = 0
     try:
         with connection.cursor() as cursor:
             for params in updates:
                 cursor.execute(UPDATE_LABEL_SQL, params)
+                # psycopg exposes the number of rows affected by the guarded
+                # UPDATE. Keep a fallback for lightweight test doubles that
+                # do not implement rowcount.
+                affected = getattr(cursor, "rowcount", None)
+                updated_count += affected if isinstance(affected, int) and affected >= 0 else 1
         connection.commit()
     except Exception:
         connection.rollback()
         raise
-    return len(updates)
+    return updated_count
 
 
 def open_postgres(database_url: str, connect_timeout_seconds: int = 10) -> Any:

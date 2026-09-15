@@ -331,7 +331,8 @@ def main() -> int:
     parser.add_argument(
         "--new-facet-review",
         type=Path,
-        default=Path("data/review/model1_new_facet_human_review.csv"),
+        required=True,
+        help="local-only reviewed new-facet CSV; do not commit raw review text",
     )
     parser.add_argument("--output-dir", type=Path, default=Path("."))
     args = parser.parse_args()
