@@ -239,6 +239,19 @@ def test_rejects_backend_base_url_with_api_path(tmp_path: Path) -> None:
         load_job_config(environment)
 
 
+def test_rejects_configured_missing_a_alias_file(tmp_path: Path) -> None:
+    environment = _environment(tmp_path)
+    environment["DEMAND_CONSTRAINT_ALIASES_PATH"] = str(
+        tmp_path / "missing-a-aliases.json"
+    )
+
+    with pytest.raises(
+        ConfigurationError,
+        match="DEMAND_CONSTRAINT_ALIASES_PATH must reference an existing file",
+    ):
+        load_job_config(environment)
+
+
 def test_does_not_use_legacy_checkpoint_setting(tmp_path: Path) -> None:
     environment = _environment(tmp_path)
     legacy_directory = tmp_path / "old-checkpoints"
@@ -417,7 +430,7 @@ def test_profile_version_mismatch_stops_before_database_or_backend(tmp_path):
         run_demand_clustering_job(config, planned_at=PLANNED_AT, connection_factory=must_not_connect)
 
 
-@pytest.mark.parametrize("primary_path", [None, "", "missing-a.json"])
+@pytest.mark.parametrize("primary_path", [None, ""])
 def test_a_path_is_optional_b_base_is_required(tmp_path, primary_path):
     environment = _environment(tmp_path)
     if primary_path is not None:

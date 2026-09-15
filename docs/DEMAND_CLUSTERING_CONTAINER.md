@@ -50,15 +50,18 @@ profile·taxonomy를 `/artifacts/releases/<artifact-version>/`에서 함께 읽�
 
 V2.2 전환 시 profile의 `taxonomy_version`도 `v2.2`여야 한다. 배치는 DB에 연결하기 전에
 taxonomy·profile·A 별칭의 선언 버전을 검사한다. 기존 V2.1 profile은 category-local
-코드표와 실제 상품 해석 결과가 동일한지 확인한 뒤 새 release로 준비한다.
+코드표와 실제 상품 해석 결과가 동일한지 확인한 뒤 새 release로 준비한다. **기존 V2.1
+profile을 둔 채 컨테이너 이미지만 갱신하면 배치가 기동하지 않는다.** V2.2 profile과
+taxonomy를 같은 release 디렉터리에 함께 공급하고 두 경로를 한 번에 전환해야 한다.
 [B의 V2.2 연계 안내](PART_B_V22_INTEGRATION.md)에 생성·검증 명령이 있다.
 
 `DEMAND_CONSTRAINT_ALIASES_PATH`는 A 승인 별칭, `DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH`는
 필수 B 기본 별칭이다. B는 항상 읽고, A에 없는 표현·카테고리도 계속 활용한다.
-같은 카테고리·표현은 A가 우선한다. A 경로를 비우거나 A 파일이 없으면 B만 사용하며,
-A에서 삭제된 표현도 B에 남아 있으면 사용한다. A 파일이 존재하지만 JSON·버전·코드/값이
-잘못됐거나 읽을 권한이 없으면 중단한다. B 경로를 비우거나 B 파일이 없으면 설정 오류다.
-`partAIntegration.aliasMode`와 `primaryAliasLoadStatus`로 A 사용·미사용 이유를 구분한다.
+같은 카테고리·표현은 A가 우선한다. A 경로를 비우거나 설정하지 않으면 B만 사용하며,
+A에서 삭제된 표현도 B에 남아 있으면 사용한다. A 경로를 설정했다면 파일 누락,
+잘못된 JSON·버전·코드/값, 읽기 권한 오류를 모두 설정 오류로 보고 중단한다.
+B 경로를 비우거나 B 파일이 없으면 설정 오류다. `partAIntegration.aliasMode`와
+`primaryAliasLoadStatus`로 A 사용·미사용 이유를 구분한다.
 배치 출력의 `partAIntegration`에서 적용 버전·파일 해시를 확인한다.
 profile 생성과 별칭 변경 검증은 [V2.2 연계 안내](PART_B_V22_INTEGRATION.md)를 따른다.
 

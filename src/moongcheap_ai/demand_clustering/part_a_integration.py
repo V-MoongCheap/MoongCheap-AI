@@ -128,20 +128,17 @@ def build_part_b_parser(
     """Use B expressions continuously, preferring valid A targets where available.
 
     Runtime requires the B registry. A-only is allowed here for evaluation.
-    An absent A file falls back; an unreadable or invalid supplied file fails.
-    Removing an A binding intentionally leaves the B binding available.
+    An unconfigured A registry falls back; a configured missing, unreadable, or
+    invalid registry fails. Removing an A binding intentionally leaves the B
+    binding available.
     """
     version = taxonomy_version(taxonomy)
     primary = None
     primary_hash = None
     primary_status = "NOT_CONFIGURED"
     if aliases_path is not None:
-        try:
-            primary, primary_hash = _alias_registry(aliases_path)
-        except FileNotFoundError:
-            primary_status = "FILE_MISSING"
-        else:
-            primary_status = "LOADED"
+        primary, primary_hash = _alias_registry(aliases_path)
+        primary_status = "LOADED"
     bindings = _approved_bindings(primary, taxonomy) if primary is not None else {}
     compatibility = None
     compatibility_hash = None
@@ -167,7 +164,7 @@ def build_part_b_parser(
         "compatibilityAliasStatus": compatibility.get("status", "UNREVIEWED") if compatibility is not None else None,
         "compatibilityAliasSha256": compatibility_hash,
         "compatibilitySurfaceCount": 0,
-        "compatibilitySuppressedByA": 0,
+        "compatibilityOverlapWithA": 0,
     }
     enriched = deepcopy(taxonomy)
     for category in enriched.get("categories", []):
@@ -193,7 +190,7 @@ def build_part_b_parser(
                     for surface in rule["surfaces"]:
                         normalized = normalize(surface)
                         if (category_id, normalized) in bindings:
-                            summary["compatibilitySuppressedByA"] += 1
+                            summary["compatibilityOverlapWithA"] += 1
                         elif normalized not in seen:
                             aliases.append(surface)
                             seen.add(normalized)

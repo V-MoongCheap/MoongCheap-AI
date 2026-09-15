@@ -85,15 +85,24 @@ def test_constraint_types_and_alternative_groups_survive(parsers, variant):
     assert result.preference_groups[0].operator == "ANY_OF"
 
 
-@pytest.mark.parametrize("missing", ["not_configured", "file_missing"])
-def test_absent_a_falls_back_with_observable_reason(tmp_path, missing):
-    path = None if missing == "not_configured" else tmp_path / "missing.json"
-    parser, summary = build(path)
+def test_unconfigured_a_falls_back_with_observable_reason():
+    parser, summary = build(None)
     assert summary["aliasMode"] == "B_ONLY"
-    assert summary["primaryAliasLoadStatus"] == missing.upper()
+    assert summary["primaryAliasLoadStatus"] == "NOT_CONFIGURED"
     assert summary["primaryAliasSha256"] is None
     assert summary["compatibilityAliasSha256"]
     assert interpreted(parser, "정제") == ("PARSED", {("product_form", 3, "PREFER")})
+
+
+def test_configured_missing_a_is_rejected(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        build(tmp_path / "missing.json")
+
+
+def test_a_b_overlap_metric_has_non_suppressive_name():
+    _, summary = build()
+    assert summary["compatibilityOverlapWithA"] > 0
+    assert "compatibilitySuppressedByA" not in summary
 
 
 @pytest.mark.parametrize("change", ["remove_rule", "remove_category", "empty_export"])
