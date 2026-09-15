@@ -52,7 +52,7 @@ def collect(
                     response = session.get(url, timeout=30)
                 except requests.RequestException as exc:
                     raise MFDSCollectionError(
-                        f"MFDS {service} request failed: {exc}"
+                        f"MFDS {service} request failed: {type(exc).__name__}"
                     ) from exc
                 if response.status_code in {401, 403}:
                     raise MFDSCollectionError(

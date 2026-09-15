@@ -141,6 +141,30 @@ def test_hallucinated_evidence_is_rejected():
     assert failures[0]["failure_type"] == "HALLUCINATED_EVIDENCE"
 
 
+def test_numeric_product_id_is_not_accepted_as_unknown_facet_id():
+    payload = {
+        "category_key": "C",
+        "category_name": "C",
+        "facets": [
+            {
+                "facet_id_candidate": "2019001407111",
+                "name": "Invented ingredient facet",
+                "values": [{"value": "x", "aliases": []}],
+                "evidence": [
+                    {
+                        "source_product_id": "1",
+                        "source_field": "product_form",
+                        "source_text": "정제",
+                    }
+                ],
+            }
+        ],
+    }
+    parsed, failures = parse_model_output(payload, _frame())
+    assert parsed.empty
+    assert failures[0]["failure_type"] == "INVALID_FACET_ID"
+
+
 def test_parser_normalizes_alternate_grounded_model_shape():
     frame = _frame().assign(evidence_text="정제 | 비타민 C")
     payload = {

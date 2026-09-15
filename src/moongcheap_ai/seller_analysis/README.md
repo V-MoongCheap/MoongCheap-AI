@@ -55,6 +55,6 @@ SELLER_ANALYSIS_INTERNAL_KEY=... \
 
 | 항목 | |
 |---|---|
-| `supply_coverage_ratio` 상한 1.0 | 팀 문서가 갈린다. 현재는 **상한 없이** 낸다 |
+| `supply_coverage_ratio` 상한 1.0 | 공급 가능 수량을 총수요로 나눈 뒤 최대 `1.0`으로 제한한다. 원본 비율이 초과하면 근거 문장에 상한 적용을 명시한다. |
 | `retryable` 의 코드별 값 · `details` 내용 | Backend 와 공동 확정 |
 | 비율의 `number/null` 허용 | 계약은 null 을 두는데 요청이 전부 Required 양의 정수라 분모 0 경로가 없다 |

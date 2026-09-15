@@ -40,6 +40,21 @@ MODEL_OUTPUT_COLUMNS = [
     "status",
 ]
 PROMPT_PATH = Path(__file__).resolve().parents[3] / "prompts" / "facet_discovery_v0.txt"
+KNOWN_FACET_NAMES = {
+    "form": "product_form",
+    "product form": "product_form",
+    "product_form": "product_form",
+    "제품 형태": "product_form",
+    "functional ingredients": "functional_ingredients",
+    "functional_ingredients": "functional_ingredients",
+    "기능성 성분": "functional_ingredients",
+    "intake method": "intake_method",
+    "intake_method": "intake_method",
+    "섭취 방법": "intake_method",
+    "regulated function": "regulated_function",
+    "regulated_function": "regulated_function",
+    "규제 기능": "regulated_function",
+}
 
 
 class ModelCallError(RuntimeError):
@@ -99,6 +114,7 @@ def _build_compact_prompt(
     )
     for product in products:
         compact_rows.append({key: str(product.get(key, ""))[:120] for key in keep})
+    allowed_ids = [row["source_product_id"] for row in compact_rows if row["source_product_id"]]
     instruction = (
         "Return JSON only; no markdown, no explanation. Use exactly this shape: "
         '{"category_key":"...","category_name":"...","facets":['
@@ -109,7 +125,10 @@ def _build_compact_prompt(
         '"source_text":"..."}]}]}. '
         "Use only observed product facts. Return at most 1 facet and 1 value. "
         "Use exactly 1 evidence item per facet; source_text must be one short field value, "
-        "not a sentence. Copy source_product_id exactly from the input. "
+        "not a sentence. Copy source_product_id exactly from the input and choose it only "
+        f"from this allowed list: {json.dumps(allowed_ids, ensure_ascii=False)}. "
+        "Copy source_text character-for-character from the matching input field; never "
+        "translate, normalize, summarize, or invent evidence text. "
         "Keep all strings under 60 characters. Never invent IDs, values, prices, or medical claims."
     )
     return f"{instruction}\nPrompt version: {prompt_version}\nTarget category_key: {category}\nEvidence:\n{json.dumps(compact_rows, ensure_ascii=False)}"
@@ -464,6 +483,19 @@ def parse_model_output(
                     {"failure_type": "EMPTY_FACET", "detail": "facet name is empty"}
                 )
                 continue
+            facet_id_candidate = str(facet.get("facet_id_candidate", "")).strip()
+            if facet_id_candidate.isdigit():
+                normalized_name = name.casefold()
+                recovered = KNOWN_FACET_NAMES.get(normalized_name)
+                if recovered is None:
+                    failures.append(
+                        {
+                            "failure_type": "INVALID_FACET_ID",
+                            "detail": f"numeric facet id with unknown name: {facet_id_candidate}/{name}",
+                        }
+                    )
+                    continue
+                facet_id_candidate = recovered
             if name in seen_facets:
                 failures.append({"failure_type": "DUPLICATE_FACET", "detail": name})
                 continue
@@ -573,7 +605,7 @@ def parse_model_output(
                         {
                             "category_key": category_key,
                             "category_name": category_name,
-                            "facet_id_candidate": facet.get("facet_id_candidate", ""),
+                            "facet_id_candidate": facet_id_candidate,
                             "name": name,
                             "definition": facet.get("definition", ""),
                             "value": value_text,

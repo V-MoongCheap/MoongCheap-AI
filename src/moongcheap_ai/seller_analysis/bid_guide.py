@@ -132,6 +132,7 @@ class BidGuideRequest:
 #           16절 `150 / 120 = 1.25`, 18.1절 `= 1.20`.
 RATIO_PRECISION = 4
 DISPLAY_PRECISION = 2
+SUPPLY_COVERAGE_CAP = 1.0
 
 
 def _ratio(numerator: int, denominator: int, *, met: bool) -> float:
@@ -173,7 +174,8 @@ def build_bid_guide(request: BidGuideRequest) -> dict[str, Any]:
     moq_attainment_ratio = _ratio(demand, moq, met=moq_met)
     # 판매자가 댈 수 있는 최대 수량 / 총수요. 1.0 이상이면 전량 공급 가능.
     # ⚠️ 상한 1.0 적용 여부는 확정 대기다(명세서 8-3). 지금은 상한을 걸지 않는다.
-    supply_coverage_ratio = _ratio(supply, demand, met=supply_met)
+    raw_supply_coverage_ratio = _ratio(supply, demand, met=supply_met)
+    supply_coverage_ratio = min(raw_supply_coverage_ratio, SUPPLY_COVERAGE_CAP)
 
     # 판단 사유 문장. 2026-09-09 Backend 회신 —
     # *"판단 사유를 AI측에서 잡아주는 것이 좋아 보입니다. (그대로 REASON FIELD에 저장 및 제공)"*
@@ -207,11 +209,22 @@ def build_bid_guide(request: BidGuideRequest) -> dict[str, Any]:
         )
 
     # 근거 문장은 계산된 수치만 다시 읽는다. 새 사실을 만들지 않는다.
+    if raw_supply_coverage_ratio > SUPPLY_COVERAGE_CAP:
+        supply_evidence = (
+            f"판매자 최대 공급 가능 수량 {supply}개를 총수요 {demand}개로 나눈 결과는 "
+            f"약 {_display(raw_supply_coverage_ratio, met=True)}이며, "
+            f"계산 정책의 상한 {SUPPLY_COVERAGE_CAP:.1f}을 적용했습니다."
+        )
+    else:
+        supply_evidence = (
+            f"판매자 최대 공급 가능 수량 {supply}개를 총수요 {demand}개로 나눈 결과는 "
+            f"{_display(supply_coverage_ratio, met=supply_met)}입니다."
+        )
+
     calculation_evidence = [
         f"총수요 {demand}개를 최소 성사 수량 {moq}개로 나눈 결과는 "
         f"{_display(moq_attainment_ratio, met=moq_met)}입니다.",
-        f"판매자 최대 공급 가능 수량 {supply}개를 총수요 {demand}개로 나눈 결과는 "
-        f"{_display(supply_coverage_ratio, met=supply_met)}입니다.",
+        supply_evidence,
         f"상태 판정은 표시용 반올림 값이 아니라 원본 정수 비교로 했습니다: "
         f"{demand} vs {moq} → {moq_status}, {supply} vs {demand} → {supply_status}.",
     ]
