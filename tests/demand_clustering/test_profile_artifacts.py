@@ -68,3 +68,9 @@ def test_mixed_profile_versions_are_rejected():
     with pytest.raises(ValueError, match="do not match v2.2"):
         validate_profile_versions(pd.DataFrame({"taxonomy_version": ["v2.2", "v2.1"]}), taxonomy)
     assert validate_profile_versions(pd.DataFrame({"taxonomy_version": ["v2.2"]}), taxonomy) == "v2.2"
+
+
+def test_empty_profiles_are_rejected():
+    taxonomy = json.loads(TAXONOMY_PATH.read_text())
+    with pytest.raises(ValueError, match="profiles must not be empty"):
+        validate_profile_versions(pd.DataFrame({"taxonomy_version": []}), taxonomy)

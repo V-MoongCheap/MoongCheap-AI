@@ -35,6 +35,8 @@ def validate_profile_versions(
     expected = taxonomy_version(taxonomy)
     if "taxonomy_version" not in profiles:
         raise ValueError("profiles missing taxonomy_version")
+    if profiles.empty:
+        raise ValueError("profiles must not be empty")
     actual = set(profiles["taxonomy_version"].fillna("").astype(str).str.strip())
     if actual - {expected}:
         raise ValueError(

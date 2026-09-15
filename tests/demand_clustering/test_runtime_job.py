@@ -430,6 +430,24 @@ def test_profile_version_mismatch_stops_before_database_or_backend(tmp_path):
         run_demand_clustering_job(config, planned_at=PLANNED_AT, connection_factory=must_not_connect)
 
 
+def test_empty_profiles_stop_before_database_or_backend(tmp_path):
+    environment = _environment(tmp_path)
+    profiles_path = Path(environment["MFDS_CATALOG_PROFILES_PATH"])
+    profiles = pd.read_csv(profiles_path, dtype=str)
+    profiles.iloc[0:0].to_csv(profiles_path, index=False)
+    config = load_job_config(environment)
+
+    def must_not_connect(*args):
+        pytest.fail("empty profiles must be detected before database access")
+
+    with pytest.raises(ValueError, match="profiles must not be empty"):
+        run_demand_clustering_job(
+            config,
+            planned_at=PLANNED_AT,
+            connection_factory=must_not_connect,
+        )
+
+
 @pytest.mark.parametrize("primary_path", [None, ""])
 def test_a_path_is_optional_b_base_is_required(tmp_path, primary_path):
     environment = _environment(tmp_path)
