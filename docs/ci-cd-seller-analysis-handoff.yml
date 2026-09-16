@@ -20,8 +20,9 @@ container_architecture: linux/amd64  # BE·AI 공유 노드(workload=backend-ai)
 # Cloud Jenkinsfile.template 은 Kaniko 로 `pwd`/Dockerfile 을 빌드한다.
 # 이 이미지는 --dockerfile 을 docker/Dockerfile.seller-analysis 로 지정해야 한다.
 # docker/Dockerfile.seller-analysis.dockerignore 는 BuildKit 의 Dockerfile 별 제외 규칙이다.
-# Kaniko 가 이 파일을 읽지 않으면 빌드 입력만 커지고 이미지 내용은 같다(COPY 대상이 명시돼 있다). Kaniko 빌드는 미검증.
-# 로컬 검증 빌드도 BuildKit 없이(구형 빌더) 해 Dockerfile 별 제외 규칙의 적용은 확인하지 못했다.
+# 빌더가 이 파일을 읽지 않으면 `COPY src` 가 __pycache__ 등 작업 공간의 생성 파일까지 담을 수 있다.
+# CI 가 같은 작업 공간에서 테스트를 먼저 돌리면 생긴다. 이미지 내용이 같다고 보장하지 않는다.
+# 제외 규칙 적용은 검증 대기 — Kaniko 와 BuildKit 모두 실행해 보지 않았다(로컬 검증은 구형 빌더).
 kaniko_build_verified: false
 
 application_port: 8081
@@ -32,7 +33,7 @@ metrics_path: ""  # 메트릭 엔드포인트 없음
 
 kubernetes:
   workload_kind: Deployment  # 상주 HTTP 서버. Cloud moongcheap-service 차트가 Deployment·Service 를 렌더링한다
-  helm_values_file: gitops/values/services/ai.yaml  # MoongCheap-Cloud
+  helm_values_file: gitops/values/services/ai.yaml  # MoongCheap-Cloud. 이 ai 서비스가 판매자 수요 분석 API 전용인지는 미확인
   namespace_example: moongcheap-develop  # Cloud ApplicationSet(moongcheap-services-develop) destination
   service_port: 80  # Cloud values 의 service.port. 컨테이너 8081 로 연결
   node_selector:
@@ -66,7 +67,7 @@ secret_variables:
     secret_key: internal-key  # B 인계서 선례와 같게 제안
     open_questions:
       - "B 배치(AI → Backend)의 ai-backend-internal-key 와 같은 키를 쓸지, 방향별로 나눌지 미정"
-      - "Backend develop 의 InternalApiKeyFilter 는 X-Internal-Api-Key 헤더를 읽는다. 이 API 는 합의대로 X-Internal-Key 를 읽으므로 Backend 호출 클라이언트가 X-Internal-Key 로 보내야 한다 (올바른 키를 X-Internal-Api-Key 로 보내면 403 확인, 2026-09-17)"
+      - "Backend → AI 호출 클라이언트를 Backend 저장소에서 찾지 못해, Backend 가 보낼 헤더 이름은 미확인이다. 이 API 는 합의대로 X-Internal-Key 만 읽는다 (다른 이름으로 오면 403 확인, 2026-09-17). Backend develop 의 InternalApiKeyFilter(X-Internal-Api-Key)는 Backend 가 받는 요청용이라 이 API 호출과 방향이 다르다"
 
 resources:
   requests:

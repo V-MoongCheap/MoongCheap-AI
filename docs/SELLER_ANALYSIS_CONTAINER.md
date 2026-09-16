@@ -25,9 +25,9 @@ docker build --platform linux/amd64 \
 `--dockerfile=`pwd`/Dockerfile` 로 루트 `Dockerfile` 을 빌드한다. 이 이미지는 빌드 입력을 저장소 루트로 두고
 `--dockerfile` 만 `docker/Dockerfile.seller-analysis` 로 바꾼다.
 `docker/Dockerfile.seller-analysis.dockerignore` 는 BuildKit 의 Dockerfile 별 제외 규칙이라 Kaniko 가 읽지 않을 수 있다.
-그 경우 빌드 입력만 커지고 이미지 내용은 같다(COPY 대상이 명시돼 있다). **Kaniko 빌드는 검증하지 않았다.**
+그 경우 `COPY src` 가 `__pycache__` 같은 작업 공간의 생성 파일까지 담을 수 있다. **이미지 내용이 같다고 보장하지 않는다.** **Kaniko 빌드는 검증하지 않았다.**
 
-아래 검증 기록의 빌드도 BuildKit 없이(구형 빌더) 했으므로 **Dockerfile 별 제외 규칙이 적용되는지는 확인하지 못했다.** 작업 폴더의 `__pycache__` 가 이미지에 함께 들어갔으며, 깨끗한 CI 체크아웃에는 생기지 않는다.
+아래 검증 기록의 빌드도 BuildKit 없이(구형 빌더) 했으므로 **Dockerfile 별 제외 규칙이 적용되는지는 확인하지 못했다.** 실제로 작업 폴더의 `__pycache__` 가 이미지에 함께 들어갔다. CI 가 같은 작업 공간에서 테스트를 먼저 돌리면 CI 에서도 생긴다 — 빌더·빌드 입력 검증 대기다.
 
 ## 테스트
 
@@ -70,7 +70,8 @@ docker run --rm -p 8081:8081 \
 ## Kubernetes 배포 (Cloud Helm 차트에 반영할 값)
 
 이 저장소에는 Kustomize 매니페스트를 두지 않는다. Cloud `moongcheap-service` 차트가 이미 Deployment·Service 를
-렌더링하고, ApplicationSet 에 `ai` 서비스가 있으므로 `gitops/values/services/ai.yaml` 에 아래 값을 반영하면 된다.
+렌더링하고, ApplicationSet 에 `ai` 서비스가 있으므로 `gitops/values/services/ai.yaml` 에 아래 값을 반영하는 것을 제안한다.
+⚠️ 그 `ai` 서비스가 **판매자 수요 분석 API 전용인지는 확인하지 않았다.** 다른 AI 구성요소와 공유하는 값이면 배포 방식을 인프라와 먼저 정한다.
 아래 「Cloud 현재값」 은 MoongCheap-Cloud develop `4f450fb` 기준이다.
 
 | 항목 | 이 이미지 | Cloud 현재값 | 조치 |
@@ -104,7 +105,7 @@ docker run --rm -p 8081:8081 \
 |---|---|
 | `GET /health` | `200` · `internal_key_required: true` |
 | 인증 헤더 없음 / 잘못된 키 | 둘 다 `403` |
-| 올바른 키를 `X-Internal-Api-Key` 헤더로 보냄 | `403` — 헤더 이름이 달라도 거절된다 (「확인 대기」 의 인증 헤더 이름) |
+| 올바른 키를 `X-Internal-Api-Key` 헤더로 보냄 | `403` — 이 API 는 `X-Internal-Key` 만 읽는다 |
 | 정상 요청 | `200` · 지표·근거 문장 정상 |
 | 개인정보 필드(`user_id`) 포함 요청 | `400` |
 | `GET /openapi.json` | `200` — 이미지에 담은 계약 파일로 생성 |
@@ -119,7 +120,7 @@ docker run --rm -p 8081:8081 \
 | 항목 | |
 |---|---|
 | Cloud `containerPort` | Cloud values 는 8000, 이 이미지는 8081. 인프라 설계서의 `[AI API Port 확정 필요]` 에 8081 을 제안했다 |
-| 인증 헤더 이름 | 이 API 는 합의대로 `X-Internal-Key` 를 읽는다. Backend develop 의 `InternalApiKeyFilter` 는 `X-Internal-Api-Key` 를 읽으므로, Backend 의 호출 클라이언트가 어느 이름으로 보낼지 확인 필요 |
+| 인증 헤더 이름 | 이 API 는 합의대로 `X-Internal-Key` 만 읽는다. Backend → AI 호출 클라이언트는 Backend 저장소에서 찾지 못해 **Backend 가 보낼 헤더 이름은 미확인**이다. Backend develop 의 `InternalApiKeyFilter`(`X-Internal-Api-Key`)는 Backend 가 **받는** 요청용이라 이 API 와 방향이 다르다 |
 | 내부 키 공유 | B 배치(AI → Backend)의 키와 같은 값을 쓸지 방향별로 나눌지 미정. Secret 이름도 인프라 확정 |
 | ECR 리포지토리 | 네이밍 규약은 `moongcheap/{service}` 다. AI 파트는 배치와 API 두 이미지를 내므로 리포지토리를 나눌지 태그로 구분할지 확인 필요 |
 | Kaniko 빌드 · 차트 보안 설정 | 미검증 · 미지원 (위 「빌드」 · 「Kubernetes 배포」) |
