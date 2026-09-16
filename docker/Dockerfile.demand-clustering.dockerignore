@@ -10,5 +10,6 @@
 !config/
 !config/demand_constraint_rules.json
 !config/demand_constraint_aliases.json
+!config/model1_aliases_reviewed_v2.json
 **/__pycache__/
 **/*.py[cod]

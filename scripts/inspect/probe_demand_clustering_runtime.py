@@ -53,9 +53,14 @@ def main() -> int:
     )
     arguments.add_argument(
         "--aliases", type=Path,
-        default=Path(os.environ.get(
-            "DEMAND_CONSTRAINT_ALIASES_PATH", "config/demand_constraint_aliases.json"
-        )),
+        default=os.environ.get(
+            "DEMAND_CONSTRAINT_ALIASES_PATH", "config/model1_aliases_reviewed_v2.json"
+        ) or None,
+    )
+    arguments.add_argument("--without-a-aliases", dest="aliases", action="store_const", const=None)
+    arguments.add_argument(
+        "--compatibility-aliases", type=Path,
+        default=os.environ.get("DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH", "config/demand_constraint_aliases.json"),
     )
     args = arguments.parse_args()
     if platform.system() != "Linux":
@@ -90,7 +95,9 @@ def main() -> int:
         ClaimIndexedSubstituteProposalPlanner,
         build_runtime_catalog_profiles,
     )
-    from moongcheap_ai.demand_constraints import DemandConstraintParser
+    from moongcheap_ai.demand_clustering.part_a_integration import (
+        build_part_b_parser, validate_profile_versions,
+    )
 
     profiles = pd.read_csv(args.profiles, dtype=str).fillna("")
     if profiles.empty:
@@ -98,8 +105,10 @@ def main() -> int:
     taxonomy = json.loads(args.taxonomy.read_text(encoding="utf-8"))
     checkpoint("importsAndArtifactRead")
 
-    parser = DemandConstraintParser.from_taxonomy(
+    validate_profile_versions(profiles, taxonomy)
+    parser, integration = build_part_b_parser(
         taxonomy, rules_path=args.rules, aliases_path=args.aliases,
+        compatibility_aliases_path=args.compatibility_aliases,
     )
     scorer = E5RuntimeTextSimilarityScorer(E5RuntimeScorerConfig(
         model_path=args.model, batch_size=args.batch_size,
@@ -143,6 +152,7 @@ def main() -> int:
         "psycopg": psycopg.__version__,
         "index": dict(planner.index_summary),
         "taxonomyCategoryCount": len(taxonomy["categories"]),
+        "partAIntegration": integration,
         "parserInputCount": len(queries),
         "requestedPassageCount": args.passage_count,
         "e5BatchSize": args.batch_size,

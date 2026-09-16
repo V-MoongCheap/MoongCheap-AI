@@ -13,7 +13,8 @@ configMapGenerator:
       - MFDS_CATALOG_PROFILES_PATH=/artifacts/releases/replace-with-artifact-version/catalog_profiles.csv
       - DEMAND_TAXONOMY_PATH=/artifacts/releases/replace-with-artifact-version/taxonomy.json
       - DEMAND_CONSTRAINT_RULES_PATH=/app/config/demand_constraint_rules.json
-      - DEMAND_CONSTRAINT_ALIASES_PATH=/app/config/demand_constraint_aliases.json
+      - DEMAND_CONSTRAINT_ALIASES_PATH=/app/config/model1_aliases_reviewed_v2.json
+      - DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH=/app/config/demand_constraint_aliases.json
       - E5_MODEL_PATH=/models/multilingual-e5-small/snapshots/614241f622f53c4eeff9890bdc4f31cfecc418b3
       - E5_BATCH_SIZE=32
       - CLUSTER_MIN_PARTICIPANTS=5

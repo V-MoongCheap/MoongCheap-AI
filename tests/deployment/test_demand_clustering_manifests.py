@@ -106,6 +106,8 @@ def test_generated_config_reference_and_runtime_settings(resources):
     assert config["HF_HUB_OFFLINE"] == config["TRANSFORMERS_OFFLINE"] == "1"
     assert config["OMP_NUM_THREADS"] == config["MKL_NUM_THREADS"] == "1"
     assert config["HF_HOME"] == "/tmp/huggingface"
+    assert config["DEMAND_CONSTRAINT_ALIASES_PATH"] == "/app/config/model1_aliases_reviewed_v2.json"
+    assert config["DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH"] == "/app/config/demand_constraint_aliases.json"
     profiles = PurePosixPath(config["MFDS_CATALOG_PROFILES_PATH"])
     taxonomy = PurePosixPath(config["DEMAND_TAXONOMY_PATH"])
     assert profiles.parent == taxonomy.parent

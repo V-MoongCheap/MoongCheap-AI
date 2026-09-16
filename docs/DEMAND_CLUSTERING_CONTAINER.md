@@ -38,13 +38,32 @@ docker run --rm --network none --read-only \
 | Part A 상품도감 기준의 상품 profile | `/artifacts/catalog_profiles.csv` | 읽기 전용 파일 |
 | profile과 일치하는 taxonomy | `/artifacts/taxonomy.json` | 읽기 전용 파일 |
 | CPU multilingual-e5-small 모델 | `/models/multilingual-e5-small` | 읽기 전용 디렉터리 |
-| 자연어 규칙·별칭 | `/app/config/demand_constraint_*.json` | 이미지에 포함 |
+| 자연어 규칙 | `/app/config/demand_constraint_rules.json` | 이미지에 포함 |
+| 선택 A V2.2 승인 별칭 | `/app/config/model1_aliases_reviewed_v2.json` | 이미지에 포함 |
+| 필수 B 기본 별칭 | `/app/config/demand_constraint_aliases.json` | 이미지에 포함, A 승인과 별도 관리 |
 
 기본 경로는 기존 `MFDS_CATALOG_PROFILES_PATH`, `DEMAND_TAXONOMY_PATH`,
 `E5_MODEL_PATH` 등의 환경 변수로 바꿀 수 있다. 마운트 파일·디렉터리는 UID 65534가
 읽고 탐색할 수 있어야 한다. Kubernetes 기본안은 기존 PVC를 읽기 전용으로 마운트하고,
 profile·taxonomy를 `/artifacts/releases/<artifact-version>/`에서 함께 읽도록 경로를
 덮어쓴다. PVC 생성·파일 공급과 실제 release 버전 반영은 인프라 배포 과정에 연결한다.
+
+V2.2 전환 시 profile의 `taxonomy_version`도 `v2.2`여야 한다. 배치는 DB에 연결하기 전에
+taxonomy·profile·A 별칭의 선언 버전을 검사한다. 기존 V2.1 profile은 category-local
+코드표와 실제 상품 해석 결과가 동일한지 확인한 뒤 새 release로 준비한다. **기존 V2.1
+profile을 둔 채 컨테이너 이미지만 갱신하면 배치가 기동하지 않는다.** V2.2 profile과
+taxonomy를 같은 release 디렉터리에 함께 공급하고 두 경로를 한 번에 전환해야 한다.
+[B의 V2.2 연계 안내](PART_B_V22_INTEGRATION.md)에 생성·검증 명령이 있다.
+
+`DEMAND_CONSTRAINT_ALIASES_PATH`는 A 승인 별칭, `DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH`는
+필수 B 기본 별칭이다. B는 항상 읽고, A에 없는 표현·카테고리도 계속 활용한다.
+같은 카테고리·표현은 A가 우선한다. A 경로를 비우거나 설정하지 않으면 B만 사용하며,
+A에서 삭제된 표현도 B에 남아 있으면 사용한다. A 경로를 설정했다면 파일 누락,
+잘못된 JSON·버전·코드/값, 읽기 권한 오류를 모두 설정 오류로 보고 중단한다.
+B 경로를 비우거나 B 파일이 없으면 설정 오류다. `partAIntegration.aliasMode`와
+`primaryAliasLoadStatus`로 A 사용·미사용 이유를 구분한다.
+배치 출력의 `partAIntegration`에서 적용 버전·파일 해시를 확인한다.
+profile 생성과 별칭 변경 검증은 [V2.2 연계 안내](PART_B_V22_INTEGRATION.md)를 따른다.
 
 모델은 런타임에 다운로드하지 않는다. `HF_HUB_OFFLINE=1`이 기본이며 모델 가중치,
 tokenizer, SentenceTransformer 설정 파일이 모두 필요하다. Hugging Face cache를
