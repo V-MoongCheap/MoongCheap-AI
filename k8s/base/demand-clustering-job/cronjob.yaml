@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/part-of: moongcheap-ai
 spec:
   # Initial handoff values; infrastructure confirms the final schedule/deadlines.
-  schedule: "15 * * * *"
+  schedule: "45 * * * *"
   timeZone: Asia/Seoul
   suspend: true
   concurrencyPolicy: Forbid
@@ -27,18 +27,15 @@ spec:
             app.kubernetes.io/component: batch
             app.kubernetes.io/part-of: moongcheap-ai
         spec:
-          # This selects the AI node pool, not one particular hostname.
+          # Infrastructure must label the shared BE/AI nodes; this creates no node group.
           nodeSelector:
-            workload: ai
+            workload: backend-ai
             kubernetes.io/os: linux
             kubernetes.io/arch: amd64
-          tolerations:
-            - key: workload
-              operator: Equal
-              value: ai
-              effect: NoSchedule
+          # No dedicated AI taint is assumed in the shared worker design.
+          tolerations: []
           restartPolicy: Never
-          serviceAccountName: demand-clustering-job
+          serviceAccountName: demand-clustering-sa
           automountServiceAccountToken: false
           securityContext:
             runAsNonRoot: true
@@ -61,6 +58,9 @@ spec:
                       name: ai-batch-reader-database
                       key: url
                 - name: BACKEND_INTERNAL_KEY
+                  # Agreed source: SSM Parameter Store SecureString. This example
+                  # expects a pre-supplied Secret; it does not read SSM itself.
+                  # Cloud must confirm the delivery mechanism before deployment.
                   valueFrom:
                     secretKeyRef:
                       name: ai-backend-internal-key

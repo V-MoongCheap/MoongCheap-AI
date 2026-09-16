@@ -175,7 +175,7 @@ UNASSIGNED
 
 - Part A 상품도감 기준 profile·taxonomy 공급과 DB 입력 catalog ID 일치 확인
 - CPU E5 모델 파일 공급과 버전 관리
-- 합의한 두 Backend 내부 API의 실제 연동과 Parameter Store 키 주입
+- 합의한 두 Backend 내부 API의 실제 연동과 Parameter Store 관리 내부 키의 Pod 환경 변수 공급
 - 재제안은 허용하되, 이미 거절한 동일 보드·상품을 제외할지와 거절 이력 조회 방식
 - Seller Offer 매칭과 낙찰 방식
 

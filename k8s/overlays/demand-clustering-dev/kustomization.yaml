@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Part B only; do not move other AI components into the Cloud namespace.
+resources:
+  - ../../base/demand-clustering-job
+
+# Matches Cloud develop's ApplicationSet; infrastructure provisions Secrets/PVCs.
+namespace: moongcheap-develop
+
+labels:
+  - pairs:
+      app.kubernetes.io/instance: demand-clustering-develop
+    includeSelectors: false
+
+# Keep placeholders and suspend=true until the deployment dependencies are ready.

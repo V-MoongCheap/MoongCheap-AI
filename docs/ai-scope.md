@@ -53,7 +53,7 @@
 
 - Part A 상품도감 기준 profile·taxonomy와 CPU E5 모델 파일 공급·버전 관리
 - 두 내부 API의 합의한 계약에 대한 Backend 구현 확인과 실연동 검증
-- Parameter Store 키 주입, Docker 이미지·스케줄 배포
+- Parameter Store 관리 내부 키의 Pod 환경 변수 공급 방식 확정, Docker 이미지·스케줄 배포
 - Backend의 `reject_history` 테이블 배포·거절 저장, AI SELECT 권한과 API 2 동시성 재검증 확인
 - 별도 평가 경로의 relation 승인·artifact 발행 및 오프라인 E5 catalog embedding 갱신
 

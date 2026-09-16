@@ -6,7 +6,7 @@ HTTP 서버가 아니므로 Service, Ingress, 애플리케이션 포트, HTTP he
 
 AI는 Dockerfile·기본 CronJob 매니페스트·실행 계약·자원 측정 자료를 제공한다.
 Jenkins/ECR 이미지 배포, GitOps 갱신, ArgoCD/EKS 연결과 환경별 운영 설정은 인프라
-측에서 구성한다. [Kubernetes 안내](../k8s/README.md)에 Secret·볼륨·AI 노드 배치
+측에서 구성한다. [Kubernetes 안내](../k8s/README.md)에 Secret·볼륨·BE·AI 노드 배치
 설정과 배포 전 준비 사항을 정리했다.
 전달용 필드는 [B파트 인계서](ci-cd-demand-clustering-handoff.yml)에 있다.
 
@@ -71,10 +71,13 @@ tokenizer, SentenceTransformer 설정 파일이 모두 필요하다. Hugging Fac
 이때 `E5_MODEL_PATH`는 마운트 내부의 `snapshots/<revision>`으로 지정한다.
 
 별도로 주입할 필수 값은 `SHARED_DATABASE_URL`, `BACKEND_BASE_URL`,
-`BACKEND_INTERNAL_KEY`다. DB 계정은 SELECT 전용이며 내부 키는 배포 환경이
-AWS Parameter Store에서 Kubernetes Secret으로 공급한 뒤 Pod에 주입한다.
-Secret 동기화 구성은 기본 매니페스트에 포함하지 않는다. 앱은 AWS 자격 증명이나 직접적인 SSM 호출을
-요구하지 않는다. 실제 Secret 값은 이미지·Git·로그에 넣지 않는다.
+`BACKEND_INTERNAL_KEY`다. DB 계정은 SELECT 전용이며 내부 키의 원본 저장소는
+Backend와 합의한 AWS Parameter Store `SecureString`이다. 배포 환경이 이를
+`BACKEND_INTERNAL_KEY`로 주입하며 앱은 `X-Internal-Key` 헤더로 전송한다.
+현재 매니페스트의 Kubernetes Secret 참조는 전달 방식의 예시이지 SSM 자동 연동이 아니다.
+Secret 경유 여부·조회 권한·주입 방식은 Cloud와 확정하고, 다른 방식이면 GitOps 참조도
+함께 바꾼다. 앱은 AWS 자격 증명이나 직접적인 AWS API 호출을 요구하지 않는다.
+실제 Secret 값은 이미지·Git·로그에 넣지 않는다.
 
 DB 조회 대상에는 `demand`, `demand_board`, `reject_history`가 포함된다.
 Backend가 거절 이력 테이블을 배포하고 사용자 거절을 저장해야 하며, AI 계정에
@@ -100,9 +103,10 @@ docker run --rm --read-only \
 | 항목 | 초기 전달안 |
 | --- | --- |
 | 실행 형태 | 시간별 CronJob, 컨테이너 기본 entrypoint 그대로 사용 |
-| 기본 매니페스트 | `k8s/base`, 개발 환경 예시 `k8s/overlays/dev` |
-| 초기 스케줄·제한 | 매시간 15분, `Asia/Seoul`, 실행 제한 30분, `suspend: true` |
-| 노드 배치 | `workload=ai` + Linux amd64 선택, `workload=ai:NoSchedule` taint 허용 |
+| 기본 매니페스트 | `k8s/base/demand-clustering-job`, B 전용 개발 예시 `k8s/overlays/demand-clustering-dev` |
+| 개발 Namespace | Cloud GitOps 기준 `moongcheap-develop`; 기존 공용 overlay 및 A Namespace는 유지 |
+| 초기 스케줄·제한 | 매시간 45분, `Asia/Seoul`, 실행 제한 30분, `suspend: true` |
+| 노드 배치 | `workload=backend-ai` + Linux amd64 선택, AI 전용 taint 허용 없음 |
 | 중첩·재실행 | `concurrencyPolicy: Forbid`, `backoffLimit: 0`, `restartPolicy: Never` |
 | CPU | requests `1`, limits `2` |
 | 메모리 | requests `3Gi`, limits `4Gi` |
@@ -113,8 +117,11 @@ docker run --rm --read-only \
 | 네트워크 | SELECT 전용 PostgreSQL과 Backend 내부 API에 연결; 모델 다운로드 불필요 |
 
 자원 값은 아래 측정에 여유를 둔 **초기 제안값**이지 운영 최대 부하 보장이 아니다.
-스케줄·제한 시간과 자원 값은 실제 배치 부하에 맞게 인프라와 조정한다. AI 노드 선택은
-특정 한 대에 대한 고정이 아니며 AI Node Group이 한 대일 때 그 노드에 모인다.
+스케줄·제한 시간과 자원 값은 실제 배치 부하에 맞게 인프라와 조정한다. BE·AI 노드 선택은
+특정 한 대에 대한 고정이 아니며 Backend·다른 AI·시스템 Pod의 자원을 합산해 배치 여유를 확인한다.
+노드 라벨·Namespace와 Helm 전환은 배포 설정에 해당하므로 현재 CPU 배치 Dockerfile은 그대로 사용한다.
+Cloud Jenkins 템플릿의 루트 `Dockerfile` 경로는 `docker/Dockerfile.demand-clustering`으로
+지정해야 한다. Python/uv/kubectl 준비와 Kaniko 실제 빌드 검증은 CI 연동 시 수행한다.
 Secret과 artifact 공급은 인프라가 준비한다. 첫 배포는 실제 연동 검증이 끝날 때까지 자동 실행을
 중지한 상태로 준비한다. 실패한 요청은 즉시 재시도하지 않고 다음 정기 배치에서
 최신 DB 상태로 재계산한다. 수동 실행도 기존 배치와 겹치지 않도록 운영해야 한다.

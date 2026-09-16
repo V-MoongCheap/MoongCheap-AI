@@ -127,7 +127,7 @@ Backend 행과 catalog profile의 명시적 join 지점이다.
 - CPU E5 모델 파일 공급 및 버전 관리
 - 합의한 두 Backend 내부 API의 실제 연동·상태 재검증 확인
 - Backend `reject_history` 테이블 배포·거절 저장과 AI DB 계정의 SELECT 권한 확인
-- Parameter Store 키 주입 및 시간별 배치 배포
+- Parameter Store 관리 내부 키의 Pod 환경 변수 공급 방식 확정 및 시간별 배치 배포
 
 relation 310개 승인과 오프라인 catalog embedding artifact 발행은 별도 평가 경로의
 후속 과제이며 현재 claim 인덱스·CPU E5 배치 실행의 선행 조건은 아니다.
