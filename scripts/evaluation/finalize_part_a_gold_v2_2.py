@@ -9,11 +9,22 @@ import pandas as pd
 
 
 REQUIRED = {"DEV": 100, "HOLDOUT": 50, "CHALLENGE": 50}
+REVIEW_SCHEMA = {
+    "corrected_expected_preference_groups",
+    "proposed_expected_effective_requirement_mode",
+    "corrected_expected_effective_requirement_mode",
+    "proposed_expected_passthrough_text",
+    "corrected_expected_passthrough_text",
+}
 
 
 def finalize(input_path: Path, output_dir: Path) -> dict[str, int]:
     frame = pd.read_csv(input_path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
-    missing = {column for column in ("case_id", "evaluation_partition_candidate", "reviewer_status") if column not in frame}
+    missing = {
+        column
+        for column in ("case_id", "evaluation_partition_candidate", "reviewer_status")
+        if column not in frame
+    } | (REVIEW_SCHEMA - set(frame.columns))
     if missing:
         raise ValueError(f"missing required columns: {sorted(missing)}")
     if len(frame) != 200:
@@ -26,6 +37,19 @@ def finalize(input_path: Path, output_dir: Path) -> dict[str, int]:
     counts = frame["evaluation_partition_candidate"].value_counts().to_dict()
     if counts != REQUIRED:
         raise ValueError(f"unexpected partition counts: {counts}; expected {REQUIRED}")
+    mode = frame["corrected_expected_effective_requirement_mode"].where(
+        frame["corrected_expected_effective_requirement_mode"].ne(""),
+        frame["proposed_expected_effective_requirement_mode"],
+    )
+    passthrough = frame["corrected_expected_passthrough_text"].where(
+        frame["corrected_expected_passthrough_text"].ne(""),
+        frame["proposed_expected_passthrough_text"],
+    )
+    invalid_modes = set(mode) - {"STRUCTURED", "SEMANTIC_TEXT", "NONE"}
+    if invalid_modes:
+        raise ValueError(f"invalid effective requirement modes: {sorted(invalid_modes)}")
+    frame["expected_effective_requirement_mode"] = mode
+    frame["expected_passthrough_text"] = passthrough
     output_dir.mkdir(parents=True, exist_ok=True)
     for partition, count in REQUIRED.items():
         frame.loc[frame["evaluation_partition_candidate"].eq(partition)].to_csv(

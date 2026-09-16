@@ -1,0 +1,13 @@
+# Keep the labeling image independent of local data, secrets, and model caches.
+**
+!packaging/
+!packaging/demand-clustering/
+!packaging/demand-clustering/pyproject.toml
+!packaging/demand-clustering/uv.lock
+!src/
+!src/moongcheap_ai/
+!src/moongcheap_ai/**
+!config/
+!config/model1_aliases_reviewed_v2.json
+**/__pycache__/
+**/*.py[cod]

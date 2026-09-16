@@ -240,7 +240,7 @@ def load_job_config(
             DEMAND_CONSTRAINT_RULES_PATH_ENV,
         ),
         constraint_aliases_path=(
-            Path(source[DEMAND_CONSTRAINT_ALIASES_PATH_ENV].strip()).expanduser()
+            _required_file(source, DEMAND_CONSTRAINT_ALIASES_PATH_ENV)
             if source.get(DEMAND_CONSTRAINT_ALIASES_PATH_ENV, "").strip()
             else None
         ),

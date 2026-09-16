@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import time
 import urllib.error
@@ -100,7 +99,7 @@ class OllamaDemandLabeler:
             parsed = json.loads(payload.get("response", ""))
             results = parsed if isinstance(parsed, list) else parsed.get("results")
             if not isinstance(results, list):
-                raise ValueError("results is not a list")
+                raise TypeError("results is not a list")
             expected_ids = {str(row["demand_id"]) for row in rows}
             output = {}
             for item in results:

@@ -10,7 +10,8 @@
 - `facet/`: Facet evidence와 taxonomy 후보
 - `labeling/`: Demand label과 typed constraint batch 처리
 - `demand/`: 합성 Demand와 Part C용 수요보드 mechanics snapshot 생성
-- `evaluation/`: MFDS 근거·리뷰셋 생성, 방향성 relation·상품 검색·제안 품질 평가
+- `evaluation/`: MFDS 근거·리뷰셋 생성, 방향성 relation·상품 검색·제안 품질 평가,
+  판매자 수요 분석(영역 2) 고정 평가셋 생성과 채점
 - `audit/`: row count, completeness, conflict 검사
 
 `demand/`의 시뮬레이션 변환과 `evaluation/`의 구현은

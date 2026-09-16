@@ -130,6 +130,17 @@ class BidGuideRequest:
 #   2자리 — 문서 예시가 전부 소수 둘째 자리다. 「AI API Contract」 5절의 근거 문장
 #           *"…1.30입니다"* · *"약 1.15이며"*, 「AI 평가 데이터셋 및 평가 지표 정의서」
 #           16절 `150 / 120 = 1.25`, 18.1절 `= 1.20`.
+# 공급 충족률의 상한. 「AI API Contract」 5절 「Seller Analysis API」 의 예시가
+# `supply_coverage_ratio: 1.0` 을 내고 근거 문장에 *"약 1.15이며, 계산 정책의 상한 1.0을
+# 적용했습니다"* 라고 적는다. 게시된 계약이 상한을 전제하므로 그대로 따른다.
+#
+# ⚠️ 「AI 평가 데이터셋 및 평가 지표 정의서」 16절(`150 / 120 = 1.25`)과
+#    「AI 통합 영역 최종 선정 및 BE/FE 통합 인터페이스 명세」 3.5절(`1.15`)의 예시는
+#    상한을 적용하지 않는다. 이 둘과는 값이 어긋난다 — 파트 확정이 필요하다.
+#
+# ⛔ MOQ 달성률에는 상한을 두지 않는다. 계약이 상한을 말한 것은 공급 충족률뿐이다.
+SUPPLY_COVERAGE_CAP = 1.0
+
 RATIO_PRECISION = 4
 DISPLAY_PRECISION = 2
 
@@ -172,8 +183,10 @@ def build_bid_guide(request: BidGuideRequest) -> dict[str, Any]:
     # 총수요 / 최소 성사수량. 1.0 이상이면 성사 조건을 채운다.
     moq_attainment_ratio = _ratio(demand, moq, met=moq_met)
     # 판매자가 댈 수 있는 최대 수량 / 총수요. 1.0 이상이면 전량 공급 가능.
-    # ⚠️ 상한 1.0 적용 여부는 확정 대기다(명세서 8-3). 지금은 상한을 걸지 않는다.
-    supply_coverage_ratio = _ratio(supply, demand, met=supply_met)
+    # 상한 1.0 을 적용한다. 근거는 위 SUPPLY_COVERAGE_CAP 주석에 적었다.
+    raw_supply_coverage = _ratio(supply, demand, met=supply_met)
+    supply_coverage_ratio = min(raw_supply_coverage, SUPPLY_COVERAGE_CAP)
+    supply_capped = raw_supply_coverage > SUPPLY_COVERAGE_CAP
 
     # 판단 사유 문장. 2026-09-09 Backend 회신 —
     # *"판단 사유를 AI측에서 잡아주는 것이 좋아 보입니다. (그대로 REASON FIELD에 저장 및 제공)"*
@@ -210,8 +223,15 @@ def build_bid_guide(request: BidGuideRequest) -> dict[str, Any]:
     calculation_evidence = [
         f"총수요 {demand}개를 최소 성사 수량 {moq}개로 나눈 결과는 "
         f"{_display(moq_attainment_ratio, met=moq_met)}입니다.",
-        f"판매자 최대 공급 가능 수량 {supply}개를 총수요 {demand}개로 나눈 결과는 "
-        f"{_display(supply_coverage_ratio, met=supply_met)}입니다.",
+        (
+            f"판매자 최대 공급 가능 수량 {supply}개를 총수요 {demand}개로 나눈 결과는 "
+            f"약 {_display(raw_supply_coverage, met=supply_met)}이며, "
+            f"계산 정책의 상한 {SUPPLY_COVERAGE_CAP:.1f}을 적용했습니다."
+            if supply_capped
+            else
+            f"판매자 최대 공급 가능 수량 {supply}개를 총수요 {demand}개로 나눈 결과는 "
+            f"{_display(supply_coverage_ratio, met=supply_met)}입니다."
+        ),
         f"상태 판정은 표시용 반올림 값이 아니라 원본 정수 비교로 했습니다: "
         f"{demand} vs {moq} → {moq_status}, {supply} vs {demand} → {supply_status}.",
     ]

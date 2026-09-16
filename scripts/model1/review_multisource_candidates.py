@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.data_foundation.model1_review import build_review_queue, collapse_same_model_candidates, display_category_name, normalize_review_candidates, write_review_artifacts
+from moongcheap_ai.data_foundation.model1_review import (
+    build_review_queue,
+    collapse_same_model_candidates,
+    display_category_name,
+    normalize_review_candidates,
+    write_review_artifacts,
+)
 
 
 def main() -> None:

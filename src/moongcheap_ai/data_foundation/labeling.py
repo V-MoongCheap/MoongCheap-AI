@@ -15,8 +15,21 @@ class TaxonomyValidationError(ValueError):
     pass
 
 
+def _text(value: Any) -> str:
+    """Convert scalar input safely, including pandas missing scalars."""
+    if value is None:
+        return ""
+    try:
+        missing = pd.isna(value)
+    except (TypeError, ValueError):
+        missing = False
+    if isinstance(missing, bool) and missing:
+        return ""
+    return str(value)
+
+
 def _normalise(value: Any) -> str:
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or "")).casefold()).strip()
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", _text(value)).casefold()).strip()
 
 
 NO_REQUIREMENT_PHRASES = {"조건 없음", "조건없음", "상관 없음", "상관없음", "아무 조건 없음", "무관"}
@@ -24,13 +37,20 @@ NO_REQUIREMENT_PHRASES = {"조건 없음", "조건없음", "상관 없음", "상
 
 class TaxonomyLoader:
     def __init__(self, taxonomy: dict[str, Any]) -> None:
+        if not isinstance(taxonomy, dict):
+            raise TaxonomyValidationError("taxonomy root must be an object")
         self.taxonomy = taxonomy
         self.categories: dict[str, dict[str, Any]] = {}
         self.root_category: dict[str, Any] | None = None
         if taxonomy.get("facets"):
             self._validate_category({"category_id": "__root__", "facets": taxonomy["facets"]})
             self.root_category = {"category_id": "__root__", "facets": taxonomy["facets"]}
-        for category in taxonomy.get("categories", []):
+        categories = taxonomy.get("categories", [])
+        if not isinstance(categories, list):
+            raise TaxonomyValidationError("taxonomy categories must be a list")
+        for category in categories:
+            if not isinstance(category, dict):
+                raise TaxonomyValidationError("taxonomy category must be an object")
             category_id = str(category.get("category_id", "")).strip()
             if not category_id:
                 continue
@@ -40,7 +60,7 @@ class TaxonomyLoader:
             self.categories[category_id] = category
 
     @classmethod
-    def from_path(cls, path: Path) -> "TaxonomyLoader":
+    def from_path(cls, path: Path) -> TaxonomyLoader:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -56,6 +76,8 @@ class TaxonomyLoader:
         if not isinstance(facets, list):
             raise TaxonomyValidationError("category facets must be a list")
         for index, facet in enumerate(facets, 1):
+            if not isinstance(facet, dict):
+                raise TaxonomyValidationError("taxonomy facet must be an object")
             name = str(facet.get("name", "")).strip()
             if not name or name in seen_facets:
                 raise TaxonomyValidationError(f"invalid or duplicate facet: {name}")
@@ -73,6 +95,8 @@ class TaxonomyLoader:
             if not isinstance(values, list) or not values:
                 raise TaxonomyValidationError(f"facet has no values: {name}")
             for value in values:
+                if not isinstance(value, dict):
+                    raise TaxonomyValidationError(f"taxonomy value must be an object: {name}")
                 try:
                     code = int(value["code"])
                 except (KeyError, TypeError, ValueError) as exc:
@@ -87,7 +111,7 @@ class TaxonomyLoader:
             raise TaxonomyValidationError("facet orders must be contiguous from 1")
 
     def category(self, category_id: Any) -> dict[str, Any] | None:
-        return self.categories.get(str(category_id or "").strip()) or self.root_category
+        return self.categories.get(_text(category_id).strip()) or self.root_category
 
     def resolve(self, category_id: Any, extra_requirement: Any) -> tuple[dict[str, dict[str, Any]], list[str]]:
         category = self.category(category_id)
@@ -156,6 +180,39 @@ class TaxonomyLoader:
 
 def load_taxonomy(path: Path) -> TaxonomyLoader:
     return TaxonomyLoader.from_path(path)
+
+
+def taxonomy_from_category_facet_rows(frame: pd.DataFrame) -> dict[str, Any]:
+    """Build a taxonomy payload from Backend ``category.facet`` text rows."""
+    categories: dict[str, dict[str, Any]] = {}
+    if "category_facet" not in frame.columns:
+        raise TaxonomyValidationError("database rows do not contain category_facet")
+    for _, row in frame.iterrows():
+        raw = str(row.get("category_facet", "") or "").strip()
+        if not raw:
+            continue
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise TaxonomyValidationError("category.facet contains invalid JSON") from exc
+        category_id = str(row.get("category_id", "") or "").strip()
+        if isinstance(parsed, dict):
+            category_id = str(parsed.get("category_id", category_id)).strip()
+            facets = parsed.get("facets", [])
+        elif isinstance(parsed, list):
+            facets = parsed
+        else:
+            raise TaxonomyValidationError("category.facet must be an object or list")
+        if not category_id:
+            raise TaxonomyValidationError("category.facet row has no category key")
+        candidate = {"category_id": category_id, "facets": facets}
+        previous = categories.get(category_id)
+        if previous is not None and previous != candidate:
+            raise TaxonomyValidationError(f"conflicting category.facet rows: {category_id}")
+        categories[category_id] = candidate
+    if not categories:
+        raise TaxonomyValidationError("no usable category.facet rows")
+    return {"version": "backend-category-facet", "categories": list(categories.values())}
 
 
 def build_product_facet_map(frame: pd.DataFrame) -> dict[str, list[dict[str, Any]]]:

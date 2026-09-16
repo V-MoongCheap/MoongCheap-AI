@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -24,7 +24,7 @@ def audit_aihub(staging: pd.DataFrame) -> tuple[dict[str, Any], pd.DataFrame]:
     barcode_ok = _nonempty(frame, "barcode")
     kan_ok = _nonempty(frame, "kan_code")
     summary: dict[str, Any] = {
-        "raw_row_count": int(len(frame)),
+        "raw_row_count": len(frame),
         "product_name_non_null": int(name_ok.sum()),
         "barcode_non_null": int(barcode_ok.sum()),
         "barcode_valid_count": int(frame.loc[barcode_ok, "barcode_valid"].fillna(False).astype(bool).sum()) if "barcode_valid" in frame else 0,
@@ -105,7 +105,7 @@ def product_catalog_coverage(staging: pd.DataFrame, catalog: pd.DataFrame) -> di
         "raw_product_rows": int(row_count),
         "unique_barcode_count": _unique_count(staging, "barcode"),
         "unique_product_name_count": _unique_count(staging, "product_name_normalized"),
-        "canonical_product_count": int(len(catalog)),
+        "canonical_product_count": len(catalog),
         "kan_category_count": _unique_count(staging, "kan_code"),
         "category_product_counts": {str(k): int(v) for k, v in staging.loc[_nonempty(staging, "kan_code"), "kan_code"].value_counts().sort_index().items()} if "kan_code" in staging else {},
         "barcode_coverage_ratio": round(_nonempty(staging, "barcode").sum() / denominator, 6),

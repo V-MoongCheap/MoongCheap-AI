@@ -1,0 +1,73 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: a-labeling-job
+  labels:
+    app.kubernetes.io/name: a-labeling-job
+    app.kubernetes.io/component: batch
+    app.kubernetes.io/part-of: moongcheap-ai
+spec:
+  schedule: "15 * * * *"
+  timeZone: Asia/Seoul
+  suspend: true
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: a-labeling-job
+            app.kubernetes.io/component: batch
+            app.kubernetes.io/part-of: moongcheap-ai
+        spec:
+          nodeSelector:
+            kubernetes.io/os: linux
+            kubernetes.io/arch: amd64
+          restartPolicy: Never
+          serviceAccountName: a-labeling-job
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: a-labeling-job
+              image: moongcheap/ai-labeling:replace-with-git-sha
+              imagePullPolicy: IfNotPresent
+              command: ["a-labeling-batch", "--write-db", "--output", "/tmp/a-labeling-output.csv"]
+              envFrom:
+                - configMapRef:
+                    name: a-labeling-config
+              env:
+                - name: A_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ai-labeling-database
+                      key: url
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+                limits:
+                  cpu: "2"
+                  memory: 3Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 256Mi

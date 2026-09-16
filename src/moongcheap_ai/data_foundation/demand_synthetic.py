@@ -9,7 +9,6 @@ from typing import Any
 
 import pandas as pd
 
-
 REQUIRED_COLUMNS = (
     "demand_id",
     "catalog_id",

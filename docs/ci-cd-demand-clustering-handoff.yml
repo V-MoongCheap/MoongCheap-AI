@@ -60,7 +60,7 @@ environment_variables:
   - name: DEMAND_CONSTRAINT_RULES_PATH
     purpose: "자연어 조건 규칙 JSON"
   - name: DEMAND_CONSTRAINT_ALIASES_PATH
-    purpose: "선택 A 승인 별칭; 미설정/파일 없음이면 B-only, 제공된 파일의 잘못된 버전·코드/값은 차단"
+    purpose: "선택 A 승인 별칭; 미설정이면 B-only, 경로를 설정한 뒤 파일 누락·읽기 실패·잘못된 버전·코드/값은 기동 차단"
   - name: DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH
     purpose: "필수 B 기본 별칭; config/demand_constraint_aliases.json, A와 겹치는 표현만 A 우선"
   - name: E5_MODEL_PATH
@@ -108,6 +108,13 @@ runtime_filesystem:
     - path: /models/multilingual-e5-small
       existing_pvc: demand-clustering-e5-model
       contents: "blobs/와 snapshots/<revision>/을 포함한 전체 모델 cache"
+
+artifact_migration:
+  required_before_v2_2_deploy: true
+  reason: "기존 V2.1 profile은 V2.2 taxonomy와 버전이 달라 새 배치가 DB 연결 전에 기동을 중단함"
+  required_files: [catalog_profiles.csv, taxonomy.json]
+  rollout: "두 파일을 같은 새 release 경로에 공급하고 MFDS_CATALOG_PROFILES_PATH와 DEMAND_TAXONOMY_PATH를 함께 전환"
+  image_only_rollout_supported: false
 
 external_dependencies:
   - "Shared PostgreSQL (SELECT on demand, demand_board, reject_history)"

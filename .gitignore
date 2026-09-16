@@ -61,3 +61,8 @@ data/processed/*
 !data/processed/**/.gitkeep
 data/reports/*
 !data/reports/.gitkeep
+
+# Review artifacts may contain source review text and stay local-only.
+data/processed/reviews/nutrime/nutrime_consumer_facet_discovery.csv
+data/review/model1_mixability_review_details.csv
+data/review/model1_new_facet_human_review.csv
