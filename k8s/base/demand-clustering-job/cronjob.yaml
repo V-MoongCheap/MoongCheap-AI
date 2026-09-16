@@ -58,6 +58,9 @@ spec:
                       name: ai-batch-reader-database
                       key: url
                 - name: BACKEND_INTERNAL_KEY
+                  # Agreed source: SSM Parameter Store SecureString. This example
+                  # expects a pre-supplied Secret; it does not read SSM itself.
+                  # Cloud must confirm the delivery mechanism before deployment.
                   valueFrom:
                     secretKeyRef:
                       name: ai-backend-internal-key

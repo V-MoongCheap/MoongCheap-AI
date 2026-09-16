@@ -195,8 +195,10 @@ Backend가 담당하며 AI는 조회 결과에 따라 다음 배치 대상을 �
 운영 CronJob은 `concurrencyPolicy: Forbid`, Job은 `backoffLimit: 0`,
 Pod는 `restartPolicy: Never`로 설정한다. 실패한 실행을 즉시 재시도하지 않고
 다음 정기 실행에 맡기며, 외부 워크플로의 자동 재시도도 비활성화한다.
-이 저장소는 `k8s/base`의 기본 CronJob과 `k8s/overlays/dev`의 중지된 개발 환경 예시를
-제공한다. 실제 환경별 설정과 배포는 인프라 GitOps에서 관리한다.
+이 저장소는 `k8s/base/demand-clustering-job`의 기본 CronJob과
+`k8s/overlays/demand-clustering-dev`의 중지된 B 전용 개발 예시를 제공한다.
+B 전용 예시는 Cloud 기준 `moongcheap-develop`을 사용하며 기존 공용
+`k8s/overlays/dev`와 중복 배포하지 않는다. 실제 환경별 설정과 배포는 인프라 GitOps에서 관리한다.
 [Kubernetes 안내](../../../k8s/README.md)에 AI 노드 선택, Secret·artifact 공급과
 오프라인 검증 방법을 정리했다.
 

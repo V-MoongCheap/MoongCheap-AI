@@ -4,13 +4,12 @@ kind: Kustomization
 resources:
   - ../../base
 
-# Namespace example from the Cloud V2 design; the GitOps draft uses moongcheap-dev.
-# Infrastructure confirms the namespace and provisions matching Secrets/PVCs.
-namespace: ai
+# Example namespace. Infrastructure provisions it and the external dependencies.
+namespace: moongcheap-ai-dev
 
 labels:
   - pairs:
-      app.kubernetes.io/instance: ai-develop
+      app.kubernetes.io/instance: moongcheap-ai-dev
     includeSelectors: false
 
 # Keep the image/address/artifact placeholders and suspend=true until configured.

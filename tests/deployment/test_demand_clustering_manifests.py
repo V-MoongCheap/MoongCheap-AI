@@ -14,7 +14,10 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.fixture(scope="module", params=["base", "overlays/dev"])
+@pytest.fixture(
+    scope="module",
+    params=["base", "overlays/dev", "overlays/demand-clustering-dev"],
+)
 def resources(request, tmp_path_factory):
     kubectl = shutil.which("kubectl")
     if kubectl is None:
@@ -27,15 +30,23 @@ def resources(request, tmp_path_factory):
         [kubectl, "kustomize", str(ROOT / "k8s" / request.param)],
         check=True, capture_output=True, text=True, timeout=30, env=environment,
     )
+    all_documents = list(yaml.safe_load_all(result.stdout))
     documents = [
-        document for document in yaml.safe_load_all(result.stdout)
+        document for document in all_documents
         if document["metadata"]["name"].startswith("demand-clustering")
     ]
     assert len(documents) == 3
     assert {document["kind"] for document in documents} == {
         "CronJob", "ConfigMap", "ServiceAccount",
     }
-    expected_namespace = "ai" if request.param == "overlays/dev" else None
+    expected_namespace = {
+        "base": None,
+        "overlays/dev": "moongcheap-ai-dev",
+        "overlays/demand-clustering-dev": "moongcheap-develop",
+    }[request.param]
+    if request.param == "overlays/demand-clustering-dev":
+        # The standalone B overlay must not move or deploy Part A resources.
+        assert len(all_documents) == len(documents)
     for document in documents:
         assert document["metadata"].get("namespace") == expected_namespace
     return {document["kind"]: document for document in documents}
@@ -165,3 +176,26 @@ def test_measured_resource_baseline_and_one_shot_command(resources):
     }
     for server_field in ("ports", "livenessProbe", "readinessProbe", "startupProbe"):
         assert server_field not in container
+
+
+def test_handoff_uses_part_b_paths_and_agreed_parameter_store_source():
+    handoff = yaml.safe_load(
+        (ROOT / "docs/ci-cd-demand-clustering-handoff.yml").read_text(encoding="utf-8")
+    )
+    kubernetes = handoff["kubernetes"]
+    assert kubernetes["base_path"] == "k8s/base/demand-clustering-job"
+    assert kubernetes["dev_example_path"] == "k8s/overlays/demand-clustering-dev"
+    overlay = yaml.safe_load(
+        (ROOT / kubernetes["dev_example_path"] / "kustomization.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert overlay["namespace"] == kubernetes["namespace_example"] == "moongcheap-develop"
+    secrets = {row["name"]: row for row in handoff["secret_variables"]}
+    key = secrets["BACKEND_INTERNAL_KEY"]
+    assert key["source"] == {
+        "provider": "aws-ssm-parameter-store", "type": "SecureString",
+    }
+    assert "X-Internal-Key" in key["purpose"]
+    assert key["secret_name"] == "ai-backend-internal-key"
+    assert key["secret_key"] == "internal-key"
