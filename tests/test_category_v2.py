@@ -1,6 +1,9 @@
 import pandas as pd
 
-from moongcheap_ai.data_foundation.category_v2 import build_category_v2, classify_service_group
+from moongcheap_ai.data_foundation.category_v2 import (
+    build_category_v2,
+    classify_service_group,
+)
 
 
 def test_category_group_uses_product_facts_not_recognition_number():
@@ -22,3 +25,10 @@ def test_category_v2_keeps_unmapped_products_and_fake_ids_blank(tmp_path):
     assert mapping.loc[1, "service_category_candidate_key"] == "UNMAPPED"
     tree = pd.read_csv(tmp_path / "service_category_tree_v2.csv", dtype=str).fillna("")
     assert tree["category_candidate_key"].str.startswith("health-functional-food").all()
+
+
+def test_category_v2_handles_empty_and_partial_input(tmp_path):
+    empty_result = build_category_v2(pd.DataFrame(), tmp_path / "empty")
+    partial_result = build_category_v2(pd.DataFrame([{"source_product_id": "1"}]), tmp_path / "partial")
+    assert empty_result["tree_nodes"] == 1
+    assert partial_result["unmapped_products"] == 1

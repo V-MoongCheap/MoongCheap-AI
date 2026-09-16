@@ -10,7 +10,6 @@ import pandas as pd
 
 from .demand_synthetic import PRICE_OPTIONS, prepare_demand_input
 
-
 STYLE_TEMPLATES = {
     "PREFERENCE": ("{value} 제품으로 찾아주세요.", "{value} 조건을 선호합니다."),
     "QUESTION": ("{value} 제품이 있을까요?",),

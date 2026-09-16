@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-import json
 
 import pandas as pd
 
-from scripts.reviews.qa_nutrime_consumer_facets import _discovery_counts, _mixability_details, _product_field_qa
+from scripts.reviews.qa_nutrime_consumer_facets import (
+    _discovery_counts,
+    _mixability_details,
+    _product_field_qa,
+)
 
 
 def test_product_field_qa_detects_daily_frequency(tmp_path) -> None:
@@ -23,7 +26,14 @@ def test_product_field_qa_detects_daily_frequency(tmp_path) -> None:
 
 def test_mixability_details_preserve_unmapped_reason() -> None:
     raw = pd.DataFrame(
-        [{"source_review_id": "r1", "source_product_id": "", "product_name": "", "review_text": "물에 잘 녹아요"}]
+        [
+            {
+                "source_review_id": "r1",
+                "source_product_id": "",
+                "product_name": "",
+                "review_text": "물에 잘 녹아요",
+            }
+        ]
     )
     discovery = pd.DataFrame([{"review_id": "r1", "proposed_facet": "mixability"}])
     result = _mixability_details(raw, discovery)
