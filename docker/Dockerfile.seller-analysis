@@ -16,8 +16,7 @@ FROM python:3.13.12-slim-trixie AS runtime
 
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    SELLER_ANALYSIS_PORT=8081
+    PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
@@ -27,6 +26,7 @@ COPY src ./src
 COPY docs/contracts ./docs/contracts
 
 USER 65534:65534
+# 포트는 아래 실행 명령에 고정한다. 환경 변수로 바꾸는 경로는 두지 않는다.
 EXPOSE 8081
 
 # ⛔ SELLER_ANALYSIS_INTERNAL_KEY 없이는 기동하지 않는다. 인증이 빠진 채 떠 있으면
