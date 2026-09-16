@@ -17,6 +17,7 @@
     "ruleVersion": {"type": "string", "minLength": 1, "maxLength": 200},
     "proposals": {
       "type": "array",
+      "maxItems": 50,
       "items": {"$ref": "#/$defs/proposal"}
     }
   },

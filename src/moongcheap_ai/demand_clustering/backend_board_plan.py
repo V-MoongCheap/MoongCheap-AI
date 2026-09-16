@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
@@ -12,6 +12,7 @@ import requests
 from .backend_http import (
     aware_datetime as _aware_datetime,
     exact_fields as _exact_fields,
+    iter_plan_requests,
     nonnegative_int as _nonnegative_int,
     nonnegative_int as _price,
     positive_int as _positive_int,
@@ -27,6 +28,9 @@ BOARD_PLAN_SCHEMA_VERSION = "demand-board-assignment-plan.v0.1"
 BOARD_PLAN_ENDPOINT_PROPOSAL = (
     "/api/demand-boards/internal/formation-plans"
 )
+# Backend-announced per-request object limits; demandIds are not split.
+MAX_EXISTING_BOARD_ASSIGNMENTS = 50
+MAX_NEW_BOARDS = 50
 PLAN_FIELDS = {
     "schemaVersion",
     "plannedAt",
@@ -216,6 +220,18 @@ def build_board_assignment_plan(
     return result
 
 
+def iter_board_assignment_requests(
+    plan: Mapping[str, Any],
+) -> Iterator[dict[str, Any]]:
+    """Validate the whole logical plan, then emit bounded wire requests."""
+
+    validate_board_assignment_plan_contract(plan)
+    yield from iter_plan_requests(plan, {
+        "existingBoardAssignments": MAX_EXISTING_BOARD_ASSIGNMENTS,
+        "newBoards": MAX_NEW_BOARDS,
+    })
+
+
 def post_board_assignment_plan(
     backend_base_url: str,
     internal_key: str,
@@ -225,22 +241,42 @@ def post_board_assignment_plan(
     timeout_seconds: int = 15,
     http_post: Callable[..., Any] = requests.post,
 ) -> BackendBoardPlanApplyResult:
-    """Submit one formation plan and validate the current application result.
+    """Send bounded requests sequentially and aggregate validated results.
 
     ``endpoint`` defaults to the agreed internal formation route.
-    This client never writes to PostgreSQL directly.
+    A failure stops subsequent requests without retrying or rolling back
+    earlier Backend commits. This client never writes to PostgreSQL directly.
     """
 
-    validate_board_assignment_plan_contract(plan)
-    payload = post_plan_json(
-        backend_base_url,
-        internal_key,
-        plan,
-        endpoint=endpoint,
-        timeout_seconds=timeout_seconds,
-        http_post=http_post,
-        context="Backend demand-board formation plan apply",
+    existing_applied = 0
+    existing_stale = 0
+    formed_boards: list[FormedDemandBoardResult] = []
+    for request in iter_board_assignment_requests(plan):
+        payload = post_plan_json(
+            backend_base_url,
+            internal_key,
+            request,
+            endpoint=endpoint,
+            timeout_seconds=timeout_seconds,
+            http_post=http_post,
+            context="Backend demand-board formation plan apply",
+        )
+        result = _parse_board_assignment_response(payload, request)
+        existing_applied += result.existing_applied_demand_count
+        existing_stale += result.existing_stale_rejected_count
+        formed_boards.extend(result.new_boards)
+    return BackendBoardPlanApplyResult(
+        status="APPLIED",
+        existing_applied_demand_count=existing_applied,
+        existing_stale_rejected_count=existing_stale,
+        new_boards=tuple(formed_boards),
     )
+
+
+def _parse_board_assignment_response(
+    payload: Mapping[str, Any],
+    plan: Mapping[str, Any],
+) -> BackendBoardPlanApplyResult:
     _required_fields(
         payload,
         {"status", "existingAssignments", "newBoards"},

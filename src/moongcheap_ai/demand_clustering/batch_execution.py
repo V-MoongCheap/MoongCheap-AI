@@ -147,10 +147,12 @@ def execute_demand_clustering_batch(
     input_validator: ClusteringInputValidator | None = None,
     event_handler: BatchEventHandler | None = None,
 ) -> DemandClusteringBatchExecutionResult:
-    """Read current state, run API 1 once, refresh, then run API 2 once.
+    """Read state, finish API 1's bounded requests, refresh, then run API 2.
 
-    Failures stop this invocation. No request is persisted or retried: the next
-    scheduled invocation starts with a fresh PostgreSQL snapshot and replans.
+    Each poster aggregates its sequential requests before returning. Failures
+    stop this invocation; earlier Backend commits remain applied. No request
+    is persisted or retried: the next scheduled invocation starts with a fresh
+    PostgreSQL snapshot and replans.
 
     Demands sent to API 1 are never reconsidered for a substitute offer in
     the same invocation, even when Backend reports them as stale. Demands that

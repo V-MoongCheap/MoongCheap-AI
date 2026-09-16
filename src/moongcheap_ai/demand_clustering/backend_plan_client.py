@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -12,6 +12,7 @@ import requests
 from .backend_http import (
     aware_datetime as _aware_datetime,
     exact_fields as _exact_fields,
+    iter_plan_requests,
     nonnegative_int as _nonnegative_int,
     positive_int as _positive_int,
     post_plan_json,
@@ -20,6 +21,8 @@ from .backend_http import (
 
 PLAN_SCHEMA_VERSION = "substitute-offer-plan.v0.1"
 PLAN_ENDPOINT = "/api/demand-boards/internal/substitute-offer-plans"
+# Use the Backend team's announced limit, even if a deployed DTO permits more.
+MAX_SUBSTITUTE_PROPOSALS = 50
 
 PLAN_FIELDS = {
     "schemaVersion",
@@ -112,6 +115,15 @@ def build_substitute_offer_plan_request(
     return request
 
 
+def iter_substitute_offer_requests(
+    plan: Mapping[str, Any],
+) -> Iterator[dict[str, Any]]:
+    """Validate the whole logical plan, then emit bounded wire requests."""
+
+    validate_backend_plan_contract(plan)
+    yield from iter_plan_requests(plan, {"proposals": MAX_SUBSTITUTE_PROPOSALS})
+
+
 def post_substitute_board_admission_plan(
     backend_base_url: str,
     internal_key: str,
@@ -121,18 +133,41 @@ def post_substitute_board_admission_plan(
     timeout_seconds: int = 15,
     http_post: Callable[..., Any] = requests.post,
 ) -> BackendPlanApplyResult:
-    """Submit once and validate the Backend's state-based application counts."""
+    """Send bounded requests sequentially; validate and sum every response.
 
-    validate_backend_plan_contract(plan)
-    payload = post_plan_json(
-        backend_base_url,
-        internal_key,
-        plan,
-        endpoint=endpoint,
-        timeout_seconds=timeout_seconds,
-        http_post=http_post,
-        context="Backend clustering plan apply",
+    Failures stop subsequent requests without retry or rollback of earlier
+    Backend commits. The next scheduled batch reads current database state.
+    """
+
+    applied = 0
+    already_applied = 0
+    stale_rejected = 0
+    for request in iter_substitute_offer_requests(plan):
+        payload = post_plan_json(
+            backend_base_url,
+            internal_key,
+            request,
+            endpoint=endpoint,
+            timeout_seconds=timeout_seconds,
+            http_post=http_post,
+            context="Backend clustering plan apply",
+        )
+        result = _parse_substitute_offer_response(payload, request)
+        applied += result.applied_count
+        already_applied += result.already_applied_count
+        stale_rejected += result.stale_rejected_count
+    return BackendPlanApplyResult(
+        status="APPLIED",
+        applied_count=applied,
+        already_applied_count=already_applied,
+        stale_rejected_count=stale_rejected,
     )
+
+
+def _parse_substitute_offer_response(
+    payload: Mapping[str, Any],
+    plan: Mapping[str, Any],
+) -> BackendPlanApplyResult:
     _required_fields(
         payload,
         {

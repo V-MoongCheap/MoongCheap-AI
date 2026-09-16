@@ -132,10 +132,33 @@ uv run --project packaging/demand-clustering --no-sync demand-clustering-batch -
 `clientBoardKey`는 `new-board:1`처럼 한 요청 안에서 신규 보드 항목과 응답을
 연결하는 키일 뿐, 배치 식별자나 중복 처리 방지 키가 아니다.
 
+## Backend 요청 크기 제한
+
+Backend에서 전달한 요청당 object 개수 제한을 적용한다.
+
+- API 1 `/api/demand-boards/internal/formation-plans`:
+  `existingBoardAssignments`와 `newBoards` 각각 최대 50개
+- API 2 `/api/demand-boards/internal/substitute-offer-plans`:
+  `proposals` 최대 50개
+
+전체 계획을 먼저 검증한 뒤 각 배열을 독립적으로 잘라 순차 전송한다.
+보드 내부의 `demandIds`는 나누지 않으며, `plannedAt`, `ruleVersion`과
+원래 `clientBoardKey`를 유지한다. 제한 이하 또는 빈 계획은 기존처럼 한 번 전송한다.
+각 응답은 해당 요청과 대조하여 검증하고, 처리 건수와 신규 보드별 결과를 합산한다.
+API 1의 모든 요청이 완료된 후 PostgreSQL을 재조회하고 API 2를 실행한다.
+
+계획 생성·검증 함수는 분할 전 전체 계획을 다룬다. 위 JSON Schema의 `maxItems`는
+실제로 전송할 요청에 적용하며, 오프라인 `evaluation.backend_requests` 요청 묶음도
+동일하게 분할한다. 운영 합의로 제한을 변경할 때는 `backend_board_plan.py`의
+`MAX_EXISTING_BOARD_ASSIGNMENTS`·`MAX_NEW_BOARDS`, `backend_plan_client.py`의
+`MAX_SUBSTITUTE_PROPOSALS`와 대응하는 Schema의 `maxItems`를 함께 갱신한다.
+
 ## 실패 후 다음 배치 처리
 
-API는 한 번씩만 호출한다. 오류가 발생하면 해당 실행을 실패로 종료하며,
-이전 요청을 파일에 보존하거나 자동 재전송하지 않는다. 다음 정기 배치는
+분할한 요청은 각각 한 번씩만 호출한다. 중간 요청에서 오류가 발생하면 남은 요청을
+보내지 않고 해당 실행을 실패로 종료한다. 앞선 요청에서 Backend가 이미 반영한
+변경은 되돌리지 않으며, 이전 요청을 파일에 보존하거나 자동 재전송하지 않는다.
+다음 정기 배치는
 PostgreSQL의 최신 상태를 조회하여 유효한 `UNASSIGNED` 수요를 다시 계산한다.
 
 - API 1에서 실패하거나 응답을 확인하지 못하면 같은 실행에서 API 2를 호출하지 않는다.
