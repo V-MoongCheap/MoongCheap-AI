@@ -138,6 +138,38 @@ class BidGuideContractTest(unittest.TestCase):
         self.assertLess(result["metrics"]["supply_coverage_ratio"], 1.0)
         self.assertIn("SUPPLY_INSUFFICIENT", " ".join(result["calculation_evidence"]))
 
+    def test_supply_ratio_is_capped_but_evidence_keeps_raw_ratio(self):
+        result = handle_bid_guide(
+            valid_payload(total_demand_quantity=130, maximum_supply_quantity=150)
+        )
+        self.assertEqual(result["metrics"]["supply_coverage_ratio"], 1.0)
+        self.assertIn("약 1.15", result["calculation_evidence"][1])
+        self.assertIn("상한 1.0", result["calculation_evidence"][1])
+
+    def test_supply_ratio_at_exact_boundary_does_not_claim_cap(self):
+        result = handle_bid_guide(
+            valid_payload(total_demand_quantity=130, maximum_supply_quantity=130)
+        )
+        self.assertEqual(result["metrics"]["supply_coverage_ratio"], 1.0)
+        self.assertIn("1.00", result["calculation_evidence"][1])
+        self.assertNotIn("상한", result["calculation_evidence"][1])
+
+    def test_moq_ratio_is_not_capped(self):
+        result = handle_bid_guide(
+            valid_payload(minimum_success_quantity=100, total_demand_quantity=1000)
+        )
+        self.assertEqual(result["metrics"]["moq_attainment_ratio"], 10.0)
+
+    def test_supply_status_uses_raw_integer_comparison(self):
+        enough = handle_bid_guide(
+            valid_payload(total_demand_quantity=130, maximum_supply_quantity=150)
+        )
+        short = handle_bid_guide(
+            valid_payload(total_demand_quantity=130, maximum_supply_quantity=129)
+        )
+        self.assertIn("SUPPLY_SUFFICIENT", " ".join(enough["calculation_evidence"]))
+        self.assertIn("SUPPLY_INSUFFICIENT", " ".join(short["calculation_evidence"]))
+
     def test_individual_consumer_fields_are_refused_not_dropped(self):
         for field in ("member_ids", "individual_budget", "user_id", "requested_quantities"):
             with self.subTest(field=field):

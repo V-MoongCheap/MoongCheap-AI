@@ -23,7 +23,8 @@ Cluster 단위 집계와 판매자의 공급 조건을 받아 구조화 지표�
 *"판매자 분석 수치는 SQL/Python 집계에서 생성하고 LLM은 숫자를 계산하거나 변경하지 않는다"* 를 따른다.
 
 - `moq_attainment_ratio` = `total_demand_quantity / minimum_success_quantity`
-- `supply_coverage_ratio` = `maximum_supply_quantity / total_demand_quantity`
+- `supply_coverage_ratio` = `min(maximum_supply_quantity / total_demand_quantity, 1.0)`
+  공급 가능 수량이 총수요를 초과해도 응답 비율은 최대 `1.0`으로 제한하며, 초과 전 원본 비율과 상한 적용 사실은 `calculation_evidence`에 기록한다.
 - 상태는 비율에서 도출한다 — `ratio >= 1.0` 이면 충족
 - **상태 판정은 표시용 반올림 값이 아니라 원본 정수 비교로 한다.**
   `999 / 1000` 을 소수 둘째 자리에서 반올림하면 `1.00` 이 되어 미달 판정과 어긋난다

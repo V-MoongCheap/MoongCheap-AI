@@ -173,7 +173,8 @@ def build_bid_guide(request: BidGuideRequest) -> dict[str, Any]:
     # 총수요 / 최소 성사수량. 1.0 이상이면 성사 조건을 채운다.
     moq_attainment_ratio = _ratio(demand, moq, met=moq_met)
     # 판매자가 댈 수 있는 최대 수량 / 총수요. 1.0 이상이면 전량 공급 가능.
-    # ⚠️ 상한 1.0 적용 여부는 확정 대기다(명세서 8-3). 지금은 상한을 걸지 않는다.
+    # 공급 충족 여부는 원본 정수 비교로 판정하고, 응답 비율은 계약상 1.0으로 상한한다.
+    # 초과한 원본 비율은 calculation_evidence에 남겨 숫자 손실을 방지한다.
     raw_supply_coverage_ratio = _ratio(supply, demand, met=supply_met)
     supply_coverage_ratio = min(raw_supply_coverage_ratio, SUPPLY_COVERAGE_CAP)
 
