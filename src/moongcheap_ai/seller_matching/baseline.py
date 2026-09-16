@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 import math
+import re
 
 import pandas as pd
 
@@ -18,7 +18,8 @@ def _number(value: object, default: float = 0.0) -> float:
 
 def _text(value: object) -> str:
     """Missing scalar values are not category tokens."""
-    if value is None or pd.isna(value):
+    # ⛔ 목록 같은 값에 `pd.isna` 를 쓰면 원소별 배열이 나와 `if` 가 예외를 던진다.
+    if value is None or (pd.api.types.is_scalar(value) and pd.isna(value)):
         return ""
     return str(value).strip().casefold()
 

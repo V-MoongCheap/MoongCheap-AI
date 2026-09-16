@@ -99,6 +99,16 @@ def test_missing_label_and_category_are_not_matching_tokens() -> None:
         assert result.loc[0, "match_status"] == "REVIEW"
 
 
+def test_non_scalar_cell_does_not_crash_matching() -> None:
+    """목록 값이 칸에 들어와도 판정이 멈추지 않는다.
+
+    결측 판정에 `pd.isna` 를 쓰면 목록에서는 원소별 배열이 나와 `if` 가 예외를 던진다.
+    기존 기준선은 `str()` 로 감싸 멈추지 않았으므로 그 동작을 유지한다.
+    """
+    result = match_offers(_cluster(), _offer(category_leaf=["홍삼", "건강식품"]))
+    assert bool(result.loc[0, "category_match"]) is True
+
+
 def test_nonfinite_price_without_fallback_is_not_available() -> None:
     for value in (float("inf"), float("-inf"), float("nan")):
         result = match_offers(_cluster(), _offer(min_unit_price=value))
