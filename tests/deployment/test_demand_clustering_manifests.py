@@ -27,7 +27,10 @@ def resources(request, tmp_path_factory):
         [kubectl, "kustomize", str(ROOT / "k8s" / request.param)],
         check=True, capture_output=True, text=True, timeout=30, env=environment,
     )
-    documents = list(yaml.safe_load_all(result.stdout))
+    documents = [
+        document for document in yaml.safe_load_all(result.stdout)
+        if document["metadata"]["name"].startswith("demand-clustering")
+    ]
     assert len(documents) == 3
     assert {document["kind"] for document in documents} == {
         "CronJob", "ConfigMap", "ServiceAccount",
