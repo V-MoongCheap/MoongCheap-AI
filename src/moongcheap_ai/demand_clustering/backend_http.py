@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from datetime import datetime
 from typing import Any
 
@@ -53,6 +53,32 @@ def required_fields(
     missing = sorted(required - set(value))
     if missing:
         raise ValueError(f"{context} is missing required fields: " + ",".join(missing))
+
+
+def iter_plan_requests(
+    plan: Mapping[str, Any],
+    array_limits: Mapping[str, int],
+) -> Iterator[dict[str, Any]]:
+    """Slice validated plan arrays independently, preserving metadata and rows.
+
+    Limits count top-level objects, never the demand IDs inside a board.
+    An empty plan still yields one request, matching the existing API contract.
+    Callers must validate the entire plan before iterating to prevent partial
+    application of a plan containing invalid or duplicate rows in later slices.
+    """
+
+    request_count = 1
+    for field, limit in array_limits.items():
+        positive_int(limit, f"{field} request limit")
+        request_count = max(request_count, (len(plan[field]) + limit - 1) // limit)
+    for index in range(request_count):
+        yield {
+            **plan,
+            **{
+                field: plan[field][index * limit:(index + 1) * limit]
+                for field, limit in array_limits.items()
+            },
+        }
 
 
 def post_plan_json(

@@ -18,10 +18,12 @@
     "ruleVersion": {"type": "string", "minLength": 1, "maxLength": 200},
     "existingBoardAssignments": {
       "type": "array",
+      "maxItems": 50,
       "items": {"$ref": "#/$defs/existingBoardAssignment"}
     },
     "newBoards": {
       "type": "array",
+      "maxItems": 50,
       "items": {"$ref": "#/$defs/newBoard"}
     }
   },
