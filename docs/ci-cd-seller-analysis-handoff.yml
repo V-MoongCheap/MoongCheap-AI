@@ -1,0 +1,61 @@
+# Seller Demand Analysis API CI/CD Handoff (Part C)
+# 실제 Secret 값은 작성하지 않습니다.
+
+repository: https://github.com/V-MoongCheap/kdt-ai-2-team2-integrated
+branch: develop
+
+build_command: "pip install -r requirements-api.txt"
+test_command: "pytest tests/seller_analysis"
+ci_tools: [python3.13, pip]
+
+dockerfile_path: docker/Dockerfile.seller-analysis
+image_size: "220MB (linux/amd64)"
+container_image_name: ai-seller-analysis  # 네이밍 규약은 moongcheap/{service}. AI 배치 이미지와 리포지토리를 나눌지 확인 필요
+container_build_command: "docker build --platform linux/amd64 -f docker/Dockerfile.seller-analysis -t <repo>:develop-<git-short-sha> ."
+container_architecture: linux/amd64  # BE·AI Worker Node Group(t3.large) 기준
+
+application_port: 8081  # 인프라 설계서의 [AI API Port 확정 필요] 항목에 대한 AI 파트 제안값
+health_check_path: /health
+metrics_path: ""  # 메트릭 엔드포인트 없음
+
+environment_variables:
+  - name: SELLER_ANALYSIS_ALLOW_UNAUTHENTICATED
+    purpose: "인증 없이 기동할 때만 1. 운영에서는 설정하지 않음 (선택)"
+
+secret_variables:
+  - name: SELLER_ANALYSIS_INTERNAL_KEY
+    purpose: "Backend → AI 내부 호출 인증 키. 요청 헤더 X-Internal-Key 와 비교"
+    injection: "환경 변수 주입 (2026-09-16 인프라 확인). 값의 공급 경로와 Kubernetes Secret 구성은 배포 환경 소관"
+    secret_name: ai-seller-analysis-internal-key  # {service}-{용도}-secret 규약 기준 제안값, 실제 이름은 인프라 확정
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+  gpu: false
+  status: "초기 제안값. 컨테이너 실측 79 MiB(arm64 호스트의 amd64 에뮬레이션), 로컬 실행 RSS 44.6 MiB. 동시성 기준 측정 아님"
+
+runtime_filesystem:
+  read_only_root: true
+  run_as_user: 65534
+  run_as_group: 65534
+  writable_paths: []   # 파일을 쓰지 않음
+  read_only_mounts: [] # 모델·아티팩트 마운트 없음
+
+external_dependencies:
+  - "없음 — DB·모델·외부 API 를 호출하지 않는다. Backend 가 요청 본문으로 준 값만 계산한다"
+
+notes: >-
+  판매자 수요 분석 API 는 상주 서버이며 Part A/B 배치와 다른 이미지다.
+  SELLER_ANALYSIS_INTERNAL_KEY 없이는 기동하지 않는다. 인증이 빠진 채 떠 있으면
+  헬스체크와 정상 응답이 모두 통과해 조용히 고장 나기 때문이다.
+  Parameter Store 조회 권한과 Kubernetes Secret 동기화는 배포 환경이 담당하며
+  앱은 AWS API 를 직접 호출하지 않는다.
+  이미지 push, GitOps 갱신, ArgoCD/EKS 연결, 노드 label·nodeSelector 설정은 인프라 측 작업이다.
+  앱은 인증 키를 환경 변수 하나로만 받는다.
+  2026-09-16 빌드·기동을 검증했다: 이미지 220MB, read-only 루트와 비루트(65534) 실행,
+  헬스체크 200, 인증 없음·잘못된 키 403, 개인정보 필드 400, 키 없이 기동 시 실패.
+  기능 존폐가 PM 결정 대기이므로 배포 대상 포함 여부는 별도 확인이 필요하다.

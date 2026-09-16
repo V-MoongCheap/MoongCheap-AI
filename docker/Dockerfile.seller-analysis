@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+# 판매자 수요 분석 내부 API. 계산 계층은 표준 라이브러리만 쓰고, 이 이미지는 HTTP 진입
+# 계층(`moongcheap_ai.seller_analysis.api`)을 띄운다. 배치(Part A/B)와는 별도 이미지다.
+FROM python:3.13.12-slim-trixie AS builder
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+WORKDIR /build
+
+# 서버 의존성은 requirements-api.txt 하나로 고정돼 있다. 계산·계약 검증은 표준 라이브러리다.
+COPY requirements-api.txt ./
+RUN python -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir -r requirements-api.txt
+
+FROM python:3.13.12-slim-trixie AS runtime
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SELLER_ANALYSIS_PORT=8081
+
+WORKDIR /app
+COPY --from=builder /opt/venv /opt/venv
+# api.py 는 저장소 루트 기준으로 docs/contracts 를 읽어 OpenAPI 를 만든다
+# (REPO_ROOT = src/moongcheap_ai/seller_analysis 에서 세 단계 위). 같은 배치를 유지한다.
+COPY src ./src
+COPY docs/contracts ./docs/contracts
+
+USER 65534:65534
+EXPOSE 8081
+
+# ⛔ SELLER_ANALYSIS_INTERNAL_KEY 없이는 기동하지 않는다. 인증이 빠진 채 떠 있으면
+#    헬스체크와 정상 응답이 모두 통과해 조용히 고장 난다.
+ENTRYPOINT ["python", "-m", "uvicorn", "moongcheap_ai.seller_analysis.api:create_app", \
+            "--factory", "--app-dir", "/app/src", "--host", "0.0.0.0", "--port", "8081"]
