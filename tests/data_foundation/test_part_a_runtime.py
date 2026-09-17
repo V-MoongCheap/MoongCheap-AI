@@ -29,12 +29,13 @@ def test_part_a_returns_backend_contract_without_clustering(tmp_path):
     taxonomy, rules, aliases = _fixtures(tmp_path)
     demands = pd.DataFrame([
         {"demand_id": "1", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "\uac00\ub2a5\ud558\uba74 \ucea1\uc290\uc778 \uc81c\ud488\uc73c\ub85c \ubd80\ud0c1\ud574\uc694.", "is_substitutable": "true"},
-        {"demand_id": "2", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "", "is_substitutable": "false"},
+        {"demand_id": "2", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "분말", "is_substitutable": "false"},
         {"demand_id": "3", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "\ub538\uae30\ub9db \uc81c\ud488\uc774\uba74 \uc88b\uaca0\uc5b4\uc694.", "is_substitutable": "true"},
         {"demand_id": "4", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "\ubd84\ub9d0 \ub610\ub294 \ucea1\uc290\ub3c4 \uad1c\ucc2e\uc544\uc694.", "is_substitutable": "true"},
     ])
     result, summary = run_part_a_batch(demands, taxonomy, rules, aliases)
-    assert list(result["status"]) == ["PARSED", "NOT_APPLICABLE", "PASSTHROUGH", "PARSED"]
+    assert list(result["status"]) == ["PARSED", "PARSED", "PASSTHROUGH", "PARSED"]
+    assert json.loads(result.loc[1, "constraints"])[0]["valueCode"] == 2
     constraints = json.loads(result.loc[0, "constraints"])
     assert constraints[0]["facetKey"] == "product_form"
     assert constraints[0]["valueCode"] == 1

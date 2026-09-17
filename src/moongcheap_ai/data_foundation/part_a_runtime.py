@@ -194,10 +194,15 @@ def run_part_a_batch(
                 rows.append(row)
                 continue
             requirement = str(raw.get("extra_requirement", "") or "").strip()
+            # Labeling is required for the original-catalog clustering path as
+            # well.  ``is_substitutable`` gates B's cross-catalog substitute
+            # path; it must not discard the demand's own Facet requirement.
+            # Keep the validated consent value in the handoff row, but parse
+            # the requirement independently of that routing decision.
             result = parser.interpret(
                 category_id,
                 requirement,
-                is_substitutable=is_substitutable,
+                is_substitutable=True,
             ).to_dict()
             status = str(result["status"])
             if status not in STATUSES:
