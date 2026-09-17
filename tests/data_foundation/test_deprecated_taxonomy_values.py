@@ -38,3 +38,17 @@ def test_deprecated_vitamin_d_code_is_not_used_for_new_product_mapping() -> None
     assert row["mapping_status"] == "MAPPED"
     assert int(row["value_code"]) == 2
     assert row["value"] == "비타민 D"
+
+
+def test_product_display_values_resolve_to_ingredient_canonical_values() -> None:
+    taxonomy = json.loads((ROOT / "config/facet_taxonomy_v2_2.json").read_text(encoding="utf-8"))
+    loader = TaxonomyLoader(taxonomy)
+
+    for category_id, text, expected_code, expected_value in (
+        ("health-functional-food:red_ginseng", "홍삼제품", 1, "홍삼"),
+        ("health-functional-food:probiotics", "프로바이오틱스 제품", 1, "프로바이오틱스"),
+    ):
+        values, warnings = loader.resolve(category_id, text)
+        assert not warnings
+        assert values["functional_ingredients"]["code"] == expected_code
+        assert values["functional_ingredients"]["value"] == expected_value
