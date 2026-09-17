@@ -10,3 +10,10 @@ configMapGenerator:
     literals:
       - A_ALIAS_REGISTRY_PATH=/app/config/model1_aliases_reviewed_v2.json
       - A_BACKEND_HTTP_TIMEOUT_SECONDS=15
+      # Deterministic Rule/Alias labeling is the safe default. Enable the
+      # optional Qwen fallback only after an Ollama service is provisioned.
+      - A_MODEL2_FALLBACK_ENABLED=false
+      - A_MODEL2_FALLBACK_MODEL=qwen2.5:7b-instruct
+      - A_MODEL2_OLLAMA_BASE_URL=http://ollama:11434
+      - A_MODEL2_FALLBACK_TIMEOUT_SECONDS=300
+      - A_MODEL2_FALLBACK_BATCH_SIZE=5

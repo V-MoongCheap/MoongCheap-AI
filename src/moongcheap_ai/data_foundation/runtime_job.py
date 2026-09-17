@@ -15,7 +15,9 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from .backend_contract import build_label_result_payload, post_label_results
+from .demand_label_comparison import LLMLabelingError, OllamaDemandLabeler, _apply_model_result
 from .labeling import (
+    TaxonomyLoader,
     taxonomy_from_category_facet_rows,
 )
 from .part_a_runtime import run_part_a_batch
@@ -40,6 +42,11 @@ def run_batch(
     rules_path: Path = Path("config/demand_constraint_rules.json"),
     compatibility_alias_registry_path: Path | None = None,
     processed_at: str | None = None,
+    model2_fallback_enabled: bool = False,
+    model2_fallback_model: str = "qwen2.5:7b-instruct",
+    model2_fallback_endpoint: str = "http://localhost:11434",
+    model2_fallback_timeout: int = 300,
+    model2_fallback_batch_size: int = 5,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     timestamp = processed_at or datetime.now(UTC).isoformat()
     if demands.empty:
@@ -74,7 +81,128 @@ def run_batch(
         "NOT_APPLICABLE": "LABELED",
     }).fillna("REVIEW")
     labeled["label_warnings"] = labeled["reasonCodes"]
+    fallback_summary = {"enabled": model2_fallback_enabled, "calls": 0, "accepted": 0, "review": 0}
+    if model2_fallback_enabled and not labeled.empty:
+        resolved_taxonomy = taxonomy_payload
+        if resolved_taxonomy is None:
+            resolved_taxonomy = TaxonomyLoader.from_path(taxonomy_path).taxonomy
+        labeled, fallback_summary = _apply_model2_fallback(
+            labeled,
+            TaxonomyLoader(dict(resolved_taxonomy)),
+            model=model2_fallback_model,
+            endpoint=model2_fallback_endpoint,
+            timeout=model2_fallback_timeout,
+            batch_size=model2_fallback_batch_size,
+        )
+    labeled.attrs["model2_fallback"] = fallback_summary
     return labeled, build_label_result_payload(labeled, processed_at=timestamp)
+
+
+def _apply_model2_fallback(
+    labeled: pd.DataFrame,
+    loader: TaxonomyLoader,
+    *,
+    model: str,
+    endpoint: str,
+    timeout: int,
+    batch_size: int,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Resolve only unresolved positive requirements with an optional Qwen call.
+
+    The fallback never replaces a parsed rule result, never resolves explicit
+    conflicts/exclusions, and never accepts a response that cannot be mapped
+    entirely into the current taxonomy.  Ollama is deliberately optional so
+    the normal CronJob remains deterministic when the model service is absent.
+    """
+    if batch_size <= 0:
+        raise ValueError("model2_fallback_batch_size must be positive")
+    result = labeled.copy()
+    for column in ("fallback_status", "fallback_model", "fallback_warning"):
+        result[column] = ""
+    extra_requirement = result.get("extra_requirement", pd.Series("", index=result.index))
+    candidate_mask = (
+        result["status"].isin({"PASSTHROUGH", "TAXONOMY_AMBIGUOUS", "REVIEW"})
+        & extra_requirement.fillna("").astype(str).str.strip().ne("")
+        & ~result["effectiveRequirementMode"].astype(str).str.upper().isin({"EXCLUDE", "CONFLICT"})
+    )
+    candidates = result[candidate_mask]
+    summary = {"enabled": True, "calls": 0, "accepted": 0, "review": int(len(candidates))}
+    if candidates.empty:
+        return result, summary
+    labeler = OllamaDemandLabeler(model, endpoint=endpoint, timeout=timeout)
+    for start in range(0, len(candidates), batch_size):
+        batch = candidates.iloc[start:start + batch_size]
+        rows = [
+            {
+                "demand_id": str(row["demand_id"]),
+                "category_id": str(row["category_id"]),
+                "extra_requirement": str(row.get("extra_requirement", "")),
+                "product_defaults": {},
+            }
+            for _, row in batch.iterrows()
+        ]
+        try:
+            model_values = labeler.classify(rows, loader)
+            error = ""
+        except LLMLabelingError as exc:
+            model_values = {}
+            error = str(exc)
+        summary["calls"] = int(labeler.call_count)
+        for index, row in batch.iterrows():
+            demand_id = str(row["demand_id"])
+            if error:
+                result.at[index, "fallback_status"] = "UNAVAILABLE"
+                result.at[index, "fallback_warning"] = error[:500]
+                continue
+            values = model_values.get(demand_id)
+            if values is None:
+                result.at[index, "fallback_status"] = "REVIEW"
+                result.at[index, "fallback_warning"] = "MODEL_RESULT_MISSING"
+                continue
+            mapped, warnings = _apply_model_result(row, values, loader, [])
+            non_all = [item for item in mapped.values() if int(item.get("code", 0)) != 0]
+            if warnings or not non_all:
+                result.at[index, "fallback_status"] = "REVIEW"
+                result.at[index, "fallback_warning"] = ";".join(warnings) or "MODEL_RESULT_NOT_INFORMATIVE"
+                continue
+            constraints = []
+            category = loader.category(str(row["category_id"])) or {}
+            facets = {str(item["name"]): item for item in category.get("facets", [])}
+            for facet_name, value in mapped.items():
+                if int(value.get("code", 0)) == 0:
+                    continue
+                facet = facets.get(facet_name)
+                if facet is None:
+                    continue
+                constraints.append({
+                    "facetKey": facet_name,
+                    "canonicalValue": str(value.get("value", "")),
+                    "facetCode": int(facet.get("facet_id", 0)),
+                    "valueCode": int(value["code"]),
+                    "constraintType": "PREFER",
+                    "evidence": str(row.get("extra_requirement", "")),
+                })
+            if not constraints:
+                result.at[index, "fallback_status"] = "REVIEW"
+                result.at[index, "fallback_warning"] = "MODEL_RESULT_NO_TYPED_CONSTRAINT"
+                continue
+            result.at[index, "constraints"] = json.dumps(constraints, ensure_ascii=False, separators=(",", ":"))
+            result.at[index, "facet_values"] = json.dumps(mapped, ensure_ascii=False, separators=(",", ":"))
+            result.at[index, "label"] = loader.encode(mapped)
+            result.at[index, "status"] = "PARSED"
+            result.at[index, "label_status"] = "LABELED"
+            result.at[index, "effectiveRequirementMode"] = "STRUCTURED"
+            result.at[index, "interpretation_method"] = "RULE_FIRST_QWEN_FALLBACK"
+            result.at[index, "fallback_status"] = "ACCEPTED"
+            result.at[index, "fallback_model"] = model
+            result.at[index, "fallback_warning"] = ""
+            reason_codes = json.loads(str(result.at[index, "reasonCodes"]) or "[]")
+            reason_codes.append("QWEN_FALLBACK_ACCEPTED")
+            result.at[index, "reasonCodes"] = json.dumps(reason_codes, ensure_ascii=False, separators=(",", ":"))
+            result.at[index, "label_warnings"] = result.at[index, "reasonCodes"]
+            summary["accepted"] += 1
+            summary["review"] -= 1
+    return result, summary
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -138,6 +266,11 @@ def main(argv: list[str] | None = None) -> int:
             alias_registry_path=primary_alias_registry,
             rules_path=args.rules or Path(source.get("A_RULES_PATH", "config/demand_constraint_rules.json")),
             compatibility_alias_registry_path=compatibility_alias_registry,
+            model2_fallback_enabled=source.get("A_MODEL2_FALLBACK_ENABLED", "false").strip().lower() in {"1", "true", "yes"},
+            model2_fallback_model=source.get("A_MODEL2_FALLBACK_MODEL", "qwen2.5:7b-instruct"),
+            model2_fallback_endpoint=source.get("A_MODEL2_OLLAMA_BASE_URL", "http://localhost:11434"),
+            model2_fallback_timeout=int(source.get("A_MODEL2_FALLBACK_TIMEOUT_SECONDS", "300")),
+            model2_fallback_batch_size=int(source.get("A_MODEL2_FALLBACK_BATCH_SIZE", "5")),
         )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         labeled.to_csv(args.output, index=False, encoding="utf-8-sig")
@@ -160,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             response = {"status": "DRY_RUN"}
-        print(json.dumps({"status": "COMPLETED", "rows": len(labeled), "output": str(args.output), "backend": response}, ensure_ascii=False))
+        print(json.dumps({"status": "COMPLETED", "rows": len(labeled), "output": str(args.output), "model2Fallback": labeled.attrs.get("model2_fallback", {}), "backend": response}, ensure_ascii=False))
         return 0
     except (ValueError, RuntimeError, OSError) as error:
         print(json.dumps({"status": "FAILED", "error": str(error)}, ensure_ascii=False), file=sys.stderr)

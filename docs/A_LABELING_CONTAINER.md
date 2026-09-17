@@ -23,6 +23,27 @@ docker build \
 
 Runtime entrypoint는 `a-labeling-batch --write-db --output /tmp/a-labeling-output.csv`다. 이미지에는 Raw data, `.env`, DB Secret, 모델 가중치를 포함하지 않는다. `/tmp`는 컨테이너의 유일한 쓰기 경로다.
 
+## Model 2 fallback
+
+기본 실행은 결정론적인 Rule/Alias 경로다. 운영에서 Qwen fallback을 사용하려면
+별도의 Ollama 서비스가 먼저 준비되어야 하며, 다음 환경변수를 ConfigMap 또는
+Secret 정책에 맞게 주입한다.
+
+```text
+A_MODEL2_FALLBACK_ENABLED=true
+A_MODEL2_FALLBACK_MODEL=qwen2.5:7b-instruct
+A_MODEL2_OLLAMA_BASE_URL=http://ollama:11434
+A_MODEL2_FALLBACK_TIMEOUT_SECONDS=300
+A_MODEL2_FALLBACK_BATCH_SIZE=5
+```
+
+fallback은 Rule 결과를 대체하지 않고 `PASSTHROUGH`, `TAXONOMY_AMBIGUOUS`,
+또는 명시적 제외/충돌이 아닌 `REVIEW`만 대상으로 한다. 응답이 현재 Taxonomy의
+Facet/Value로 완전히 검증되고 typed constraint를 만들 수 있을 때만 `PARSED`로
+승격한다. 호출 실패, 누락 결과, Taxonomy 밖 값, 정보가 없는 결과는 기존 결과를
+유지하고 `REVIEW`로 남긴다. 따라서 Ollama가 없는 환경에서도 기본 CronJob은
+정상적으로 Rule-only로 동작한다.
+
 ## CI/CD handoff
 
 ```yaml

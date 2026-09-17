@@ -1,135 +1,52 @@
 # Model 1 / Model 2 비교 및 MVP 선택 결과 V1
 
-## 1. 문서 목적
+## 1. 결론
 
-Model 1과 Model 2 후보를 비교한 결과와 현재 MVP의 실행 구성을 기록한다.
-여기서 말하는 **MVP 선택**은 지금 배포할 구성의 결정이다. 실제 사용자 수요로
-사람이 확정한 Gold Set이 아직 없으므로, 어떤 LLM이 일반적으로 더 정확한지를
-최종 확정한 연구 결론은 아니다.
+현재 MVP에서 사용할 방식은 다음과 같이 확정한다. 이 결정은 프로젝트용 합성·검토 데이터와 제한된 로컬 실행 결과에 근거한 구현 결정이며, 실제 운영 사용자에 대한 일반화 성능을 보증하는 최종 연구 결론은 아니다.
 
-## 2. 현재 MVP 결정
-
-| 대상 | MVP 결정 | 근거 |
+| 대상 | MVP 적용 방식 | 역할 |
 | --- | --- | --- |
-| Model 1 Facet Discovery | Rule/통계 기반 후보 + Evidence Gate + Human Review | 상품 근거 없는 LLM 후보를 자동 Taxonomy에 넣지 않기 위함 |
-| Model 2 Demand Labeling | 최신 Part A Rule/Alias Runtime | 제한 평가에서 구조화 요구 53건 중 typed constraint 52건 일치, 전체 상태 79/80건 일치 |
-| Qwen 2.5 7B | 배포·자동 fallback 제외 | 같은 80건에서 요구 코드 충족 33/53, Taxonomy 검증 경고 3건, 약 168초 |
-| Embedding | B/C에서 별도 선택 | Demand Labeling과 역할·평가셋이 다름 |
-| Seller Demand Analysis 생성 | SQL/Python 집계 + Template 우선 | 수치·사실을 모델이 생성하지 않도록 하기 위함 |
+| Model 1 Facet Discovery | Rule/통계 근거 + Kanana 보조 후보 + Evidence Gate + Human Review | 상품 근거가 있는 Facet 후보를 만들고 사람이 Taxonomy를 확정 |
+| Model 2 Demand Labeling | Rule-first Hybrid + Qwen 2.5 7B fallback | 명확한 요청은 Rule/Alias로 처리하고 미해결 양성 요청만 Qwen에 위임 |
+| Model 2 Model-only | 사용하지 않음 | Taxonomy 밖 값·누락·오판 위험이 Rule-only보다 큼 |
+| Embedding | Model 2에는 사용하지 않음 | B/C의 Cluster·Seller Matching에서 별도 평가 |
+| Seller Demand Analysis | SQL/Python 집계 + Template 우선 | 숫자와 사실은 코드가 계산 |
 
-현재 배포 구조는 다음과 같다.
+운영 흐름은 다음과 같다.
 
 ```text
-Model 1 = Rule/통계 근거 → Evidence Gate → Human Review → Taxonomy
-Model 2 = Rule/Alias Part A Runtime → PARSED/NONE/NOT_APPLICABLE은 라벨 저장, 모호·충돌은 Review
-LLM     = 실험·검토 보조만 허용, 자동 Label/Taxonomy 확정에는 사용하지 않음
+Model 1: Rule/통계 → Kanana 후보 보조 → Evidence 검증 → Human Review → Taxonomy
+Model 2: Rule/Alias → 명확하면 즉시 Label
+                  → 미해결 양성 요청만 Qwen 2.5 7B
+                  → Taxonomy/typed constraint 검증
+                  → 실패·충돌·근거 부족은 REVIEW
 ```
 
-`키토산 또는 키토올리고당을 피하고 싶어요`처럼 결합값 전체 제외인지 각 성분
-개별 제외인지 불명확한 사례는 자동 Label하지 않고 `REVIEW`로 남긴다.
+Qwen fallback은 `A_MODEL2_FALLBACK_ENABLED=false`가 기본값이다. Ollama가 준비된 환경에서만 명시적으로 켜며, 기본 CronJob은 모델 없이도 결정론적인 Rule 경로로 동작한다. 실제 연결 코드는 `runtime_job.py`에 있고, 실패한 모델 응답은 DB로 전송하지 않는다.
 
-## 3. Model 1: Facet Discovery
+## 2. 선택 근거
 
-### 3.1 비교 결과
+동일한 200건 비교에서 Rule-only는 138/200(69%), Qwen model-only는 118/200(59%), Rule-first Hybrid는 142/200(71%)이었다. 따라서 Model-only는 제외하고, Rule의 안전한 Taxonomy 제한을 유지하면서 Rule이 처리하지 못한 일부를 보완하는 Hybrid를 선택했다. 별도의 80건 최신 실행은 Qwen model-only만 검증한 결과이므로 Hybrid를 반박하는 수치로 해석하지 않는다. Ollama가 없는 환경에서는 최신 Hybrid 재실행을 성공으로 기록하지 않는다.
 
-Kanana(`kakaocorp/kanana-nano-2.1b-instruct`)로 16개 Category, 210개
-Product/Demand 관련 행을 실험했다.
+### Model 1
 
-| 항목 | 결과 |
-| --- | ---: |
-| 원시 LLM 후보 행 | 105 |
-| 실패 행 | 20 |
-| Rule 후보 | 246 |
-| Hybrid 후보 | 256 |
-| Rule 근거로 자동 승격된 Model 후보 | 0 |
-| Model-only 검토 후보 | 10 |
+`kakaocorp/kanana-nano-2.1b-instruct`는 16개 Category, 210개 입력에서 후보를 생성하는 보조 모델로 평가했다. 원시 후보 105건, 실패 20건이 있었고 Rule 근거로 자동 승격된 후보는 0건이었다. 따라서 Kanana는 Facet을 결정하는 모델이 아니라 검토 후보를 넓히는 모델로 확정한다. 최종 Taxonomy는 상품 원문·반복 통계·Evidence 검증과 Human Review 없이 만들어지지 않는다.
 
-실패에는 JSON 형식 오류, 입력에 없는 Evidence ID, 미정의 Facet ID가 포함됐다.
-따라서 LLM 후보는 사람이 검토할 후보를 넓히는 데만 쓰며, Rule/통계 근거가 없는
-항목은 Taxonomy에 자동 반영하지 않는다.
+### Model 2
 
-### 3.2 현재 데이터 반영
+Qwen 2.5 7B는 전체 Model-only 품질이 아니라 fallback 개선폭과 재현 가능한 Ollama 실행을 기준으로 채택했다. fallback은 명시적 제외·충돌을 임의로 긍정 조건으로 바꾸지 않으며, 현재 Taxonomy에 완전히 매핑되고 typed constraint를 만들 수 있을 때만 Label을 갱신한다. 그 외에는 `REVIEW`로 남긴다.
 
-- `config/facet_taxonomy_v2_2.json`은 현재 승인된 런타임 Taxonomy다.
-- 상품 Facet mapping 검토 결과 중 Taxonomy 코드와 값이 모두 검증된 `EDIT` 44건만
-  적용할 수 있다.
-- `UNCERTAIN` 310건은 여러 값이 같은 상품 근거에서 관측된 경우라 추측으로 한 값을
-  고르지 않고 보류한다.
+## 3. 현재 산출물 및 검증 상태
 
-## 4. Model 2: Demand Labeling
+- 최신 Part A runtime v2.2.6: 5,000건, `PARSED 3,200`, `NONE 1,000`, `PASSTHROUGH 500`, `CONFLICT 250`, `TAXONOMY_AMBIGUOUS 50`
+- B 전달용 clustering input: 5,000건, `LABELED 4,200`, `LABELED_WITH_REVIEW 800`
+- 상품 Facet mapping 최신 로컬 결과: 2,778 catalog, `MAPPED 1,934`, `UNKNOWN 5,804`, `AMBIGUOUS 269` mapping rows
+- 150건 Gold 검토 결과는 사람 최종 승인 전 후보 데이터다. `READY_FOR_HUMAN_SIGNOFF` 85건과 `EXCLUDED` 65건을 Gold 확정으로 혼동하지 않는다.
 
-### 4.1 배포 판단에 사용한 최신 비교
+## 4. 남은 검증
 
-최신 Taxonomy v2.2 및 Part A Runtime으로 AI 검토를 거쳐 평가에 채택한 80건을
-재실행했다. 이 데이터는 사람 Gold가 아니므로 일반화 정확도로 해석하지 않는다.
-
-| 방식 | 결과 | 배포 판단 |
-| --- | --- | --- |
-| Rule/Alias Runtime | 구조화 요구 53건 중 typed constraint 52건, 전체 상태 79/80건 일치 | MVP 기본 |
-| Qwen 2.5 7B model-only | 요구 코드 충족 33/53, 3건 경고, 19회 호출 약 168초 | 제외 |
-
-Rule 결과가 모호하거나 충돌하면 LLM으로 덮어쓰지 않는다. `PASSTHROUGH`,
-`CONFLICT`, `REVIEW`, `TAXONOMY_AMBIGUOUS`는 Review 상태로 보존한다.
-
-85개 Gold 후보를 현재 Runtime으로 다시 실행한 회귀 확인에서는 82건이 수정 기대
-조건과 구조적으로 일치했다. 나머지 3건은 2개의 같은 Facet 충돌과 1개의
-대안형 제외 범위 사례로, 자동 Label 대신 각각 `CONFLICT` 또는 `REVIEW`가 나온
-의도된 보수 처리다.
-
-### 4.2 과거 실험의 해석
-
-Qwen, Llama, EXAONE, Phi 계열의 100/200건 smoke·비교는 모델의 형식 준수,
-실행 시간, 실패 형태를 파악한 탐색 실험이다. 당시 일부 Qwen Hybrid 수치가
-Rule-only보다 높았더라도, 제품 기본 Facet 맥락과 부정 조건을 충분히 검증하지
-못했고 최신 80건 재평가에서도 Rule Runtime보다 낮았다.
-
-따라서 과거의 “Qwen fallback 후보” 표현은 현재 결론이 아니며, Qwen을 자동
-fallback이나 운영 의존성으로 추가하지 않는다.
-
-## 5. 평가 데이터 상태와 최종 확정 조건
-
-현재 `model2_gold_v1`에는 150건의 검토 resolution이 있다.
-
-| 구분 | 건수 | 현재 의미 |
-| --- | ---: | --- |
-| `READY_FOR_HUMAN_SIGNOFF` | 85 | AI 검토·검증을 통과한 Gold 후보. 사람 최종 승인은 아직 아님 |
-| `EXCLUDED` | 65 | 근거·시나리오·카테고리 문제가 있어 Gold에서 제외 |
-
-Model 2의 최종 비교를 확정하려면 85건에서 사람이 승인한 행만 Gold로 표시하고,
-정책 보류 사례를 해결해야 한다. 같은 확정 Gold로 다음 세 방식을 재측정한다.
-
-```text
-Rule-only
-Rule-first Hybrid
-Model-only (비교용, 배포 후보 아님)
-```
-
-## 6. 재현 가능한 실행 경로
-
-### Model 1 검토 반영
-
-```bash
-PYTHONPATH=src python scripts/data/apply_product_facet_review.py \
-  --mapping data/processed/model2_catalog_v0/product_facet_mapping_v0.csv \
-  --review /path/to/product_facet_mapping_review_queue_reviewed_high.csv \
-  --taxonomy config/facet_taxonomy_v2_2.json \
-  --output data/processed/model2_catalog_v0/product_facet_mapping_v0_reviewed.csv \
-  --report data/reports/product_facet_mapping_review_apply_v1.json
-```
-
-### Model 2 비교
-
-동일한 사람 확정 Gold 입력, Taxonomy와 Runtime 결과를 준비한 뒤
-`scripts/evaluation/compare_demand_labeling_models.py`로 비교한다. 모델 가중치나
-Ollama 실행 환경이 없으면 성공으로 기록하지 않고 `NOT_RUN` 또는
-`BLOCKED_NO_EXECUTABLE_MODEL`로 기록한다.
-
-## 7. 남은 작업
-
-1. 85개 Gold 후보를 사람 기준으로 최종 승인·수정·제외한다.
-2. 확정 Gold로 Model 2 비교 결과를 다시 기록한다.
-3. Model 1의 `UNCERTAIN` mapping은 상품 원문 근거로 재검토하되, 근거가 없으면
-   보류를 유지한다.
-4. Backend 실제 Catalog/Category ID로 교체한 뒤 A DB write를 검증한다.
-5. B의 실제 Cluster 결과와 C Seller Offer를 결합해 E2E를 검증한다.
-6. 인프라 환경에서 Docker, CronJob, DB Secret 주입, CI/CD를 검증한다.
+1. 사람이 85개 Gold 후보의 최종 승인·수정·제외를 확정한다.
+2. 확정 Gold와 실제 상품 Facet mapping을 사용해 Rule-only, Hybrid, Model-only를 같은 입력으로 재측정한다.
+3. Ollama/Qwen이 준비된 환경에서 fallback 호출·timeout·재처리·DB 멱등성을 검증한다.
+4. Backend 실제 Catalog/Category ID와 DB Secret을 받은 뒤 write 경로를 검증한다.
+5. B의 실제 Cluster와 C의 Seller Offer를 결합해 전체 E2E를 검증한다.
