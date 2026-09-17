@@ -71,6 +71,11 @@ Product/Demand 관련 행을 실험했다.
 Rule 결과가 모호하거나 충돌하면 LLM으로 덮어쓰지 않는다. `PASSTHROUGH`,
 `CONFLICT`, `REVIEW`, `TAXONOMY_AMBIGUOUS`는 Review 상태로 보존한다.
 
+85개 Gold 후보를 현재 Runtime으로 다시 실행한 회귀 확인에서는 82건이 수정 기대
+조건과 구조적으로 일치했다. 나머지 3건은 2개의 같은 Facet 충돌과 1개의
+대안형 제외 범위 사례로, 자동 Label 대신 각각 `CONFLICT` 또는 `REVIEW`가 나온
+의도된 보수 처리다.
+
 ### 4.2 과거 실험의 해석
 
 Qwen, Llama, EXAONE, Phi 계열의 100/200건 smoke·비교는 모델의 형식 준수,
