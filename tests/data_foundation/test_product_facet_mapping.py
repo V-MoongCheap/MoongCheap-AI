@@ -44,6 +44,28 @@ def test_category_text_does_not_create_a_product_form_fact():
     assert form.mapping_status == "UNKNOWN"
 
 
+def test_ambiguous_mapping_keeps_per_value_source_fields_for_review():
+    local_taxonomy = taxonomy()
+    local_taxonomy["health-functional-food:probiotics"]["facets"][0]["values"].append(
+        {"code": 2, "value": "캡슐"}
+    )
+    catalog = pd.DataFrame([{
+        "catalog_id": "c3", "source_product_id": "p3", "category_id": "health-functional-food:probiotics",
+        "name": "유산균 분말", "title": "", "package_spec": "캡슐 30정", "keywords_json": "",
+        "source_document_id": "p3", "source": "DOMEGGOOK", "license_status": "LOCAL_ONLY",
+    }])
+
+    result = build_product_mapping(catalog, local_taxonomy)
+
+    form = result[result.facet_name == "product_form"].iloc[0]
+    evidence = json.loads(form.candidate_evidence)
+    assert form.mapping_status == "AMBIGUOUS"
+    assert evidence == [
+        {"value_code": 1, "value": "분말", "matched_terms": ["분말"], "source_fields": ["name"]},
+        {"value_code": 2, "value": "캡슐", "matched_terms": ["캡슐"], "source_fields": ["package_spec"]},
+    ]
+
+
 def test_mfds_evidence_uses_category_crosswalk_and_document_ratio():
     mfds = pd.DataFrame([
         {"source_product_id": "m1", "raw_category_name": "프로바이오틱스", "product_form": "분말", "product_type": "", "functional_ingredients": "프로바이오틱스"},

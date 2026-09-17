@@ -177,7 +177,7 @@ def build_product_mapping(catalog: pd.DataFrame, taxonomy: dict[str, dict[str, A
         text_parts = [(column, _text(product.get(column))) for column in text_columns]
         combined = _norm(" ".join(value for _, value in text_parts))
         for facet_name in ("product_form", "functional_ingredients", "daily_frequency"):
-            candidates = []
+            candidates: list[tuple[dict[str, Any], list[str], list[str]]] = []
             for value in _facet_values(category, facet_name):
                 aliases = [_text(alias) for alias in value.get("aliases", [])]
                 terms = [_text(value.get("value")), *aliases]
@@ -186,13 +186,33 @@ def build_product_mapping(catalog: pd.DataFrame, taxonomy: dict[str, dict[str, A
                 terms = [term for term in terms if _norm(term) not in GENERIC_FACET_VALUES and len(_norm(term)) > 1]
                 hits = [term for term in terms if term and _norm(term) in combined]
                 if hits:
-                    candidates.append((value, hits[0]))
+                    source_fields = sorted({
+                        column
+                        for column, raw in text_parts
+                        if any(_norm(hit) in _norm(raw) for hit in hits)
+                    })
+                    candidates.append((value, hits, source_fields))
+            candidate_evidence = [
+                {
+                    "value_code": int(value["code"]),
+                    "value": _text(value.get("value")),
+                    "matched_terms": hits,
+                    "source_fields": source_fields,
+                }
+                for value, hits, source_fields in candidates
+            ]
             if len(candidates) == 1:
-                value, hit = candidates[0]
-                source_fields = [column for column, raw in text_parts if _norm(hit) in _norm(raw)]
-                rows.append(_mapping_row(product, category_id, facet_name, value, "MAPPED", hit, source_fields, "OBSERVED_CATALOG_TEXT"))
+                value, hits, source_fields = candidates[0]
+                rows.append(_mapping_row(
+                    product, category_id, facet_name, value, "MAPPED", hits[0],
+                    source_fields, "OBSERVED_CATALOG_TEXT", candidate_evidence,
+                ))
             elif len(candidates) > 1:
-                rows.append(_mapping_row(product, category_id, facet_name, None, "AMBIGUOUS", ";".join(hit for _, hit in candidates), None, "MULTIPLE_OBSERVED_VALUES"))
+                rows.append(_mapping_row(
+                    product, category_id, facet_name, None, "AMBIGUOUS",
+                    ";".join(hit for _, hits, _ in candidates for hit in hits),
+                    None, "MULTIPLE_OBSERVED_VALUES", candidate_evidence,
+                ))
             else:
                 rows.append(_mapping_row(product, category_id, facet_name, None, "UNKNOWN", "", None, "NO_OBSERVED_VALUE"))
     return pd.DataFrame(rows)
@@ -200,7 +220,7 @@ def build_product_mapping(catalog: pd.DataFrame, taxonomy: dict[str, dict[str, A
 
 def _mapping_row(product: pd.Series, category_id: str, facet_name: str, value: dict[str, Any] | None,
                  status: str, matched_text: str, source_fields: list[str] | None = None,
-                 reason: str = "") -> dict[str, Any]:
+                 reason: str = "", candidate_evidence: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return {
         "catalog_id": _text(product.get("catalog_id")),
         "source_product_id": _text(product.get("source_product_id")),
@@ -212,6 +232,7 @@ def _mapping_row(product: pd.Series, category_id: str, facet_name: str, value: d
         "mapping_reason": reason,
         "matched_text": matched_text,
         "source_fields": json.dumps(source_fields or [], ensure_ascii=False),
+        "candidate_evidence": json.dumps(candidate_evidence or [], ensure_ascii=False),
         "source_document_id": _text(product.get("source_document_id")),
         "source": _text(product.get("source")),
         "license_status": _text(product.get("license_status")),

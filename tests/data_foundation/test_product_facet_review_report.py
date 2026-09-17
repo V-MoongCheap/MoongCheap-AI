@@ -57,6 +57,7 @@ def test_review_report_prioritizes_unresolved_mapping_and_keeps_decisions_blank(
 
     assert list(result["review_priority"]) == ["HIGH", "MEDIUM"]
     assert result["reviewed_value"].eq("").all()
+    assert result["candidate_evidence"].eq("[]").all()
     assert result["reviewed_code"].eq("").all()
     assert result["review_decision"].eq("").all()
     assert report["status_counts"] == {"UNKNOWN": 1, "AMBIGUOUS": 1, "MAPPED": 1}

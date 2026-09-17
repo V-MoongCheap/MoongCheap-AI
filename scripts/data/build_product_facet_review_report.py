@@ -58,6 +58,7 @@ def build_review_queue(mapping: pd.DataFrame) -> pd.DataFrame:
         "value",
         "matched_text",
         "source_fields",
+        "candidate_evidence",
         "source_document_id",
         "source",
         "reviewed_value",
@@ -65,6 +66,8 @@ def build_review_queue(mapping: pd.DataFrame) -> pd.DataFrame:
         "review_decision",
         "review_note",
     ]
+    if "candidate_evidence" not in unresolved:
+        unresolved["candidate_evidence"] = "[]"
     return unresolved.sort_values(
         ["_priority_order", "category_id", "catalog_id", "facet_name"]
     )[columns].reset_index(drop=True)

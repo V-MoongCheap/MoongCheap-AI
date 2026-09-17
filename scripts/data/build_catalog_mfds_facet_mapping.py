@@ -28,9 +28,9 @@ def read_frame(path: Path) -> pd.DataFrame:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--catalog", type=Path, required=True)
-    parser.add_argument("--mfds", type=Path, required=True)
+    parser.add_argument("--mfds", type=Path)
     parser.add_argument("--taxonomy", type=Path, required=True)
-    parser.add_argument("--evidence-output", type=Path, required=True)
+    parser.add_argument("--evidence-output", type=Path)
     parser.add_argument("--mapping-output", type=Path, required=True)
     parser.add_argument("--summary-output", type=Path, required=True)
     parser.add_argument("--mfds-reference", type=Path)
@@ -38,16 +38,26 @@ def main() -> None:
     parser.add_argument("--min-evidence-documents", type=int, default=3)
     parser.add_argument("--min-evidence-ratio", type=float, default=0.05)
     args = parser.parse_args()
+    if bool(args.mfds) != bool(args.evidence_output):
+        raise SystemExit("--mfds and --evidence-output must be provided together")
     taxonomy = load_taxonomy(str(args.taxonomy))
     catalog = read_frame(args.catalog)
-    mfds = read_frame(args.mfds)
-    evidence = build_category_evidence(mfds, taxonomy, args.min_evidence_documents, args.min_evidence_ratio)
+    mfds = read_frame(args.mfds) if args.mfds else pd.DataFrame()
+    evidence = (
+        build_category_evidence(
+            mfds, taxonomy, args.min_evidence_documents, args.min_evidence_ratio
+        )
+        if args.mfds
+        else pd.DataFrame()
+    )
     mapping = build_product_mapping(catalog, taxonomy)
     references = read_frame(args.mfds_reference) if args.mfds_reference else None
-    args.evidence_output.parent.mkdir(parents=True, exist_ok=True)
+    if args.evidence_output:
+        args.evidence_output.parent.mkdir(parents=True, exist_ok=True)
     args.mapping_output.parent.mkdir(parents=True, exist_ok=True)
     args.summary_output.parent.mkdir(parents=True, exist_ok=True)
-    evidence.to_csv(args.evidence_output, index=False, encoding="utf-8-sig")
+    if args.evidence_output:
+        evidence.to_csv(args.evidence_output, index=False, encoding="utf-8-sig")
     mapping.to_csv(args.mapping_output, index=False, encoding="utf-8-sig")
     reference_rows = 0
     reference_mapped_rows = 0
@@ -69,6 +79,7 @@ def main() -> None:
         "evidence_rows": int(len(evidence)),
         "evidence_categories": int(evidence["category_id"].nunique()) if not evidence.empty else 0,
         "join_policy": "category crosswalk only; no direct Domeggook-MFDS product-id join",
+        "mfds_evidence_status": "GENERATED" if args.mfds else "NOT_GENERATED_INPUT_UNAVAILABLE",
         "evidence_rule": {"min_documents": args.min_evidence_documents, "min_ratio": args.min_evidence_ratio},
         "mfds_reference_rows": int(reference_rows),
         "mfds_reference_category_mapped_rows": int(reference_mapped_rows),
