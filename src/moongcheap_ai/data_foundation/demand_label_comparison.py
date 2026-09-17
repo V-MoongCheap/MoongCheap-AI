@@ -20,7 +20,13 @@ class LLMLabelingError(RuntimeError):
 
 def _allowed(loader: TaxonomyLoader, category_id: str) -> dict[str, list[dict[str, Any]]]:
     category = loader.category(category_id)
-    return {str(facet["name"]): facet["values"] for facet in (category or {}).get("facets", [])}
+    return {
+        str(facet["name"]): [
+            value for value in facet["values"]
+            if str(value.get("status", "")).upper() != "DEPRECATED"
+        ]
+        for facet in (category or {}).get("facets", [])
+    }
 
 
 def _prompt(rows: list[dict[str, Any]], loader: TaxonomyLoader) -> str:

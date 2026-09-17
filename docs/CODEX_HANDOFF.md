@@ -8,13 +8,13 @@
 2. Demand Cluster–Seller Offer Matching
 3. Seller Demand Analysis
 
-현재 작업 Branch에는 AI-Hub 점검, 관측된 KAN Category 처리, 상품 staging 및 식별, MFDS 수집·파싱, Rule 기반 Facet 후보 도출 V0가 포함되어 있습니다. Clustering과 Seller Matching은 아직 구현하지 않았습니다.
+현재 저장소에는 MFDS·판매자·소비자 표현 Evidence를 결합한 Model 1 Facet 후보 도출, Model 2 Labeling, Demand Clustering, Seller Matching, Seller Demand Analysis의 로컬 MVP 경로가 포함되어 있습니다. PostgreSQL/AWS/EKS 연결과 실제 Backend ID 기반 쓰기는 외부 환경 의존 사항으로 아직 로컬 Mock/CSV 경계에서 검증합니다.
 
 Implementation lives under `src/moongcheap_ai`; data, Category, Facet, and Labeling additions belong under `src/moongcheap_ai/data_foundation/`, with matching tests under `tests/data_foundation/`.
 
 ## 기준 원칙
 
-동작을 변경하기 전 프로젝트 소유자가 전달한 최신 지시를 확인합니다. Naver Shopping, GobizKorea, Open Icecat, K-FIND, Domeggook, Consumer RAG 또는 AI 전용 DB는 다시 도입하지 않습니다.
+동작을 변경하기 전 프로젝트 소유자가 전달한 최신 지시를 확인합니다. GobizKorea, Open Icecat, K-FIND, Consumer RAG 또는 AI 전용 DB는 현재 범위에 포함하지 않습니다. Domeggook 판매자 공고와 Naver Shopping Insight는 현재 Facet Evidence의 보조 입력으로 사용하되, 상품 사실이나 Taxonomy를 단독 확정하는 근거로 사용하지 않습니다.
 
 - Backend and AI share PostgreSQL.
 - `category.facet` is TEXT containing JSON; parse it in Python.
@@ -44,13 +44,14 @@ AI-Hub 데이터가 없으면 Catalog 단계는 `SKIPPED`로 남겨야 합니다
 
 ## 주요 산출물
 
-- `data/interim/products/product_staging.parquet`
-- `data/processed/product_catalog/product_catalog_v1.parquet`
-- `data/processed/product_catalog/product_catalog_source.csv`
-- `data/interim/facet_discovery/i0030_products_clean.parquet`
+- `data/processed/backend_seed_v5/category_seed_v5.csv`
+- `data/processed/backend_seed_v5/product_catalog_seed_v5.csv`
+- `data/processed/backend_seed_v5/product_catalog_source_snapshot_v5.csv`
+- `data/interim/facet_discovery/i0030_products_clean_dedup.csv`
 - `data/interim/facet_discovery/i2710_reference.csv`
-- `data/processed/facet_discovery/facet_review_queue.csv`
-- `data/processed/facet_discovery/facet_taxonomy_v0.json`
+- `data/interim/facet_evidence_v3/facet_evidence_unified.parquet`
+- `data/processed/model1_hybrid_kanana_210_fixed/facet_review_queue.csv`
+- `config/facet_taxonomy_v2_2.json`
 - `data/reports/TODAY_RESULT.md`
 
 변경 후 `pytest -q`를 실행합니다. 명확한 조건과 수치 처리는 Rule/SQL/Python으로 구현하고, 언어 모델은 측정 가능한 실험 근거가 있을 때만 사용합니다.

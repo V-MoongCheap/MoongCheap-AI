@@ -14,9 +14,6 @@ from pathlib import Path
 
 from moongcheap_ai.seller_analysis.bid_guide import (
     METRICS_VERSION,
-    ContractViolation,
-    VersionMismatch,
-    handle_bid_guide,
 )
 from moongcheap_ai.seller_analysis.evaluation.eval_set import (
     EVAL_FIELDS,
@@ -159,5 +156,4 @@ class EvalSetShapeTest(unittest.TestCase):
             stripped = line.strip()
             if stripped.startswith(("import ", "from ")):
                 self.assertNotIn("bid_guide", stripped, stripped)
-
 

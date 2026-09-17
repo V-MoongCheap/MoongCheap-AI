@@ -30,7 +30,7 @@ Public models do not require a token. Model weights are downloaded on first use 
 
 ## Run a small comparison
 
-The following models are candidates, not an automatic production choice:
+Kanana는 현재 Model 1의 선택된 후보 생성 보조 모델이다. 아래 다른 모델들은 비교·재현 실험용 후보이며 자동으로 운영 모델로 승격되지 않는다.
 
 ```powershell
 $env:PYTHONPATH = "src;."
@@ -46,7 +46,7 @@ python scripts\model1\run_multisource_facet_discovery.py `
   --output-dir data\processed\model1_eeve7b_smoke
 ```
 
-For another candidate, replace `--models` with:
+비교 후보를 실행하려면 `--models`를 다음처럼 바꾼다:
 
 ```text
 naver-hyperclovax/HyperCLOVAX-SEED-Text-Instruct-1.5B

@@ -1,4 +1,6 @@
-# Demand Labeling Model Selection V1
+# Demand Labeling Model Selection V1 (Historical Diagnostic)
+
+> 이 문서는 초기 V2.1 taxonomy와 200건 평가 입력을 사용한 과거 비교 기록이다. 현재 적용 기준은 `docs/MODEL_SELECTION_FINAL_V1.md`와 `config/facet_taxonomy_v2_2.json`이며, 아래 수치는 현재 Gold 확정 결과로 해석하지 않는다.
 
 ## Evaluation Scope
 
