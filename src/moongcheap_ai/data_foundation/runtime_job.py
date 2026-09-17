@@ -14,15 +14,11 @@ from typing import Any
 import pandas as pd
 from dotenv import load_dotenv
 
-from ..mvp_pipeline import ReviewedAliasMatcher, _apply_aliases
 from .backend_contract import build_label_result_payload, post_label_results
 from .labeling import (
-    TaxonomyLoader,
-    build_product_facet_map,
-    label_demands,
-    load_taxonomy,
     taxonomy_from_category_facet_rows,
 )
+from .part_a_runtime import run_part_a_batch
 from .postgres_reader import open_read_only_postgres, read_unprocessed_demands
 from .postgres_writer import open_postgres, write_label_results
 
@@ -41,6 +37,8 @@ def run_batch(
     taxonomy_payload: dict[str, Any] | None = None,
     product_facets_path: Path | None = None,
     alias_registry_path: Path | None = None,
+    rules_path: Path = Path("config/demand_constraint_rules.json"),
+    compatibility_alias_registry_path: Path | None = None,
     processed_at: str | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     timestamp = processed_at or datetime.now(UTC).isoformat()
@@ -54,19 +52,28 @@ def run_batch(
             "processedAt": timestamp,
             "results": [],
         }
-    loader = TaxonomyLoader(taxonomy_payload) if taxonomy_payload is not None else load_taxonomy(taxonomy_path)  # type: ignore[arg-type]
-    facet_map = None
-    if product_facets_path and product_facets_path.exists():
-        facet_map = build_product_facet_map(pd.read_csv(product_facets_path, dtype=str).fillna(""))
-    labeled = label_demands(demands.fillna(""), loader, product_facet_map=facet_map)
-    if alias_registry_path and alias_registry_path.exists():
-        labeled, alias_hits, corrected_alias_hits, alias_conflicts = _apply_aliases(
-            labeled, ReviewedAliasMatcher(alias_registry_path)
-        )
-        labeled["taxonomy_version"] = "v2.2"
-        labeled["alias_hits"] = alias_hits
-        labeled["corrected_alias_hits"] = corrected_alias_hits
-        labeled["alias_conflicts"] = alias_conflicts
+    if taxonomy_payload is None and taxonomy_path is None:
+        raise ValueError("taxonomy_path or taxonomy_payload is required")
+    # Product facts describe the selected catalog; they must not silently turn
+    # into consumer requirements. The shared Part A parser emits only typed
+    # constraints from extra_requirement and keeps unresolved requests pending.
+    del product_facets_path
+    labeled, _ = run_part_a_batch(
+        demands,
+        taxonomy_path,
+        rules_path,
+        alias_registry_path or Path("config/model1_aliases_reviewed_v2.json"),
+        taxonomy_payload=taxonomy_payload,
+        compatibility_alias_registry_path=compatibility_alias_registry_path,
+        processed_at=timestamp,
+        skip_processed=False,
+    )
+    labeled["label_status"] = labeled["status"].map({
+        "PARSED": "LABELED",
+        "NONE": "LABELED",
+        "NOT_APPLICABLE": "LABELED",
+    }).fillna("REVIEW")
+    labeled["label_warnings"] = labeled["reasonCodes"]
     return labeled, build_label_result_payload(labeled, processed_at=timestamp)
 
 
@@ -77,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--taxonomy", type=Path)
     parser.add_argument("--product-facets", type=Path)
     parser.add_argument("--alias-registry", type=Path)
+    parser.add_argument("--rules", type=Path)
+    parser.add_argument("--compatibility-alias-registry", type=Path)
     parser.add_argument("--output", type=Path, default=Path("data/processed/demands/runtime_labeled_v0.csv"))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -109,12 +118,26 @@ def main(argv: list[str] | None = None) -> int:
             taxonomy_payload = taxonomy_from_category_facet_rows(demands)
         if taxonomy_payload is None and not demands.empty and not taxonomy_path.is_file():
             raise SystemExit(f"taxonomy file not found: {taxonomy_path}")
+        primary_alias_registry = args.alias_registry or Path(
+            source.get("A_ALIAS_REGISTRY_PATH", "config/model1_aliases_reviewed_v2.json")
+        )
+        compatibility_alias_registry = args.compatibility_alias_registry or Path(
+            source.get("A_COMPATIBILITY_ALIAS_REGISTRY_PATH", "config/demand_constraint_aliases.json")
+        )
+        # The reviewed A alias export is version-bound to v2.2. A taxonomy
+        # reconstructed from Backend category.facet must use its own values
+        # until Backend publishes the matching reviewed alias export.
+        if taxonomy_payload is not None and taxonomy_payload.get("version") != "v2.2":
+            primary_alias_registry = None
+            compatibility_alias_registry = None
         labeled, payload = run_batch(
             demands,
             taxonomy_path,
             taxonomy_payload=taxonomy_payload,
             product_facets_path=args.product_facets or (Path(source["A_PRODUCT_FACETS_PATH"]) if source.get("A_PRODUCT_FACETS_PATH") else None),
-            alias_registry_path=args.alias_registry or Path(source.get("A_ALIAS_REGISTRY_PATH", "config/model1_aliases_reviewed_v2.json")),
+            alias_registry_path=primary_alias_registry,
+            rules_path=args.rules or Path(source.get("A_RULES_PATH", "config/demand_constraint_rules.json")),
+            compatibility_alias_registry_path=compatibility_alias_registry,
         )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         labeled.to_csv(args.output, index=False, encoding="utf-8-sig")

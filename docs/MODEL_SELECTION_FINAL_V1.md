@@ -6,6 +6,30 @@ Model 1과 Model 2의 후보 방식을 같은 평가 원칙으로 정리하고, 
 
 이 문서의 정확도 수치는 실제 운영 사용자 Gold가 아니라 프로젝트용 합성·검토 데이터 기준이다. 따라서 모델의 절대적인 일반화 성능을 의미하지 않는다.
 
+## 1. 최신 MVP 결정
+
+이 절은 아래의 초기 200건 후보 비교 결과보다 우선한다. 최신 Part A Runtime과
+Taxonomy v2.2로, AI 검토를 거쳐 평가에 채택한 80건을 다시 실행했다. 이 데이터는
+독립적인 사람 Gold가 아니므로 일반화 성능 수치로 사용하지 않는다. 대신 현재 MVP
+구성에서 Rule과 LLM 중 무엇을 배포할지 결정하는 회귀 검증으로 사용한다.
+
+| 대상 | 결과 | 결정 |
+| --- | --- | --- |
+| Model 1 Facet Discovery | Kanana의 미승인 후보 4건은 실제 MFDS 기능성 원문에는 있었지만 기존 Facet 계약과 맞지 않았다. | Rule/통계 근거만 Taxonomy 후보로 사용한다. LLM 결과는 Human Review 보조로만 유지한다. |
+| Model 2 Rule/Alias | 구조화 요구 53건 중 typed constraint 일치 52건, 전체 상태 일치 79/80건 | MVP Labeling 본체로 사용한다. |
+| Qwen 2.5 7B | 구조화 요구 53건 중 요구 코드 충족 33건, 3건 Taxonomy 검증 경고, 19회 호출에 약 168초 | Model-only와 자동 fallback으로 배포하지 않는다. |
+
+Model 2의 남은 1건은 `키토산 또는 키토올리고당`의 제외 범위가 하나의 결합값인지
+각 성분의 개별 제외인지 확정되지 않은 정책 사례다. `REVIEW`로 보존한다.
+
+따라서 현재 배포 결정은 다음과 같다.
+
+```text
+Model 1 = Rule/통계 기반 Facet 후보 + Evidence Gate + Human Review
+Model 2 = 최신 Rule/Alias Part A Runtime + Review Queue
+Qwen 2.5 7B = 재평가 대상 보조 후보, 배포하지 않음
+```
+
 ## 2. 역할 구분
 
 | 구분 | 역할 | 핵심 출력 |

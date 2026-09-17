@@ -13,6 +13,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --project packaging/a-labeling --locked --no-dev --no-install-project
 COPY src ./src
 COPY config/model1_aliases_reviewed_v2.json ./config/model1_aliases_reviewed_v2.json
+COPY config/demand_constraint_aliases.json ./config/demand_constraint_aliases.json
+COPY config/demand_constraint_rules.json ./config/demand_constraint_rules.json
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --project packaging/a-labeling --locked --no-dev --no-editable
 
@@ -30,6 +32,8 @@ ENV PATH="/opt/venv/bin:$PATH" \
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /build/config/model1_aliases_reviewed_v2.json ./config/model1_aliases_reviewed_v2.json
+COPY --from=builder /build/config/demand_constraint_aliases.json ./config/demand_constraint_aliases.json
+COPY --from=builder /build/config/demand_constraint_rules.json ./config/demand_constraint_rules.json
 
 USER 65534:65534
 ENTRYPOINT ["a-labeling-batch", "--write-db", "--output", "/tmp/a-labeling-output.csv"]

@@ -451,10 +451,12 @@ class ConstraintInputPolicy:
         normalized = normalize(text)
         if re.search(r"(?:피하|제외|금지|말고|없는\s*제품|포함되지\s*않)", normalized):
             return "EXCLUDE"
-        if re.search(r"(?:원해요|원합니다|필요해요|찾아|원하는|꼭|반드시|무조건)", normalized):
+        if re.search(r"(?:꼭|반드시|무조건)", normalized):
             return "MUST"
         if "가능하면" in normalized or re.search(r"(?:선호|좋겠|좋을|우선)", normalized):
             return "PREFER"
+        if re.search(r"(?:원해요|원합니다|필요해요|찾아|원하는)", normalized):
+            return "MUST"
         return None
 
     @staticmethod
@@ -960,9 +962,16 @@ class ConstraintInputPolicy:
         # frame is a fallback for clear user-owned requests only; it must not
         # turn reported speech, unresolved negation, or non-final comparisons
         # into an actionable constraint.
+        fallback_safe_review = baseline.status == "REVIEW" and all(
+            warning.startswith((
+                "PREDICATE_EVENT_UNRESOLVED:",
+                "NO_FACET_CONSTRAINT_EXTRACTED",
+            ))
+            for warning in baseline.warnings
+        )
         explicit = (
             self._explicit_requirement_result(category_id, value)
-            if baseline.status == "PARSED"
+            if baseline.status == "PARSED" or fallback_safe_review
             else None
         )
         if explicit is not None:

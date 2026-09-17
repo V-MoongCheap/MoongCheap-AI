@@ -171,3 +171,26 @@ def test_v22_category_local_alias_maps_powder_to_korean_value():
     assert result.constraints[0].facet_name == "product_form"
     assert result.constraints[0].value == "분말"
     assert result.constraints[0].value_code == 1
+
+
+def test_part_a_runtime_uses_compatibility_aliases_for_explicit_requirement() -> None:
+    root = __import__("pathlib").Path(".")
+    demands = pd.DataFrame([{
+        "demand_id": "omega", "catalog_id": "catalog-1",
+        "category_id": "health-functional-food:omega_fatty_acid",
+        "extra_requirement": "오메가3 함유 제품을 원해요.",
+        "is_substitutable": "true",
+    }])
+
+    result, _ = run_part_a_batch(
+        demands,
+        root / "config/facet_taxonomy_v2_2.json",
+        root / "config/demand_constraint_rules.json",
+        root / "config/model1_aliases_reviewed_v2.json",
+        compatibility_alias_registry_path=root / "config/demand_constraint_aliases.json",
+    )
+
+    assert result.loc[0, "status"] == "PARSED"
+    assert result.loc[0, "label"] == "0-2-0"
+    constraint = json.loads(result.loc[0, "constraints"])[0]
+    assert constraint["constraintType"] == "MUST"

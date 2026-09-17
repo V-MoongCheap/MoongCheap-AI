@@ -90,6 +90,29 @@ def test_runtime_does_not_label_or_submit_unknown_category(tmp_path) -> None:
     assert payload["results"] == []
 
 
+def test_runtime_job_uses_part_a_parser_for_explicit_requirement() -> None:
+    root = __import__("pathlib").Path(".")
+    demands = pd.DataFrame([{
+        "demand_id": "1",
+        "catalog_id": "catalog-1",
+        "category_id": "health-functional-food:omega_fatty_acid",
+        "extra_requirement": "오메가3 함유 제품을 원해요.",
+        "is_substitutable": "true",
+    }])
+
+    labeled, payload = run_batch(
+        demands,
+        root / "config/facet_taxonomy_v2_2.json",
+        alias_registry_path=root / "config/model1_aliases_reviewed_v2.json",
+        compatibility_alias_registry_path=root / "config/demand_constraint_aliases.json",
+        processed_at="2026-01-01T00:00:00+00:00",
+    )
+
+    assert labeled.loc[0, "label"] == "0-2-0"
+    assert labeled.loc[0, "label_status"] == "LABELED"
+    assert payload["results"][0]["label"] == "0-2-0"
+
+
 def test_empty_runtime_batch_is_a_successful_noop(tmp_path) -> None:
     taxonomy = {
         "categories": [{"category_id": "c1", "facets": []}],
