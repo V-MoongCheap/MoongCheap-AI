@@ -25,7 +25,8 @@ SELECT
 FROM demand AS d
 JOIN product_catalog AS pc ON pc.id = d.catalog_id
 JOIN category AS c ON c.id = pc.category_id
-WHERE d.processed_at IS NULL
+WHERE d.status = 'UNASSIGNED'
+  AND d.processed_at IS NULL
 ORDER BY d.id
 """.strip()
 
