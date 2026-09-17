@@ -66,6 +66,34 @@ def test_ambiguous_mapping_keeps_per_value_source_fields_for_review():
     ]
 
 
+def test_compound_taxonomy_value_wins_over_its_observed_atomic_parts():
+    local_taxonomy = {
+        "health-functional-food:eye_health": {
+            "category_id": "health-functional-food:eye_health",
+            "facets": [{
+                "name": "functional_ingredients",
+                "values": [
+                    {"code": 0, "value": "ALL"},
+                    {"code": 1, "value": "마리골드꽃추출물"},
+                    {"code": 2, "value": "마리골드꽃추출물, 헤마토코쿠스 추출물"},
+                    {"code": 4, "value": "헤마토코쿠스 추출물, 마리골드꽃추출물"},
+                ],
+            }],
+        }
+    }
+    catalog = pd.DataFrame([{
+        "catalog_id": "c4", "source_product_id": "p4", "category_id": "health-functional-food:eye_health",
+        "name": "루테인", "title": "", "nutrition_raw": "마리골드꽃추출물, 헤마토코쿠스 추출물",
+    }])
+
+    result = build_product_mapping(catalog, local_taxonomy)
+
+    row = result[result.facet_name.eq("functional_ingredients")].iloc[0]
+    assert row.mapping_status == "MAPPED"
+    assert int(row.value_code) == 2
+    assert row.value == "마리골드꽃추출물, 헤마토코쿠스 추출물"
+
+
 def test_mfds_evidence_uses_category_crosswalk_and_document_ratio():
     mfds = pd.DataFrame([
         {"source_product_id": "m1", "raw_category_name": "프로바이오틱스", "product_form": "분말", "product_type": "", "functional_ingredients": "프로바이오틱스"},

@@ -197,6 +197,28 @@ def build_product_mapping(catalog: pd.DataFrame, taxonomy: dict[str, dict[str, A
                         if any(_norm(hit) in _norm(raw) for hit in hits)
                     })
                     candidates.append((value, hits, source_fields))
+            compound_candidates = []
+            for value in _facet_values(category, facet_name):
+                parts = [
+                    part.strip()
+                    for part in re.split(r"[,，]", _text(value.get("value")))
+                    if part.strip()
+                ]
+                if len(parts) < 2:
+                    continue
+                if all(_norm(part) in combined for part in parts):
+                    source_fields = sorted({
+                        column
+                        for column, raw in text_parts
+                        if any(_norm(part) in _norm(raw) for part in parts)
+                    })
+                    compound_candidates.append((value, parts, source_fields))
+            if compound_candidates:
+                # Taxonomies may contain the same ingredient set in multiple
+                # orders. Keep the lowest existing code as the deterministic
+                # canonical combination and avoid reporting its atomic pieces
+                # as a false ambiguity.
+                candidates = [min(compound_candidates, key=lambda item: int(item[0]["code"]))]
             candidate_evidence = [
                 {
                     "value_code": int(value["code"]),
