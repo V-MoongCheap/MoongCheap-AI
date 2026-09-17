@@ -125,7 +125,7 @@ class TaxonomyLoader:
             candidates: list[tuple[int, int, dict[str, Any], str]] = []
             for value in facet.get("values", []):
                 code = int(value["code"])
-                if code == 0:
+                if code == 0 or str(value.get("status", "")).upper() == "DEPRECATED":
                     continue
                 aliases = [value.get("value", ""), *(value.get("aliases") or [])]
                 for alias in aliases:

@@ -77,7 +77,12 @@ def map_category(value: Any, taxonomy: dict[str, dict[str, Any]]) -> tuple[str, 
 def _facet_values(category: dict[str, Any], facet_name: str) -> list[dict[str, Any]]:
     for facet in category.get("facets", []):
         if facet.get("name") == facet_name:
-            return [value for value in facet.get("values", []) if int(value.get("code", -1)) != 0]
+            return [
+                value
+                for value in facet.get("values", [])
+                if int(value.get("code", -1)) != 0
+                and str(value.get("status", "")).upper() != "DEPRECATED"
+            ]
     return []
 
 

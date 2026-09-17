@@ -2892,7 +2892,7 @@
             {
               "code": 2,
               "value": "비타민 D",
-              "aliases": [],
+              "aliases": ["비타민D"],
               "status": "PROVISIONAL"
             },
             {
@@ -2911,7 +2911,8 @@
               "code": 5,
               "value": "비타민D",
               "aliases": [],
-              "status": "PROVISIONAL"
+              "status": "DEPRECATED",
+              "canonical_code": 2
             },
             {
               "code": 6,
