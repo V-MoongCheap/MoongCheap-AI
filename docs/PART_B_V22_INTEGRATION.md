@@ -4,6 +4,27 @@ B는 DB의 `extra_requirement`를 기존 v0.46 규칙과 Kiwi로 직접 해석�
 A 분류표를 기준으로 B 별칭을 사용하고, A 승인 별칭이 있으면 함께 적용한다.
 수요 `label`을 해석 입력으로 활용하는 작업은 별도 계약을 정한 뒤 진행한다.
 
+## Part A 5,000건 handoff의 Label 의미
+
+Part A의 `label`은 동일 Category 안에서 후보를 빠르게 찾기 위한 압축 코드다.
+특히 단일 `PREFER` 조건도 코드에 나타날 수 있으므로, Part B는 Label만으로
+필수 조건을 판정하거나 Cluster를 분리하면 안 된다.
+
+최신 handoff에는 아래 구조화 필드도 함께 포함한다.
+
+| 필드 | 용도 |
+| --- | --- |
+| `constraints` | `MUST` / `PREFER` / `EXCLUDE`가 명시된 JSON 배열 |
+| `preference_groups` | OR 등 복수 선호 조건의 JSON 배열 |
+| `passthrough_text` | Taxonomy 밖의 원문 요구 |
+| `reason_codes` | 파서 판단 근거·검토 사유 |
+| `labeling_status` | `LABELED` 또는 `LABELED_WITH_REVIEW` |
+
+Part B는 `constraints`의 `MUST`/`EXCLUDE`만 hard gate로 사용하고, `PREFER`는
+동점 후보 순위에만 사용한다. `labeling_status=LABELED_WITH_REVIEW`은 Label을
+신뢰한 자동 확정 대상이 아니며, 기존 B parser와 원문을 함께 사용해 보수적으로
+처리한다.
+
 ## 실행 자료와 별칭 정책
 
 | 설정 | 자료와 역할 |

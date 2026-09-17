@@ -41,7 +41,8 @@ def build(raw_path: Path, runtime_path: Path, output_path: Path, metadata_path: 
         column for column in (
             "demand_id", "catalog_id", "category_id", "label", "status",
             "constraints", "reasonCodes", "taxonomyVersion", "parserVersion",
-            "effectiveRequirementMode", "facet_values", "interpretation_method",
+            "effectiveRequirementMode", "preferenceGroups", "passthroughText",
+            "facet_values", "interpretation_method",
         ) if column in runtime.columns
     ]
     joined = raw.merge(runtime[runtime_columns], on="demand_id", how="left", validate="one_to_one", suffixes=("", "_runtime"))
@@ -60,11 +61,35 @@ def build(raw_path: Path, runtime_path: Path, output_path: Path, metadata_path: 
         lambda row: "[]" if row["status"] in LABELED_STATUSES else _json_list(row.get("reasonCodes", "")),
         axis=1,
     )
+    # `label` is a compact candidate-search key.  It cannot express whether a
+    # value was a MUST, PREFER, or EXCLUDE condition; Part B must use these
+    # typed fields for hard gates and preference ranking.
+    joined["constraints"] = (
+        joined["constraints"].map(_json_list)
+        if "constraints" in joined
+        else "[]"
+    )
+    joined["preference_groups"] = (
+        joined["preferenceGroups"].map(_json_list)
+        if "preferenceGroups" in joined
+        else "[]"
+    )
+    joined["passthrough_text"] = (
+        joined["passthroughText"].astype(str)
+        if "passthroughText" in joined
+        else ""
+    )
+    joined["reason_codes"] = (
+        joined["reasonCodes"].map(_json_list)
+        if "reasonCodes" in joined
+        else "[]"
+    )
 
     feature_columns = [
         "demand_id", "catalog_id", "category_id", "extra_requirement",
         "desired_price_min", "desired_price_max", "quantity", "is_substitutable",
         "label", "labeling_status", "unresolved_items", "effectiveRequirementMode",
+        "constraints", "preference_groups", "passthrough_text", "reason_codes",
         "taxonomyVersion", "data_origin", "scenario_type",
     ]
     missing = [column for column in feature_columns if column not in joined.columns]

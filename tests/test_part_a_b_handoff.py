@@ -28,6 +28,8 @@ def test_part_a_b_handoff_separates_evaluation_metadata(tmp_path) -> None:
         "label": "1-0-0",
         "status": "PARSED",
         "constraints": "[]",
+        "preferenceGroups": "[]",
+        "passthroughText": "",
         "reasonCodes": "[]",
         "taxonomyVersion": "v2.2",
         "effectiveRequirementMode": "STRUCTURED",
@@ -46,4 +48,32 @@ def test_part_a_b_handoff_separates_evaluation_metadata(tmp_path) -> None:
     metadata = pd.read_csv(metadata_path, dtype=str)
     assert "expected_facet_profile" not in handoff.columns
     assert "expected_facet_profile" in metadata.columns
+    assert handoff.loc[0, "constraints"] == "[]"
+    assert handoff.loc[0, "preference_groups"] == "[]"
+    assert handoff.loc[0, "reason_codes"] == "[]"
     assert len(handoff) == len(metadata) == 1
+
+
+def test_part_a_b_handoff_preserves_prefer_type_separately_from_label(tmp_path) -> None:
+    raw = pd.DataFrame([{
+        "demand_id": "d1", "catalog_id": "c1", "category_id": "cat1",
+        "extra_requirement": "가능하면 분말", "desired_price_min": "", "desired_price_max": "",
+        "quantity": "1", "is_substitutable": "false", "data_origin": "SYNTHETIC_GROUNDED",
+        "scenario_type": "PREFERENCE",
+    }])
+    runtime = pd.DataFrame([{
+        "demand_id": "d1", "catalog_id": "c1", "category_id": "cat1", "label": "1",
+        "status": "PARSED", "constraints": '[{"constraintType":"PREFER"}]',
+        "preferenceGroups": "[]", "passthroughText": "", "reasonCodes": "[]",
+        "taxonomyVersion": "v2.2", "effectiveRequirementMode": "STRUCTURED",
+    }])
+    raw_path, runtime_path = tmp_path / "raw.csv", tmp_path / "runtime.csv"
+    raw.to_csv(raw_path, index=False)
+    runtime.to_csv(runtime_path, index=False)
+    output_path, metadata_path = tmp_path / "b.csv", tmp_path / "metadata.csv"
+
+    build(raw_path, runtime_path, output_path, metadata_path)
+
+    handoff = pd.read_csv(output_path, dtype=str).fillna("")
+    assert handoff.loc[0, "label"] == "1"
+    assert handoff.loc[0, "constraints"] == '[{"constraintType":"PREFER"}]'
