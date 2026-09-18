@@ -17,6 +17,7 @@
 
 - 키는 환경변수 `BACKEND_INTERNAL_API_KEY` 로만 받는다 (명령줄에 남기지 않는다)
 - 필수 판정 필드가 빠진 board 는 판정하지 않고 보고서 `skipped` 에 계약 오류로 남는다 (명세 10-1.4절)
+- 종료 코드: 0 정상 · 1 실행 실패 · 2 키 없음 · 3 조회는 됐는데 한 건도 판정하지 못함
 - 배송비 단위 · 가격 상한 기준은 PM 결정 전이다. 명령줄 값은 시험용이며 보고서 `policy` 에 남는다
 """
 
@@ -77,9 +78,19 @@ def _print_summary(report: dict) -> None:
             print(f"  {mark} {e['productId']:>6} {rank:>4} score {e['score']} 총액 {e['totalCost']:,}원 | {e['reason']}")
     for item in report["skipped"]:
         print(f"\n[board {item['boardId']}] 건너뜀 — {item['reason']}")
-    print(f"\n전송 요청 {len(report['requests'])}건 · 전송 {'함' if report['sent'] else '안 함 (dry run)'}")
+    counts = report["counts"]
+    print(f"\n조회 {counts['fetched']}건 · 판정 {counts['judged']}건(낙찰 {counts['awarded']}) · 건너뜀 {counts['skipped']}건")
+    print(f"전송 요청 {len(report['requests'])}건 · 전송 {'함' if report['sent'] else '안 함 (dry run)'}")
     for response in report["responses"]:
         print(f"  응답: {response}")
+
+
+def _write_report(path: Path | None, report: dict) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n보고서: {path}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -118,10 +129,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"실행 실패: {error}", file=sys.stderr)
         return 1
     _print_summary(report)
-    if args.report:
-        args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"\n보고서: {args.report}")
+    counts = report["counts"]
+    if counts["fetched"] and not counts["judged"]:
+        # 주기 실행에서 조용히 지나가면 안 되는 상태다. 조회는 됐는데 전부 계약 오류다.
+        print(f"판정한 board 가 없다 — 조회 {counts['fetched']}건이 모두 건너뛰어졌다", file=sys.stderr)
+        _write_report(args.report, report)
+        return 3
+    _write_report(args.report, report)
     return 0
 
 

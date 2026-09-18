@@ -285,6 +285,18 @@ def test_send_posts_each_request_and_keeps_backend_counts():
     assert report["responses"] == [{"status": "APPLIED", "appliedCount": 1, "staleRejectedCount": 0}]
 
 
+def test_report_counts_judged_and_skipped_boards():
+    report = run_once(_page(_board(boardId=1), _board(boardId=2, products=[])), POLICY, now=NOW, send=None)
+
+    assert report["counts"] == {"fetched": 2, "judged": 1, "skipped": 1, "awarded": 1}
+
+
+def test_counts_report_an_empty_page():
+    report = run_once(_page(), POLICY, now=NOW, send=None)
+
+    assert report["counts"] == {"fetched": 0, "judged": 0, "skipped": 0, "awarded": 0}
+
+
 def test_report_lists_skipped_boards():
     report = run_once(_page(_board(boardId=1), _board(boardId=2, products=[])), POLICY, now=NOW, send=None)
 

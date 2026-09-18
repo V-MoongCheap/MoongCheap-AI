@@ -257,6 +257,13 @@ def run_once(
         "fetchedAt": page.fetched_at,
         "hasNext": page.has_next,
         "policy": {"shippingFeeUnit": policy.shipping_fee_unit, "priceCapBasis": policy.price_cap_basis},
+        # 주기 실행에서 「한 건도 판정하지 못한 주기」 를 바로 알아보기 위한 요약이다.
+        "counts": {
+            "fetched": len(boards) + len(skipped),
+            "judged": len(boards),
+            "skipped": len(skipped),
+            "awarded": sum(board["outcome"] == AWARD for board in boards),
+        },
         "boards": boards,
         "skipped": skipped,
         "requests": requests,

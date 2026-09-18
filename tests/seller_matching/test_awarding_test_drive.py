@@ -70,6 +70,29 @@ def test_send_applies_boards_and_removes_them_from_pending(backend, monkeypatch,
     assert server.backend.applied[1001]["evaluations"][0]["isAwarded"] is True
 
 
+def test_exit_code_signals_that_nothing_could_be_judged(tmp_path, monkeypatch, capsys):
+    """모든 board 가 계약 오류면 주기 실행에서 알아챌 수 있어야 한다."""
+    monkeypatch.delenv("BACKEND_INTERNAL_API_KEY", raising=False)
+    broken = json.loads(SAMPLE.read_text(encoding="utf-8"))
+    broken["boards"] = [b for b in broken["boards"] if b["boardId"] == 1004]
+    payload = tmp_path / "pending.json"
+    payload.write_text(json.dumps(broken, ensure_ascii=False), encoding="utf-8")
+
+    code = _load("run_awarding_test_drive").main(["--pending-file", str(payload), *ARGS])
+
+    assert code == 3
+    assert "판정한 board 가 없다" in capsys.readouterr().err
+
+
+def test_exit_code_is_zero_when_there_is_nothing_to_judge(tmp_path, monkeypatch):
+    monkeypatch.delenv("BACKEND_INTERNAL_API_KEY", raising=False)
+    empty = json.loads(SAMPLE.read_text(encoding="utf-8")) | {"boards": [], "size": 0}
+    payload = tmp_path / "empty.json"
+    payload.write_text(json.dumps(empty, ensure_ascii=False), encoding="utf-8")
+
+    assert _load("run_awarding_test_drive").main(["--pending-file", str(payload), *ARGS]) == 0
+
+
 def test_send_requires_backend_url():
     with pytest.raises(SystemExit):
         _load("run_awarding_test_drive").main(["--pending-file", str(SAMPLE), *ARGS, "--send"])
