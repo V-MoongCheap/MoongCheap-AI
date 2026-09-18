@@ -108,7 +108,16 @@ def generate_demand_5000(
     if count < 1:
         raise ValueError("count must be positive")
     catalog = load_catalog(products_path, mapping_path)
-    taxonomy = load_taxonomy(taxonomy_path)
+    taxonomy_payload = json.loads(taxonomy_path.read_text(encoding="utf-8"))
+    taxonomy = {
+        _category_key(category.get("category_id")): category
+        for category in taxonomy_payload.get("categories", [])
+    }
+    taxonomy_version = str(
+        taxonomy_payload.get("taxonomy_version")
+        or taxonomy_payload.get("version")
+        or TAXONOMY_VERSION
+    )
     catalog = catalog[catalog["service_category_candidate_key"].map(_category_key).isin(taxonomy)].reset_index(drop=True)
     if catalog.empty:
         raise ValueError("no mapped products overlap taxonomy")
@@ -184,7 +193,17 @@ def generate_demand_5000(
             "quantity": rng.choice([1, 1, 1, 2, 3]),
             "is_substitutable": rng.choice([True, True, False]),
             "product_base_facets": _json(base),
-            "expected_facet_profile": _json({facet: {"code": int(value["code"]), "value": value["value"]} for facet, value in selected.items()}),
+            # A demand profile represents consumer-stated requirements only.
+            # The selected product's observed facets are provenance for the
+            # generator, not implicit consumer constraints.
+            "expected_facet_profile": _json(
+                {
+                    facet: {"code": int(value["code"]), "value": value["value"]}
+                    for facet, value in selected.items()
+                }
+                if scenario not in {"NO_EXTRA_REQUIREMENT", "AMBIGUOUS", "OUT_OF_TAXONOMY"}
+                else {}
+            ),
             "scenario_type": scenario,
             "data_origin": DATA_ORIGIN,
             "reference_source": "ESCI+xPQA+grounded_demand_v2_1000",
@@ -192,7 +211,7 @@ def generate_demand_5000(
             "price_origin": "MOCK_POLICY",
             "quantity_origin": "MOCK_POLICY",
             "substitution_origin": "MOCK_POLICY",
-            "taxonomy_version": TAXONOMY_VERSION,
+            "taxonomy_version": taxonomy_version,
             "sampling_seed": seed,
             "processed_at": "",
             "synthetic": True,

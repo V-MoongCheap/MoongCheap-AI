@@ -115,7 +115,10 @@ def main() -> None:
     facets = build_product_facet_map(facet_frame)
     print({"stage": "facet_map", "keys": len(facets)}, flush=True)
     taxonomy_loader = load_json_taxonomy(args.taxonomy)
-    rule = label_demands(demands, taxonomy_loader, product_facet_map=facets)
+    # Product Facets remain catalog provenance. They must not become implicit
+    # consumer constraints when extra_requirement is empty; unmentioned
+    # facets are represented as ALL by the demand labeler.
+    rule = label_demands(demands, taxonomy_loader)
     rule["interpretation_method"] = "RULE_ALIAS"
     print({"stage": "rule_labeled", "rows": len(rule)}, flush=True)
     _write(rule, args.output_dir / "demand_5000_rule_labeled_v1.csv")
