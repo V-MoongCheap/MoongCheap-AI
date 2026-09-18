@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 from .extractor import (
     ConstraintExtractor,
@@ -446,6 +446,147 @@ class ConstraintInputPolicy:
             clauses=(text,),
         )
 
+    @staticmethod
+    def _explicit_requirement_type(text: str) -> str | None:
+        normalized = normalize(text)
+        if re.search(r"(?:피하|제외|금지|말고|없는\s*제품|포함되지\s*않)", normalized):
+            return "EXCLUDE"
+        if re.search(r"(?:꼭|반드시|무조건)", normalized):
+            return "MUST"
+        if "가능하면" in normalized or re.search(r"(?:선호|좋겠|좋을|우선)", normalized):
+            return "PREFER"
+        if re.search(r"(?:원해요|원합니다|필요해요|찾아|원하는)", normalized):
+            return "MUST"
+        return None
+
+    @staticmethod
+    def _compact_value(value: str) -> str:
+        value = re.sub(r"\([^)]*\)", "", value)
+        return re.sub(r"[\s\-_/·,]", "", normalize(value))
+
+    def _explicit_requirement_facets(
+        self, category_id: str, text: str
+    ) -> tuple[MatchedFacet, ...]:
+        """Find unambiguous taxonomy values in an explicit requirement sentence."""
+        # Do not seed this list from the broad matcher: it may return
+        # overlapping taxonomy candidates that are not actually evidenced by
+        # the whole sentence (for example a single ingredient alongside a
+        # more specific combination value).
+        matched: list[MatchedFacet] = []
+        category_key = self._category_key(category_id)
+        compact_text = self._compact_value(text)
+        candidates: list[MatchedFacet] = []
+        for facet_values in self.matcher.values.get(category_key, {}).values():
+            for candidate in facet_values:
+                value = candidate.value
+                value_without_product = value.removesuffix(" 제품")
+                compact_value = self._compact_value(value_without_product)
+                components = [
+                    self._compact_value(part)
+                    for part in re.split(r",|/|또는|혹은|및|와|과", value_without_product)
+                    if self._compact_value(part)
+                ]
+                found = bool(
+                    compact_value
+                    and (
+                        len(compact_value) > 1
+                        or "형태" in normalize(text)
+                    )
+                    and (
+                        compact_value in compact_text
+                        or len(components) > 1
+                        and all(component in compact_text for component in components)
+                    )
+                )
+                frequency = re.fullmatch(r"1일\s*([0-9０-９]+)회", value)
+                if frequency:
+                    number = frequency.group(1).translate(str.maketrans("０１２３４５６７８９", "0123456789"))
+                    korean_number = {
+                        "1": "한", "2": "두", "3": "세", "4": "네", "5": "다섯",
+                    }.get(number, number)
+                    found = bool(re.search(
+                        rf"(?:1일|하루)(?:에)?\s*(?:{number}|{korean_number})\s*(?:회|번)",
+                        normalize(text),
+                    ))
+                if "오메가-3" in value and re.search(r"오메가\s*3", normalize(text)):
+                    found = True
+                if found:
+                    candidates.append(candidate)
+        matched.extend(candidates)
+        by_facet: dict[str, list[MatchedFacet]] = {}
+        for facet in matched:
+            by_facet.setdefault(facet.facet_name, []).append(facet)
+        selected: list[MatchedFacet] = []
+        for facet_name, values in by_facet.items():
+            unique = {item.value_code: item for item in values}
+
+            def component_profile(item: MatchedFacet) -> tuple[int, int]:
+                raw = item.value.removesuffix(" 제품")
+                components = [
+                    self._compact_value(part)
+                    for part in raw.split(",")
+                    if self._compact_value(part)
+                ]
+                positions = [compact_text.find(component) for component in components]
+                ordered = int(
+                    len(positions) > 1
+                    and all(position >= 0 for position in positions)
+                    and positions == sorted(positions)
+                )
+                return len(components), ordered
+
+            ranked = sorted(
+                unique.values(),
+                key=lambda item: (
+                    component_profile(item)[0],
+                    component_profile(item)[1],
+                    int(
+                        "프로바이오틱스 함유 제품" in normalize(text)
+                        and item.value == "프로바이오틱스 제품"
+                    ),
+                    -int(
+                        item.value.endswith("제품")
+                        and "프로바이오틱스 함유 제품" not in normalize(text)
+                    ),
+                    len(self._compact_value(item.value.removesuffix(" 제품"))),
+                    -item.value_code,
+                ),
+                reverse=True,
+            )
+            if ranked:
+                selected.append(ranked[0])
+        return tuple(sorted(selected, key=lambda item: (item.facet_name, item.value_code)))
+
+    def _explicit_requirement_result(
+        self, category_id: str, text: str
+    ) -> ExtractionResult | None:
+        normalized = normalize(text)
+        # Mixed-polarity clauses need the extractor's clause-level handling;
+        # applying one sentence-wide polarity would incorrectly turn a MUST
+        # clause into EXCLUDE (or vice versa).
+        has_negative = bool(re.search(r"(?:피하|제외|금지|말고|없는\s*제품|포함되지\s*않)", normalized))
+        has_positive = bool(re.search(r"(?:원해요|원합니다|필요해요|찾아|원하는|꼭|반드시|무조건|포함해)", normalized))
+        if has_negative and has_positive:
+            return None
+        requirement_type = self._explicit_requirement_type(text)
+        if requirement_type is None:
+            return None
+        facets = self._explicit_requirement_facets(category_id, text)
+        if not facets:
+            return None
+        parsed = self._preference_result(
+            category_id,
+            text,
+            facets,
+            polarity_source=f"EXPLICIT_{requirement_type}_FRAME",
+            modality_scope="EXPLICIT_REQUIREMENT_FRAME",
+        )
+        constraints = tuple(
+            replace(item, constraint_type=requirement_type)
+            for item in parsed.constraints
+        )
+        return replace(parsed, constraints=constraints)
+
     def alternative_preference_group(
         self, category_id: str, text: str
     ) -> PreferenceGroup | None:
@@ -525,14 +666,12 @@ class ConstraintInputPolicy:
         return self.matcher.match(category_id, text).facets
 
     def conflict_warnings(self, category_id: str, text: str) -> tuple[str, ...]:
-        match = re.fullmatch(
-            r"(.+?)이면서\s+(.+?)인\s+제품으로\s+부탁(?:해요|드립니다)[.!?]?",
-            text.strip(),
-        )
-        if match is None:
+        branches = self._conflict_branches(text)
+        if branches is None:
             return ()
-        left = self._branch_facets(category_id, match.group(1))
-        right = self._branch_facets(category_id, match.group(2))
+        left_text, right_text = branches
+        left = self._branch_facets(category_id, left_text)
+        right = self._branch_facets(category_id, right_text)
         conflicts = {
             (left_item.facet_name, left_item.value_code, right_item.value_code)
             for left_item in left
@@ -540,10 +679,45 @@ class ConstraintInputPolicy:
             if left_item.facet_name == right_item.facet_name
             and left_item.value_code != right_item.value_code
         }
-        return tuple(
+        warnings = [
             f"CONFLICTING_VALUES:{facet_name}:{left_code}:{right_code}"
             for facet_name, left_code, right_code in sorted(conflicts)
+        ]
+        if any(marker in normalize(text) for marker in ("피하", "제외", "말고", "싫")):
+            same_value = {
+                (left_item.facet_name, left_item.value_code)
+                for left_item in left
+                for right_item in right
+                if left_item.facet_name == right_item.facet_name
+                and left_item.value_code == right_item.value_code
+            }
+            warnings.extend(
+                f"CONFLICTING_POLARITY:{facet_name}:{value_code}"
+                for facet_name, value_code in sorted(same_value)
+            )
+        return tuple(warnings)
+
+    @staticmethod
+    def _conflict_branches(text: str) -> tuple[str, str] | None:
+        value = text.strip()
+        conjunction = re.fullmatch(
+            r"(.+?)이면서\s+(.+?)인\s+제품으로\s+부탁(?:해요|드립니다)[.!?]?",
+            value,
         )
+        if conjunction is not None:
+            return conjunction.group(1), conjunction.group(2)
+        contrast = re.fullmatch(
+            r"(.+?)(?:이어야|여야)\s*하지만,?\s*(?:동시에\s*)?(.+?)(?:이어야|여야)\s*(?:해요|합니다)?[.!?]?",
+            value,
+        )
+        if contrast is None:
+            contrast = re.fullmatch(
+                r"(.+?)(?:이어야|여야)\s*하지만,?\s*(?:동시에\s*)?(.+?)(?:피하고\s*싶어(?:요|해요|합니다)?)[.!?]?",
+                value,
+            )
+        if contrast is not None:
+            return contrast.group(1), contrast.group(2)
+        return None
 
     @staticmethod
     def _conjunction_match(text: str) -> re.Match[str] | None:
@@ -567,15 +741,12 @@ class ConstraintInputPolicy:
         tuple[MatchedFacet, ...],
         tuple[TaxonomyEquivalence, ...],
     ]:
-        match = self._conjunction_match(text)
-        if match is None:
+        branches = self._conflict_branches(text)
+        if branches is None:
             return (), (), ()
-        left, left_equivalences = self._resolved_branch_facets(
-            category_id, match.group(1)
-        )
-        right, right_equivalences = self._resolved_branch_facets(
-            category_id, match.group(2)
-        )
+        left_text, right_text = branches
+        left, left_equivalences = self._resolved_branch_facets(category_id, left_text)
+        right, right_equivalences = self._resolved_branch_facets(category_id, right_text)
         equivalences = self._dedupe_equivalences(
             (*left_equivalences, *right_equivalences)
         )
@@ -586,12 +757,24 @@ class ConstraintInputPolicy:
             if left_item.facet_name == right_item.facet_name
             and left_item.value_code != right_item.value_code
         }
-        warnings = tuple(
+        warnings = list(
             f"CONFLICTING_VALUES:{facet_name}:{left_code}:{right_code}"
             for facet_name, left_code, right_code in sorted(conflicts)
         )
+        if any(marker in normalize(text) for marker in ("피하", "제외", "말고", "싫")):
+            same_value = {
+                (left_item.facet_name, left_item.value_code)
+                for left_item in left
+                for right_item in right
+                if left_item.facet_name == right_item.facet_name
+                and left_item.value_code == right_item.value_code
+            }
+            warnings.extend(
+                f"CONFLICTING_POLARITY:{facet_name}:{value_code}"
+                for facet_name, value_code in sorted(same_value)
+            )
         combined = tuple(dict.fromkeys((*left, *right)))
-        return warnings, combined, equivalences
+        return tuple(warnings), combined, equivalences
 
     def has_taxonomy_code_collision(self, category_id: str, text: str) -> bool:
         grouped: dict[tuple[int, int, str], set[int]] = {}
@@ -757,6 +940,43 @@ class ConstraintInputPolicy:
         interpreted = baseline
         method = "V042_LANGUAGE_PROOF"
         taxonomy_equivalences: tuple[TaxonomyEquivalence, ...] = ()
+        # Conflict detection must precede the normal parsed path.  A sentence
+        # can contain two individually valid values and therefore look PARSED
+        # before the same-facet contradiction is checked.
+        if self.classifier.input_channel_typed_nonblocking_states:
+            conflict, _, conflict_equivalences = self.resolved_conflict(
+                category_id, value
+            )
+            if conflict:
+                return DemandRequirementResult(
+                    status="CONFLICT",
+                    constraints=(),
+                    warnings=conflict,
+                    clauses=(value,),
+                    interpretation_method="TYPED_CONFLICT_STATE",
+                    effective_requirement_mode="NONE",
+                    diagnostic_code="CONFLICTING_SAME_FACET_VALUES",
+                    taxonomy_equivalences=conflict_equivalences,
+                )
+        # Preserve the extractor's conservative REVIEW states.  The explicit
+        # frame is a fallback for clear user-owned requests only; it must not
+        # turn reported speech, unresolved negation, or non-final comparisons
+        # into an actionable constraint.
+        fallback_safe_review = baseline.status == "REVIEW" and all(
+            warning.startswith((
+                "PREDICATE_EVENT_UNRESOLVED:",
+                "NO_FACET_CONSTRAINT_EXTRACTED",
+            ))
+            for warning in baseline.warnings
+        )
+        explicit = (
+            self._explicit_requirement_result(category_id, value)
+            if baseline.status == "PARSED" or fallback_safe_review
+            else None
+        )
+        if explicit is not None:
+            interpreted = explicit
+            method = "EXPLICIT_REQUIREMENT_FRAME"
         if self.classifier.input_channel_default_prefer_exact_value:
             if self.classifier.input_channel_equivalent_taxonomy_codes:
                 exact, equivalence = self.resolved_exact_match(category_id, value)
