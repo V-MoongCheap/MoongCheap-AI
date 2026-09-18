@@ -1,0 +1,102 @@
+# Seller Demand Analysis API CI/CD Handoff (Part C)
+# 실제 Secret 값은 작성하지 않습니다.
+
+repository: https://github.com/V-MoongCheap/MoongCheap-AI
+branch: develop
+
+# 테스트는 pandas(tests/seller_analysis/test_baseline.py)와 pytest 가 필요하다.
+# requirements-api.txt 만으로는 수집 단계에서 실패한다.
+build_command: "pip install -r requirements-api.txt \"pytest>=8,<9\" \"pandas>=2.2,<3\""
+test_command: "pytest tests/seller_analysis"
+ci_tools: [python3.13, pip]  # Python 3.11(Cloud Jenkins python-builder 이미지)에서도 121 passed 확인
+
+dockerfile_path: docker/Dockerfile.seller-analysis
+image_size: "220MB (linux/amd64)"
+container_image_name: ai-seller-analysis  # ECR repository 최종 명칭은 인프라 확인. Cloud values/services/ai.yaml 은 REPLACE_ME/ai
+container_build_command: "docker build --platform linux/amd64 -f docker/Dockerfile.seller-analysis -t <repo>:develop-<git-short-sha> ."
+container_build_context: "저장소 루트"  # Dockerfile 이 requirements-api.txt · src · docs/contracts 를 루트 기준으로 COPY 한다
+container_architecture: linux/amd64  # BE·AI 공유 노드(workload=backend-ai) 기준
+
+# Cloud Jenkinsfile.template 은 Kaniko 로 `pwd`/Dockerfile 을 빌드한다.
+# 이 이미지는 --dockerfile 을 docker/Dockerfile.seller-analysis 로 지정해야 한다.
+# docker/Dockerfile.seller-analysis.dockerignore 는 BuildKit 의 Dockerfile 별 제외 규칙이다.
+# 빌더가 이 파일을 읽지 않으면 `COPY src` 가 __pycache__ 등 작업 공간의 생성 파일까지 담을 수 있다.
+# CI 가 같은 작업 공간에서 테스트를 먼저 돌리면 생긴다. 이미지 내용이 같다고 보장하지 않는다.
+# 제외 규칙 적용은 검증 대기 — Kaniko 와 BuildKit 모두 실행해 보지 않았다(로컬 검증은 구형 빌더).
+kaniko_build_verified: false
+
+application_port: 8081
+# ⚠️ Cloud develop(4f450fb) values/services/ai.yaml 의 containerPort 는 8000 이다(초기 틀).
+#    이 이미지는 8081 에서만 듣는다. 배포 시 containerPort 를 8081 로 맞춰야 한다.
+health_check_path: /health
+metrics_path: ""  # 메트릭 엔드포인트 없음
+
+kubernetes:
+  workload_kind: Deployment  # 상주 HTTP 서버. Cloud moongcheap-service 차트가 Deployment·Service 를 렌더링한다
+  helm_values_file: gitops/values/services/ai.yaml  # MoongCheap-Cloud. 이 ai 서비스가 판매자 수요 분석 API 전용인지는 미확인
+  namespace_example: moongcheap-develop  # Cloud ApplicationSet(moongcheap-services-develop) destination
+  service_port: 80  # Cloud values 의 service.port. 컨테이너 8081 로 연결
+  node_selector:
+    workload: backend-ai  # Cloud values/services/ai.yaml 과 같음
+  probes:
+    readiness: /health
+    liveness: /health
+    status: "Cloud values 에는 둘 다 enabled: false. /health 는 프로세스 기동만 확인하며 계약 경로의 이상은 잡지 못한다"
+  security_context_recommended:
+    run_as_non_root: true
+    run_as_user: 65534
+    run_as_group: 65534
+    read_only_root_filesystem: true
+    allow_privilege_escalation: false
+    capabilities_drop: [ALL]
+    seccomp_profile: RuntimeDefault
+    status: "Cloud 차트 deployment.yaml 은 securityContext·volume 을 렌더링하지 않는다. 이미지의 USER 65534 는 차트와 무관하게 적용된다"
+
+environment_variables:
+  - name: SELLER_ANALYSIS_ALLOW_UNAUTHENTICATED
+    purpose: "인증 없이 기동할 때만 1. 운영에서는 설정하지 않음 (선택)"
+
+secret_variables:
+  - name: SELLER_ANALYSIS_INTERNAL_KEY
+    purpose: "Backend → AI 내부 호출 인증 키. 요청 헤더 X-Internal-Key 와 비교"
+    source:
+      provider: aws-ssm-parameter-store
+      type: SecureString
+    injection: "환경 변수 주입 (2026-09-16 인프라 확인). 값의 공급 경로와 Kubernetes Secret 구성은 배포 환경 소관"
+    secret_name: ""  # 인프라 확정. 네이밍 규약서의 {service}-{용도}-secret, B 인계서 선례는 ai-backend-internal-key
+    secret_key: internal-key  # B 인계서 선례와 같게 제안
+    open_questions:
+      - "B 배치(AI → Backend)의 ai-backend-internal-key 와 같은 키를 쓸지, 방향별로 나눌지 미정"
+      - "Backend → AI 호출 클라이언트를 Backend 저장소에서 찾지 못해, Backend 가 보낼 헤더 이름은 미확인이다. 이 API 는 합의대로 X-Internal-Key 만 읽는다 (다른 이름으로 오면 403 확인, 2026-09-17). Backend develop 의 InternalApiKeyFilter(X-Internal-Api-Key)는 Backend 가 받는 요청용이라 이 API 호출과 방향이 다르다"
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+  gpu: false
+  status: "초기 제안값. 컨테이너 실측 79 MiB(arm64 호스트의 amd64 에뮬레이션), 로컬 실행 RSS 44.6 MiB. 동시성 기준 측정 아님"
+
+runtime_filesystem:
+  read_only_root: true
+  run_as_user: 65534
+  run_as_group: 65534
+  writable_paths: []   # 파일을 쓰지 않음
+  read_only_mounts: [] # 모델·아티팩트 마운트 없음
+
+external_dependencies:
+  - "없음 — DB·모델·외부 API 를 호출하지 않는다. Backend 가 요청 본문으로 준 값만 계산한다"
+
+notes: >-
+  판매자 수요 분석 API 는 상주 서버이며 Part A/B 배치와 다른 이미지다.
+  SELLER_ANALYSIS_INTERNAL_KEY 없이는 기동하지 않는다. 인증이 빠진 채 떠 있으면
+  헬스체크와 정상 응답이 모두 통과해 조용히 고장 나기 때문이다.
+  Parameter Store 조회 권한과 Kubernetes Secret 동기화는 배포 환경이 담당하며
+  앱은 AWS API 를 직접 호출하지 않는다.
+  이미지 push, GitOps 갱신, ArgoCD/EKS 연결은 인프라 측 작업이다.
+  이 저장소에는 Kustomize 매니페스트를 두지 않는다. Cloud moongcheap-service 차트가 이미
+  Deployment·Service 를 렌더링하므로, 위 kubernetes 항목을 Cloud values 에 반영하면 된다.
+  앱은 인증 키를 환경 변수 하나로만 받는다. 포트는 8081 로 고정이며 환경 변수로 바꾸지 않는다.
+  기능 존폐가 PM 결정 대기이므로 배포 대상 포함 여부는 별도 확인이 필요하다.
