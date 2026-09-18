@@ -540,45 +540,10 @@ class ConstraintInputPolicy:
             if left_item.facet_name == right_item.facet_name
             and left_item.value_code != right_item.value_code
         }
-        warnings = [
+        return tuple(
             f"CONFLICTING_VALUES:{facet_name}:{left_code}:{right_code}"
             for facet_name, left_code, right_code in sorted(conflicts)
-        ]
-        if any(marker in normalize(text) for marker in ("피하", "제외", "말고", "싫")):
-            same_value = {
-                (left_item.facet_name, left_item.value_code)
-                for left_item in left
-                for right_item in right
-                if left_item.facet_name == right_item.facet_name
-                and left_item.value_code == right_item.value_code
-            }
-            warnings.extend(
-                f"CONFLICTING_POLARITY:{facet_name}:{value_code}"
-                for facet_name, value_code in sorted(same_value)
-            )
-        return tuple(warnings)
-
-    @staticmethod
-    def _conflict_branches(text: str) -> tuple[str, str] | None:
-        value = text.strip()
-        conjunction = re.fullmatch(
-            r"(.+?)이면서\s+(.+?)인\s+제품으로\s+부탁(?:해요|드립니다)[.!?]?",
-            value,
         )
-        if conjunction is not None:
-            return conjunction.group(1), conjunction.group(2)
-        contrast = re.fullmatch(
-            r"(.+?)(?:이어야|여야)\s*하지만,?\s*(?:동시에\s*)?(.+?)(?:이어야|여야)\s*(?:해요|합니다)?[.!?]?",
-            value,
-        )
-        if contrast is None:
-            contrast = re.fullmatch(
-                r"(.+?)(?:이어야|여야)\s*하지만,?\s*(?:동시에\s*)?(.+?)(?:피하고\s*싶어(?:요|해요|합니다)?)[.!?]?",
-                value,
-            )
-        if contrast is not None:
-            return contrast.group(1), contrast.group(2)
-        return None
 
     @staticmethod
     def _conjunction_match(text: str) -> re.Match[str] | None:
@@ -621,24 +586,12 @@ class ConstraintInputPolicy:
             if left_item.facet_name == right_item.facet_name
             and left_item.value_code != right_item.value_code
         }
-        warnings = list(
+        warnings = tuple(
             f"CONFLICTING_VALUES:{facet_name}:{left_code}:{right_code}"
             for facet_name, left_code, right_code in sorted(conflicts)
         )
-        if any(marker in normalize(text) for marker in ("피하", "제외", "말고", "싫")):
-            same_value = {
-                (left_item.facet_name, left_item.value_code)
-                for left_item in left
-                for right_item in right
-                if left_item.facet_name == right_item.facet_name
-                and left_item.value_code == right_item.value_code
-            }
-            warnings.extend(
-                f"CONFLICTING_POLARITY:{facet_name}:{value_code}"
-                for facet_name, value_code in sorted(same_value)
-            )
         combined = tuple(dict.fromkeys((*left, *right)))
-        return tuple(warnings), combined, equivalences
+        return warnings, combined, equivalences
 
     def has_taxonomy_code_collision(self, category_id: str, text: str) -> bool:
         grouped: dict[tuple[int, int, str], set[int]] = {}
