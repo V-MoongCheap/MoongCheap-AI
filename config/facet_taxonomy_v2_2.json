@@ -1740,7 +1740,7 @@
             {
               "code": 1,
               "value": "프로바이오틱스",
-              "aliases": [],
+              "aliases": ["프로바이오틱스 제품"],
               "status": "PROVISIONAL"
             },
             {
@@ -1753,7 +1753,8 @@
               "code": 3,
               "value": "프로바이오틱스 제품",
               "aliases": [],
-              "status": "PROVISIONAL"
+              "status": "DEPRECATED",
+              "canonical_code": 1
             },
             {
               "code": 4,
@@ -2310,14 +2311,15 @@
             {
               "code": 1,
               "value": "홍삼",
-              "aliases": [],
+              "aliases": ["홍삼제품"],
               "status": "PROVISIONAL"
             },
             {
               "code": 2,
               "value": "홍삼제품",
               "aliases": [],
-              "status": "PROVISIONAL"
+              "status": "DEPRECATED",
+              "canonical_code": 1
             },
             {
               "code": 3,
@@ -2892,7 +2894,7 @@
             {
               "code": 2,
               "value": "비타민 D",
-              "aliases": [],
+              "aliases": ["비타민D"],
               "status": "PROVISIONAL"
             },
             {
@@ -2911,7 +2913,8 @@
               "code": 5,
               "value": "비타민D",
               "aliases": [],
-              "status": "PROVISIONAL"
+              "status": "DEPRECATED",
+              "canonical_code": 2
             },
             {
               "code": 6,

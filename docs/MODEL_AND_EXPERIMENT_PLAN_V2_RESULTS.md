@@ -134,14 +134,14 @@ Rule-only는 다음 장점이 있다.
 
 LLM은 자연어 표현의 확장성과 애매한 요청 처리에 유리하지만, Model-only에서는 Taxonomy 외부의 값, 잘못된 Facet 이름, 누락 응답이 발생할 수 있다. 따라서 LLM은 Rule 결과를 대체하는 주 처리기가 아니라 제한적 fallback으로 사용한다.
 
-### 12.2 Qwen 2.5 7B를 fallback 후보로 둔 이유
+### 12.2 Qwen 2.5 7B를 fallback으로 선정한 이유
 
 - 동일 200건 전체에서 200건 응답 성공
 - Model-only 59%로 Rule-only보다 낮지만, Hybrid 71%로 Rule-only보다 2%p 높음
 - 소형 모델 후보 중 현재 Ollama 환경에서 재현 가능
 - 요청 단위 호출과 Taxonomy 검증을 적용할 수 있음
 
-이는 Qwen이 최종 정답 모델이라는 뜻이 아니다. 실제 운영에서는 실패·충돌·검토 대상에만 제한적으로 호출하며, 모델 결과가 Rule 결과를 덮어쓸 조건을 엄격히 제한한다.
+이는 Qwen이 Model-only 정답 모델이라는 뜻이 아니다. 실제 운영에서는 미해결 양성 요청에만 제한적으로 호출하며, 모델 결과가 Rule 결과를 덮어쓸 조건을 엄격히 제한한다. 이 fallback은 `a-labeling-batch`에 선택형으로 구현되어 있고 기본값은 비활성이다.
 
 ## 13. 재현 명령
 
@@ -176,7 +176,7 @@ Model 2 실행에는 동일한 Taxonomy, Demand 입력, Product Facet 매핑, Ol
 
 1. Model 1 Facet Review Queue를 Human Review하여 Taxonomy V0를 확정한다.
 2. 확정 Taxonomy와 Product Facet 매핑을 기준으로 Model 2를 재평가한다.
-3. Model 2의 `NEEDS_REVIEW` 입력만 Qwen fallback으로 호출하는 배치 경로를 구현한다.
+3. `a-labeling-batch`의 선택형 Qwen fallback을 Ollama 환경에서 timeout·실패·재처리까지 검증한다.
 4. A 파트 DB 직접 쓰기 배치와 멱등성·재처리 정책을 연결한다.
 5. B 파트 Clustering 입력 계약에 Label과 상태 필드만 전달한다.
 6. Embedding 모델 비교는 Model 2와 분리하여 B/C의 Cluster·Seller Matching 평가 세트로 진행한다.

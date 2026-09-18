@@ -1,6 +1,14 @@
 import pandas as pd
 
-from moongcheap_ai.data_foundation.postgres_reader import resolve_taxonomy_category_keys
+from moongcheap_ai.data_foundation.postgres_reader import (
+    DEFAULT_DEMANDS_SQL,
+    resolve_taxonomy_category_keys,
+)
+
+
+def test_reader_only_selects_unassigned_unprocessed_demands() -> None:
+    assert "d.status = 'UNASSIGNED'" in DEFAULT_DEMANDS_SQL
+    assert "d.processed_at IS NULL" in DEFAULT_DEMANDS_SQL
 
 
 def test_resolve_category_key_from_full_facet_text() -> None:

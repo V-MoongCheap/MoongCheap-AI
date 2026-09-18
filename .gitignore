@@ -18,6 +18,7 @@ __pycache__/
 .pytest_cache/
 .pytest_tmp*/
 .venv/
+.venv-model-*/
 .venv_translation/
 venv/
 .mypy_cache/
@@ -61,6 +62,9 @@ data/processed/*
 !data/processed/**/.gitkeep
 data/reports/*
 !data/reports/.gitkeep
+
+# Local handoff and machine-specific transfer workspace
+codex_private_handoff/
 
 # Review artifacts may contain source review text and stay local-only.
 data/processed/reviews/nutrime/nutrime_consumer_facet_discovery.csv

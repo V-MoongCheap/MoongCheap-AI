@@ -46,6 +46,21 @@ def test_build_input_keeps_all_observed_categories(monkeypatch) -> None:
     assert "GROUNDED_DEMAND_SYNTHETIC" not in set(result["source_type"])
 
 
+def test_default_input_is_not_limited_to_smoke_categories(monkeypatch) -> None:
+    frames = {
+        "products": _source("health-functional-food:joint_health", "MFDS_PRODUCT", "p1"),
+        "sellers": _source("health-functional-food:propolis", "SELLER_LISTING", "s1"),
+        "queries": _source("health-functional-food:eye_health", "CONSUMER_SEARCH", "q1"),
+    }
+    monkeypatch.setattr(runner, "load_products", lambda *args, **kwargs: frames["products"])
+    monkeypatch.setattr(runner, "load_seller_offers", lambda *args, **kwargs: frames["sellers"])
+    monkeypatch.setattr(runner, "load_translated_queries", lambda *args, **kwargs: frames["queries"])
+
+    result = runner.build_multisource_input({"products": "p", "sellers": "s", "queries": "q"})
+
+    assert "health-functional-food:joint_health" in set(result["category_key"])
+
+
 def test_model_does_not_receive_price_as_facet_evidence(monkeypatch) -> None:
     captured: list[list[dict]] = []
 
@@ -77,4 +92,3 @@ def test_model_does_not_receive_price_as_facet_evidence(monkeypatch) -> None:
     assert not failures
     assert candidates
     assert captured[0][0]["price_text"] == ""
-

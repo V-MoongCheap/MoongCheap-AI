@@ -26,7 +26,8 @@
 - AI는 인증·권한, 원본 데이터, 수요·응찰·낙찰 상태를 관리하지 않습니다.
 - AI 전용 DB, 임의의 테이블/컬럼/상태 추가를 전제로 하지 않습니다.
 - Consumer RAG 챗봇은 현재 MVP에서 제외합니다.
-- 특정 모델(Qwen3 등), Vector DB, 상시 모델 서버는 확정하지 않습니다.
+- Model 1은 Rule/통계 Evidence를 주 경로로 하고 `kakaocorp/kanana-nano-2.1b-instruct`를 후보 생성 보조로 사용합니다. Model 2는 Rule-first Hybrid를 기본으로 하며 `qwen2.5:7b-instruct`는 미해결 양성 요구에 대한 선택적 fallback입니다. 두 모델 모두 Taxonomy 검증과 Human Review 경계를 통과하지 않은 결과를 자동 확정하지 않습니다.
+- Embedding과 Vector DB는 Model 1/2의 필수 구성으로 확정하지 않았으며, B/C의 Clustering·Seller Matching 실험 범위에서 별도 검토합니다.
 
 수요 클러스터링(B파트)은 Demand·DemandBoard·거절 이력을 읽기 전용으로 조회하고,
 생성·편입·대체 제안 계획을 Backend 내부 API로 전달합니다. 이 경로의 DB 반영,
@@ -69,3 +70,13 @@ CronJob·환경 변수·Secret·AI 전용 노드 설정은
 5. 작성자가 아닌 팀원 1명의 승인과 CI 통과 후 squash merge합니다.
 
 자세한 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참고하세요.
+
+## 현재 기준 문서
+
+문서 간 해석이 충돌할 때는 다음 순서를 따른다.
+
+1. [문서 상태 및 기준표](docs/DOCUMENT_STATUS.md)
+2. [모델 선택 최종 결과](docs/MODEL_SELECTION_FINAL_V1.md)
+3. [데이터 계보](docs/DATA_LINEAGE.md)
+4. [Model 1 멀티소스 입력 정책](docs/MODEL1_MULTISOURCE_SOURCE_POLICY_V1.md)
+5. [B 연계 계약](docs/PART_B_V22_INTEGRATION.md)

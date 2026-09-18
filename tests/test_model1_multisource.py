@@ -156,3 +156,108 @@ def test_facet_input_excludes_synthetic_demand_sources(monkeypatch):
     })
 
     assert set(result["source_type"]) == {"MFDS_PRODUCT"}
+
+
+def test_unified_evidence_is_adapted_only_for_explicit_service_categories(tmp_path):
+    evidence = pd.DataFrame([
+        {
+            "evidence_id": "r1",
+            "category": "health-functional-food:probiotics",
+            "service_category": "health-functional-food:probiotics",
+            "source": "nutrime",
+            "source_type": "KOREAN_HFF_RAW_REVIEW",
+            "document_id": "review-1",
+            "product_ref": "catalog-1",
+            "text_raw": "캡슐이라 목넘김이 편해요",
+            "normalized_attribute": "product_form",
+            "normalized_value": "capsule",
+            "evidence_term": "capsule",
+        },
+        {
+            "evidence_id": "r2",
+            "category": "health-functional-food",
+            "service_category": "health-functional-food",
+            "source": "nutrime",
+            "source_type": "KOREAN_HFF_RAW_REVIEW",
+            "document_id": "review-2",
+            "product_ref": "catalog-2",
+            "text_raw": "일반 건강식품 리뷰",
+            "normalized_attribute": "product_form",
+            "normalized_value": "capsule",
+            "evidence_term": "capsule",
+        },
+    ])
+    path = tmp_path / "facet_evidence.csv"
+    evidence.to_csv(path, index=False)
+
+    result = MODULE.load_unified_evidence(path, max_per_category=10)
+
+    assert len(result) == 1
+    assert result.iloc[0]["source_type"] == "EVIDENCE_KOREAN_HFF_RAW_REVIEW"
+    assert result.iloc[0]["category_key"] == "health-functional-food:probiotics"
+    assert result.iloc[0]["evidence_text"] == "캡슐이라 목넘김이 편해요"
+
+
+def test_unified_evidence_normalizes_uppercase_service_category(tmp_path):
+    evidence = pd.DataFrame([
+        {
+            "service_category": "VITAMIN_MINERAL",
+            "source": "mfds",
+            "source_type": "PRODUCT_FACT",
+            "document_id": "product-1",
+            "product_ref": "product-1",
+            "text_raw": "정제 비타민",
+            "normalized_attribute": "product_form",
+            "normalized_value": "정제",
+            "evidence_term": "정제",
+        },
+        {
+            "service_category": "health-functional-food",
+            "source": "generic",
+            "source_type": "KOREAN_EXPRESSION_REFERENCE",
+            "document_id": "generic-1",
+            "evidence_term": "건강식품",
+        },
+        {
+            "service_category": "UNMAPPED",
+            "source": "generic",
+            "source_type": "PRODUCT_FACT",
+            "document_id": "unmapped-1",
+            "evidence_term": "미분류",
+        },
+    ])
+    path = tmp_path / "facet_evidence.csv"
+    evidence.to_csv(path, index=False)
+
+    result = MODULE.load_unified_evidence(path, max_per_category=10)
+
+    assert len(result) == 1
+    assert result.iloc[0]["category_key"] == "health-functional-food:vitamin_mineral"
+
+
+def test_unified_evidence_sampling_preserves_source_types(tmp_path):
+    rows = []
+    for source_type in ("PRODUCT_FACT", "SELLER_PRODUCT_EVIDENCE", "KOREAN_HFF_RAW_REVIEW"):
+        for number in range(10):
+            rows.append(
+                {
+                    "service_category": "PROBIOTICS",
+                    "source": source_type,
+                    "source_type": source_type,
+                    "document_id": f"{source_type}-{number}",
+                    "product_ref": f"p-{number}",
+                    "text_raw": source_type,
+                    "evidence_term": source_type,
+                }
+            )
+    path = tmp_path / "facet_evidence.csv"
+    pd.DataFrame(rows).to_csv(path, index=False)
+
+    result = MODULE.load_unified_evidence(path, max_per_category=6)
+
+    assert len(result) == 6
+    assert set(result["source_type"]) == {
+        "EVIDENCE_PRODUCT_FACT",
+        "EVIDENCE_SELLER_PRODUCT_EVIDENCE",
+        "EVIDENCE_KOREAN_HFF_RAW_REVIEW",
+    }

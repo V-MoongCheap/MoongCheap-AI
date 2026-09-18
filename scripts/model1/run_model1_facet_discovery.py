@@ -9,8 +9,7 @@ import pandas as pd
 
 from moongcheap_ai.data_foundation.model1 import (
     ModelCallError,
-    OllamaAdapter,
-    UnavailableModelAdapter,
+    create_model_adapter,
     discover_model_config,
     parse_model_output,
     sample_products,
@@ -32,7 +31,9 @@ def main() -> None:
     config = discover_model_config()
     started = time.perf_counter()
     target_categories = {"health-functional-food:vitamin_mineral", "health-functional-food:probiotics", "health-functional-food:skin_collagen"} if args.smoke_only else set(sampled["category_key"].unique())
-    model = OllamaAdapter(config.model) if config and config.provider.casefold() == "ollama" else UnavailableModelAdapter()
+    provider = config.provider if config else "transformers"
+    model_name = config.model if config else "kakaocorp/kanana-nano-2.1b-instruct"
+    model = create_model_adapter(provider, model_name)
     raw_path = args.output_dir / "facet_discovery_model_raw_v0.jsonl"
     review_rows, failures, merged = [], [], []
     calls = 0
@@ -60,12 +61,12 @@ def main() -> None:
     status = "COMPLETED" if calls == len(target_categories) and not failures else "COMPLETED_WITH_WARNINGS" if calls else "BLOCKED_NO_EXECUTABLE_MODEL"
     report = {"status": status, "provider": getattr(model, "provider", None), "model": getattr(model, "model", None), "prompt_version": "facet_discovery_v0", "sampling_seed": 42, "category_sample_counts": sampled[sampled["category_key"].isin(target_categories)].groupby("category_key").size().to_dict() if not sampled.empty else {}, "category_count": len(target_categories), "model_call_count": calls, "input_token": None, "output_token": None, "runtime_seconds": round(time.perf_counter() - started, 3), "api_cost": 0 if calls and getattr(model, "provider", "") == "ollama" else None, "failure_count": len(failures)}
     if not calls:
-        report["blocker"] = "No MODEL1_PROVIDER/MODEL1_MODEL configuration, no executable local model detected; no fake model output was created."
+        report["blocker"] = f"No executable Model 1 runtime for provider={provider}, model={model_name}; no fake model output was created."
     pd.DataFrame(failures, columns=["failure_type", "category_key", "detail"]).to_csv(args.output_dir / "facet_discovery_failures_v0.csv", index=False, encoding="utf-8-sig")
     pd.DataFrame(review_rows, columns=["category_key", "category_name", "facet_id_candidate", "name", "definition", "value", "alias", "source_product_id", "source_field", "source_text", "status"]).to_csv(args.output_dir / "facet_discovery_model_review_v0.csv", index=False, encoding="utf-8-sig")
     (args.output_dir / "facet_discovery_model_merged_v0.json").write_text(json.dumps({"status": status, "categories": merged}, ensure_ascii=False, indent=2), encoding="utf-8")
     pd.DataFrame(columns=["category_name", "normalized_facet_candidate", "comparison_status", "rule_support", "model_support", "rule_evidence", "model_evidence"]).to_csv(args.output_dir / "facet_discovery_comparison_v0.csv", index=False, encoding="utf-8-sig")
-    (args.output_dir / "facet_discovery_model_report_v0.md").write_text(f"# Model 1 Facet Discovery V0\n\n- Status: {status}\n- Provider: {report['provider']}\n- Model: {report['model']}\n- Category calls: {calls}/{len(target_categories)}\n- Input samples: {sum(report['category_sample_counts'].values())}\n- Token usage: null when provider does not report it\n- API cost: {report['api_cost']}\n- No Model 1 output is treated as final taxonomy.\n" + ("- Blocker: install/configure Ollama and set `MODEL1_PROVIDER=ollama`, `MODEL1_MODEL=<ollama list result>`.\n" if not calls else ""), encoding="utf-8")
+    (args.output_dir / "facet_discovery_model_report_v0.md").write_text(f"# Model 1 Facet Discovery V0\n\n- Status: {status}\n- Provider: {report['provider']}\n- Model: {report['model']}\n- Category calls: {calls}/{len(target_categories)}\n- Input samples: {sum(report['category_sample_counts'].values())}\n- Token usage: null when provider does not report it\n- API cost: {report['api_cost']}\n- No Model 1 output is treated as final taxonomy.\n" + (f"- Blocker: install/configure the `{provider}` runtime for `{model_name}`.\n" if not calls else ""), encoding="utf-8")
     print(report)
 
 
