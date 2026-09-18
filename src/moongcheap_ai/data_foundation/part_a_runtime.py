@@ -16,6 +16,7 @@ import pandas as pd
 
 from ..demand_constraints import DemandConstraintParser
 from .labeling import TaxonomyLoader
+from .part_a_input_policy import PartAConstraintInputPolicy
 
 RUNTIME_VERSION = "part-a-runtime.v2.2"
 STATUSES = {
@@ -109,7 +110,10 @@ def run_part_a_batch(
     taxonomy = TaxonomyLoader.from_path(taxonomy_path)
     payload = taxonomy.taxonomy
     parser = DemandConstraintParser.from_taxonomy(
-        payload, rules_path=rules_path, aliases_path=alias_registry_path
+        payload,
+        rules_path=rules_path,
+        aliases_path=alias_registry_path,
+        policy_cls=PartAConstraintInputPolicy,
     )
     source = demands.fillna("").copy()
     if skip_processed and "processed_at" in source.columns:

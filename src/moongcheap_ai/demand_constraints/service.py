@@ -33,11 +33,12 @@ class DemandConstraintParser:
         *,
         rules_path: str | Path,
         aliases_path: str | Path | None = None,
+        policy_cls: type[ConstraintInputPolicy] = ConstraintInputPolicy,
     ) -> DemandConstraintParser:
         matcher = TaxonomyFacetMatcher(taxonomy, aliases_path)
         classifier = ConstraintClassifier.from_path(rules_path)
         extractor = ConstraintExtractor(matcher, classifier)
-        return cls(extractor, ConstraintInputPolicy(matcher, extractor))
+        return cls(extractor, policy_cls(matcher, extractor))
 
     def parse(self, category_id: str, extra_requirement: str) -> ExtractionResult:
         """Return the frozen language-only result for evaluation compatibility."""
