@@ -132,6 +132,34 @@ def test_conflict_is_diagnostic_but_has_no_effective_signal(
     assert result.constraints == ()
 
 
+def test_contrastive_same_facet_conflict_is_detected_before_parsed(
+    parser: DemandConstraintParser,
+) -> None:
+    result = parser.interpret(
+        "health-functional-food:protein",
+        "분말 형태여야 하지만, 동시에 정 형태여야 해요.",
+        is_substitutable=True,
+    )
+
+    assert result.status == "CONFLICT"
+    assert result.diagnostic_code == "CONFLICTING_SAME_FACET_VALUES"
+    assert result.constraints == ()
+
+
+def test_contrastive_positive_and_negative_same_value_is_conflict(
+    parser: DemandConstraintParser,
+) -> None:
+    result = parser.interpret(
+        "health-functional-food:protein",
+        "분말 형태여야 하지만, 동시에 분말 형태는 피하고 싶어요.",
+        is_substitutable=True,
+    )
+
+    assert result.status == "CONFLICT"
+    assert result.diagnostic_code == "CONFLICTING_SAME_FACET_VALUES"
+    assert result.constraints == ()
+
+
 def test_lexical_aversion_is_an_exclusion(
     parser: DemandConstraintParser,
 ) -> None:
