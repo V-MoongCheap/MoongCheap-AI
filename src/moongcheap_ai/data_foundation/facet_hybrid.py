@@ -18,10 +18,21 @@ RULE_FIELDS = {
     "product_form": "product_form",
     "functional_ingredients": "functional_ingredients",
 }
+PLACEHOLDER_TERMS = ("상세설명", "상품상세", "상품 설명", "상세페이지", "참조")
+PRODUCT_FORM_VALUES = {"정", "분말", "캡슐", "액상", "환", "젤리", "과립", "기타"}
 
 
 def _text(value: Any) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or ""))).strip()
+
+
+def _is_usable_rule_value(facet_id: str, value: str) -> bool:
+    normalized = _text(value)
+    if not normalized or any(term in normalized for term in PLACEHOLDER_TERMS):
+        return False
+    if facet_id == "product_form":
+        return normalized in PRODUCT_FORM_VALUES
+    return True
 
 
 def _key(facet_id: Any, value: Any) -> tuple[str, str]:
@@ -47,7 +58,7 @@ def build_rule_candidates(inputs: pd.DataFrame, min_support: int = 1, min_ratio:
         for facet_id, source_field in RULE_FIELDS.items():
             raw = _text(row.get(source_field, ""))
             for value in atomic_values(facet_id, raw):
-                if not value:
+                if not _is_usable_rule_value(facet_id, value):
                     continue
                 rows.append({
                     "category_key": _text(row.get("category_key", "")),
@@ -80,7 +91,17 @@ def build_rule_candidates(inputs: pd.DataFrame, min_support: int = 1, min_ratio:
 
 
 def _candidate_key(row: pd.Series) -> tuple[str, str, str]:
-    facet_id, _ = canonical_facet(row.get("facet_id_candidate", row.get("facet_id", "")), row.get("name", row.get("facet_name", "")))
+    raw_facet_id = row.get("facet_id_candidate", row.get("facet_id", ""))
+    raw_name = row.get("name", row.get("facet_name", ""))
+    source_field = _text(row.get("source_field", ""))
+    # Small local models occasionally place a value or a definition in the
+    # facet name. A grounded source field is a safer canonical signal than
+    # that malformed label, so use it only for fields explicitly supported by
+    # the deterministic Rule baseline.
+    if source_field in RULE_FIELDS:
+        facet_id = source_field
+    else:
+        facet_id, _ = canonical_facet(raw_facet_id, raw_name)
     return _text(row.get("category_key", "")), facet_id, canonical_value(facet_id, row.get("value", ""))
 
 

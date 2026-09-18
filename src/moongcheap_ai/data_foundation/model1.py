@@ -111,6 +111,8 @@ def _build_compact_prompt(
         "product_form",
         "functional_ingredients",
         "intake_method",
+        "evidence_text",
+        "consumer_search_text",
     )
     for product in products:
         compact_rows.append({key: str(product.get(key, ""))[:120] for key in keep})
@@ -124,12 +126,17 @@ def _build_compact_prompt(
         '{"source_product_id":"...","source_field":"...",'
         '"source_text":"..."}]}]}. '
         "Use only observed product facts. Return at most 1 facet and 1 value. "
+        "facet_id_candidate must be a semantic stable key such as product_form, "
+        "functional_ingredients, or intake_method; never use a number, rank, or database ID. "
+        "The facet name and value must be directly supported by the copied input field. "
+        "If no reliable facet is supported, return an empty facets array. "
         "Use exactly 1 evidence item per facet; source_text must be one short field value, "
         "not a sentence. Copy source_product_id exactly from the input and choose it only "
         f"from this allowed list: {json.dumps(allowed_ids, ensure_ascii=False)}. "
         "Copy source_text character-for-character from the matching input field; never "
         "translate, normalize, summarize, or invent evidence text. "
-        "Keep all strings under 60 characters. Never invent IDs, values, prices, or medical claims."
+        "Keep all strings under 60 characters. Never invent IDs, values, prices, or medical claims. "
+        "Do not infer an ingredient or amount that is not literally present in the input."
     )
     return f"{instruction}\nPrompt version: {prompt_version}\nTarget category_key: {category}\nEvidence:\n{json.dumps(compact_rows, ensure_ascii=False)}"
 
@@ -176,6 +183,10 @@ class OllamaAdapter:
                 "format": "json",
                 "stream": False,
                 "think": False,
+                "options": {
+                    "temperature": 0,
+                    "num_predict": int(os.getenv("MODEL1_MAX_NEW_TOKENS", "512")),
+                },
             },
             ensure_ascii=False,
         ).encode("utf-8")

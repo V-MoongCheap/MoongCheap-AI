@@ -624,7 +624,12 @@ def main() -> None:
     parser.add_argument("--max-products-per-category", type=int, default=24)
     parser.add_argument("--max-sellers-per-category", type=int, default=24)
     parser.add_argument("--max-queries-per-category", type=int, default=12)
-    parser.add_argument("--batch-size", type=int, default=24)
+    parser.add_argument("--max-evidence-per-category", type=int, default=24)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=int(os.getenv("MODEL1_BATCH_SIZE", "4")),
+    )
     args = parser.parse_args()
     api_key = os.getenv(args.api_key_env, "") if args.api_key_env else ""
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -639,6 +644,7 @@ def main() -> None:
         max_products_per_category=args.max_products_per_category,
         max_sellers_per_category=args.max_sellers_per_category,
         max_queries_per_category=args.max_queries_per_category,
+        max_evidence_per_category=args.max_evidence_per_category,
     )
     data.to_json(
         args.output_dir / "multisource_model_input_v1.jsonl",
