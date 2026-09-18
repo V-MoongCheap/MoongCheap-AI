@@ -17,31 +17,59 @@ except ModuleNotFoundError:  # direct execution: python scripts/model1/<file>.py
     from build_approved_taxonomy_and_mapping import build_product_mapping, build_taxonomy
 
 
+def _review_values(row: pd.Series, decision: str) -> list[str]:
+    """Read both the current queue columns and the legacy review columns."""
+
+    if decision == "APPROVE":
+        raw_values = str(row.get("value_candidate", row.get("facet_value", "")))
+    elif decision == "EDIT":
+        raw_values = str(row.get("human_corrected_values_json", "")).strip()
+        if not raw_values:
+            raw_values = str(row.get("human_value", "")).strip()
+    else:
+        return []
+
+    raw_values = raw_values.strip()
+    if not raw_values:
+        return []
+    try:
+        parsed = json.loads(raw_values)
+    except json.JSONDecodeError:
+        parsed = [raw_values]
+    if isinstance(parsed, str):
+        parsed = [parsed]
+    if not isinstance(parsed, list):
+        raise ValueError("reviewed values must be a string or a JSON string list")
+    values = [str(value).strip() for value in parsed if str(value).strip()]
+    if not values:
+        raise ValueError("reviewed values must contain at least one non-empty value")
+    return values
+
+
 def human_approved_candidates(review: pd.DataFrame) -> pd.DataFrame:
     """Convert human decisions into the candidate contract used downstream."""
     rows: list[dict[str, str]] = []
     for _, row in review.fillna("").iterrows():
-        decision = str(row.get("human_review_decision", "")).strip().upper()
-        if decision == "APPROVE":
-            values = [str(row.get("value_candidate", "")).strip()]
-        elif decision == "EDIT":
-            raw_values = str(row.get("human_corrected_values_json", "")).strip()
-            try:
-                values = json.loads(raw_values)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"invalid human correction JSON for {row.get('review_id')}") from exc
-            if not isinstance(values, list) or not all(isinstance(value, str) and value.strip() for value in values):
-                raise ValueError(f"human correction must be a non-empty string list for {row.get('review_id')}")
-        else:
+        decision = str(
+            row.get("human_review_decision", row.get("human_decision", ""))
+        ).strip().upper()
+        if decision not in {"APPROVE", "EDIT"}:
             continue
-        facet = str(row.get("human_corrected_facet", "")).strip() or str(row.get("facet_candidate", "")).strip()
+        values = _review_values(row, decision)
+        facet = (
+            str(row.get("human_corrected_facet", "")).strip()
+            or str(row.get("facet_candidate", row.get("facet_name", ""))).strip()
+        )
+        category_key = str(
+            row.get("category_key", row.get("category_id", ""))
+        ).strip()
         for value in values:
             value = value.strip()
-            if not facet or not value:
+            if not category_key or not facet or not value:
                 continue
             rows.append(
                 {
-                    "category_key": str(row.get("category_id", "")).strip(),
+                    "category_key": category_key,
                     "facet_name": facet,
                     "value": value,
                     "review_id": str(row.get("review_id", "")).strip(),

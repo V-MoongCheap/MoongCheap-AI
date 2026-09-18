@@ -3,7 +3,6 @@ from __future__ import annotations
 import pandas as pd
 
 from scripts.model1.build_approved_taxonomy_and_mapping import (
-    build_product_mapping,
     build_taxonomy,
 )
 from scripts.model1.build_human_reviewed_taxonomy_and_mapping import human_approved_candidates
@@ -108,4 +107,36 @@ def test_human_queue_only_promotes_approve_and_edit() -> None:
         {"facet_name": "functional_ingredients", "value": "A"},
         {"facet_name": "functional_ingredients", "value": "B"},
         {"facet_name": "product_form", "value": "정"},
+    ]
+
+
+def test_human_queue_accepts_current_multisource_review_columns() -> None:
+    review = pd.DataFrame(
+        [
+            {
+                "category_key": "cat:a",
+                "facet_name": "product_form",
+                "facet_value": "캡슐",
+                "human_decision": "APPROVE",
+            },
+            {
+                "category_key": "cat:a",
+                "facet_name": "functional_ingredients",
+                "facet_value": "복합값",
+                "human_decision": "EDIT",
+                "human_value": '["A", "B"]',
+            },
+            {
+                "category_key": "cat:a",
+                "facet_name": "product_form",
+                "facet_value": "잘못된값",
+                "human_decision": "REJECT",
+            },
+        ]
+    )
+    candidates = human_approved_candidates(review)
+    assert candidates[["facet_name", "value"]].to_dict("records") == [
+        {"facet_name": "functional_ingredients", "value": "A"},
+        {"facet_name": "functional_ingredients", "value": "B"},
+        {"facet_name": "product_form", "value": "캡슐"},
     ]
