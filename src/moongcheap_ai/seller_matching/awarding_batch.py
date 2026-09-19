@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from moongcheap_ai.seller_matching.offer_ranking import (
@@ -36,10 +36,11 @@ RESULT_PATH = "/api/awarding/internal/result"
 PENDING_SCHEMA_VERSION = "awarding-pending.v0.1"
 RESULT_SCHEMA_VERSION = "awarding-result.v0.1"
 MAX_RESULTS_PER_REQUEST = 100  # 「… 명세서 응답」 1절 · Backend `@Size(max = 100)`
+KST = timezone(timedelta(hours=9))
 
 
 class ContractError(ValueError):
-    """조회 응답 전체를 믿을 수 없을 때."""
+    """조회/결과 응답 계약을 믿을 수 없을 때. 결과 반영 여부는 별도 확인한다."""
 
 
 @dataclass
@@ -128,11 +129,11 @@ def parse_pending(payload: Any) -> PendingPage:
 
 def build_result_requests(decisions: Sequence[BoardDecision], *, planned_at: datetime, judged_at: datetime) -> list[dict[str, Any]]:
     """판정 결과를 전송 본문으로 만든다. 한 요청에 board 최대 100개."""
-    if planned_at.tzinfo is None or judged_at.tzinfo is None:
+    if planned_at.utcoffset() is None or judged_at.utcoffset() is None:
         raise ValueError("planned_at and judged_at must carry a timezone")
     # Backend: plannedAt 은 OffsetDateTime, judgedAt 은 LocalDateTime(시간대 없음). judgedAt 은 KST 벽시계로 보낸다.
     planned = planned_at.isoformat(timespec="seconds")
-    judged = judged_at.replace(tzinfo=None).isoformat(timespec="seconds")
+    judged = judged_at.astimezone(KST).replace(tzinfo=None).isoformat(timespec="seconds")
     results = [
         {
             "boardId": decision.board_id,
@@ -198,6 +199,20 @@ def fetch_pending(base_url: str, internal_key: str, *, size: int, timeout_second
     return _json_or_raise(response, key, "awarding pending fetch")
 
 
+def validate_result_response(payload: Any, *, submitted_count: int) -> dict[str, Any]:
+    """200도 반영 보장은 아니다. 제출 건수와 맞는 업무 응답만 수용한다."""
+    prefix = "awarding result unconfirmed: "
+    if not isinstance(payload, dict) or payload.get("status") != "APPLIED":
+        raise ContractError(prefix + "expected status APPLIED")
+    for name in ("appliedCount", "staleRejectedCount"):
+        value = payload.get(name)
+        if type(value) is not int or value < 0:
+            raise ContractError(prefix + name + " must be a non-negative integer")
+    if payload["appliedCount"] + payload["staleRejectedCount"] != submitted_count:
+        raise ContractError(prefix + "response counts do not match submitted board count")
+    return payload
+
+
 def post_result(base_url: str, internal_key: str, request: Mapping[str, Any], *, timeout_seconds: float, http_post: Callable[..., Any]) -> dict[str, Any]:
     """한 번만 보낸다. 상태를 바꾸는 요청이라 재시도하지 않는다."""
     base, key = _base_and_key(base_url, internal_key, timeout_seconds)
@@ -208,7 +223,14 @@ def post_result(base_url: str, internal_key: str, request: Mapping[str, Any], *,
         timeout=timeout_seconds,
         allow_redirects=False,
     )
-    return _json_or_raise(response, key, "awarding result post")
+    try:
+        payload = _json_or_raise(response, key, "awarding result post")
+    except ValueError as error:
+        # 잘못된 JSON/본문을 오류에 붙이지 않는다. 응답이 유실돼도 서버 반영은 가능하다.
+        raise ContractError("awarding result unconfirmed: invalid JSON object") from error
+    if response.status_code != 200:
+        raise ContractError("awarding result unconfirmed: expected HTTP 200")
+    return validate_result_response(payload, submitted_count=len(request["results"]))
 
 
 def run_once(
@@ -252,7 +274,10 @@ def run_once(
         )
 
     requests = build_result_requests(decisions, planned_at=now, judged_at=now)
-    responses = [send(request) for request in requests] if send is not None else []
+    responses = [
+        validate_result_response(send(request), submitted_count=len(request["results"]))
+        for request in requests
+    ] if send is not None else []
     return {
         "fetchedAt": page.fetched_at,
         "hasNext": page.has_next,
@@ -267,6 +292,6 @@ def run_once(
         "boards": boards,
         "skipped": skipped,
         "requests": requests,
-        "sent": send is not None,
+        "sent": send is not None and bool(requests),
         "responses": responses,
     }

@@ -73,7 +73,7 @@ BACKEND_INTERNAL_API_KEY=local-test-key python scripts/awarding/run_awarding_tes
 | 종료 코드 | 뜻 |
 |---|---|
 | 0 | 정상 |
-| 1 | 조회·실행 실패 |
+| 1 | 조회·실행 실패 또는 결과 응답 계약 오류(반영 여부 미확인) |
 | 2 | `BACKEND_INTERNAL_API_KEY` 가 비어 있음 |
 | 3 | 조회는 됐는데 **한 건도 판정하지 못함** (전부 계약 오류) |
 
@@ -88,8 +88,17 @@ BACKEND_INTERNAL_API_KEY=local-test-key python scripts/awarding/run_awarding_tes
 | 가격 상한 비교 금액 | `UNIT_PRICE` / `TOTAL_WITH_SHIPPING` | **미확정 정책** — 실행할 때 지정한다 |
 
 두 정책은 「평가 / Gold Set 세부 정의」 11절에 미확정으로 남아 있다. 지정한 값은 보고서 `policy` 에 남는다.
+위 판정 도식의 단가 상한·배송비 1회 계산은 `UNIT_PRICE`/`PER_BOARD` 선택 예시다.
+다른 정책을 선택하면 해당 정책의 비교 금액·배송비 계산을 따른다. 도식만으로 정책 확정을 뜻하지 않는다.
+
+결과 응답은 HTTP 200, `status: APPLIED`, 음이 아닌 정수 `appliedCount`/`staleRejectedCount`,
+두 건수의 합이 제출 board 수와 같아야 수용한다. `APPLIED`여도 stale 건수를 실제 반영 건수로 세지 않는다.
+응답 오류·유실은 미반영 확정이 아니다. 자동 재전송하지 말고 Backend 조회/이력으로 확인한다.
+`judgedAt`은 입력 시간대를 KST로 변환한 뒤 시간대 표기를 제거한다.
 
 ## 연동 전에 필요한 것
+
+아래 외부 구현 상태는 2026-09-19 Backend develop `b56d963` 확인 기준이다. 실연동 직전에 다시 확인한다.
 
 | 항목 | 담당 | 상태 |
 |---|---|---|

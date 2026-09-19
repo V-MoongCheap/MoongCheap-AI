@@ -6,7 +6,7 @@
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -198,6 +198,15 @@ def test_naive_times_are_rejected():
         build_result_requests([], planned_at=datetime(2026, 9, 17), judged_at=NOW)  # noqa: DTZ001 — 시간대 없는 값을 거절하는지 본다
 
 
+def test_same_instant_in_utc_and_kst_has_identical_judged_at():
+    decisions = _decisions(_board())
+    utc_now = NOW.astimezone(UTC)
+    kst = build_result_requests(decisions, planned_at=NOW, judged_at=NOW)
+    utc = build_result_requests(decisions, planned_at=utc_now, judged_at=utc_now)
+    assert utc[0]["results"][0]["judgedAt"] == kst[0]["results"][0]["judgedAt"]
+    assert utc[0]["plannedAt"] == "2026-09-17T05:05:00+00:00"
+
+
 # ── HTTP ─────────────────────────────────────────────────
 
 
@@ -256,6 +265,67 @@ def test_post_is_sent_once_even_on_failure():
         post_result("http://backend", "secret", {"results": []}, timeout_seconds=5, http_post=http_post)
 
     assert calls == ["http://backend/api/awarding/internal/result"]
+
+
+@pytest.mark.parametrize("payload", [
+    {},
+    {"status": "UNKNOWN", "appliedCount": 1, "staleRejectedCount": 0},
+    {"status": "APPLIED", "appliedCount": True, "staleRejectedCount": 0},
+    {"status": "APPLIED", "appliedCount": "1", "staleRejectedCount": 0},
+    {"status": "APPLIED", "appliedCount": 1.0, "staleRejectedCount": 0},
+    {"status": "APPLIED", "appliedCount": -1, "staleRejectedCount": 2},
+    {"status": "APPLIED", "appliedCount": 0, "staleRejectedCount": 0},
+    {"status": "APPLIED", "appliedCount": 1, "staleRejectedCount": 1},
+    {"status": "APPLIED", "appliedCount": 1},
+    {"appliedCount": 1, "staleRejectedCount": 0},
+])
+def test_malformed_post_response_is_unconfirmed_and_never_retried(payload):
+    calls = []
+
+    def http_post(*args, **kwargs):
+        calls.append(kwargs)
+        return _Response(200, payload)
+
+    with pytest.raises(ContractError, match="unconfirmed"):
+        post_result("http://backend", "secret", {"results": [{}]}, timeout_seconds=1, http_post=http_post)
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("applied,stale", [(1, 0), (0, 1)])
+def test_valid_post_counts_include_stale_without_claiming_applied(applied, stale):
+    payload = {"status": "APPLIED", "appliedCount": applied, "staleRejectedCount": stale}
+    assert post_result("http://backend", "secret", {"results": [{}]}, timeout_seconds=1,
+                       http_post=lambda *a, **k: _Response(200, payload)) == payload
+
+
+def test_custom_sender_cannot_bypass_response_validation():
+    with pytest.raises(ContractError, match="unconfirmed"):
+        run_once(_page(_board()), POLICY, now=NOW, send=lambda req: {})
+
+
+def test_invalid_json_response_is_unconfirmed_without_exposing_body():
+    class InvalidJson(_Response):
+        def json(self):
+            raise ValueError("response contains secret")
+
+    with pytest.raises(ContractError, match="unconfirmed") as error:
+        post_result("http://backend", "secret", {"results": [{}]}, timeout_seconds=1,
+                    http_post=lambda *a, **k: InvalidJson(200))
+    assert "secret" not in str(error.value)
+
+
+def test_non_200_success_response_is_not_accepted():
+    payload = {"status": "APPLIED", "appliedCount": 1, "staleRejectedCount": 0}
+    with pytest.raises(ContractError, match="expected HTTP 200"):
+        post_result("http://backend", "secret", {"results": [{}]}, timeout_seconds=1,
+                    http_post=lambda *a, **k: _Response(201, payload))
+
+
+def test_no_valid_board_does_not_claim_sent_or_call_sender():
+    calls = []
+    report = run_once(_page(_board(products=[])), POLICY, now=NOW, send=calls.append)
+    assert calls == []
+    assert report["sent"] is False
 
 
 # ── 한 번 실행 ────────────────────────────────────────────
