@@ -47,6 +47,41 @@ Backend  평가 이력 저장 + 상태 반영 + 공동구매 생성
 
 ## 실행
 
+### Docker로 바로 시험하기
+
+저장소 루트에서 실행한다. Docker 데몬이 켜져 있어야 하며 최초 빌드는 이미지·패키지 다운로드가 필요하다.
+아래 실행은 모두 합성 데이터만 사용하고 외부 통신을 차단한다. 실제 Backend 키는 필요 없다.
+
+```bash
+bash scripts/awarding/build_image.sh moongcheap/ai-awarding:local linux/amd64
+docker run --rm --platform linux/amd64 --network none --read-only \
+  --cap-drop ALL --security-opt no-new-privileges moongcheap/ai-awarding:local
+```
+
+기본 실행은 파일 판정만 한다. 예상 요약은 조회 4, 판정 3, 계약 오류 1, 낙찰 2이며 `sent: false`다.
+Mock 서버까지 포함한 자동 테스트 드라이브:
+
+```bash
+docker run --rm --platform linux/amd64 --network none --read-only \
+  --tmpfs /tmp:rw,nosuid,noexec,size=16m --cap-drop ALL \
+  --security-opt no-new-privileges --entrypoint python \
+  moongcheap/ai-awarding:local scripts/awarding/container_smoke.py
+```
+
+마지막 `status: PASS`와 종료 코드 0이 성공 기준이다. 키 누락/오류, dry-run 무전송,
+정상 3건 반영, 명시적 중복 전송의 stale 3건, 재조회 시 오류 board 1004 한 건,
+잘못된 HTTP 200 본문의 실패 처리·재전송 없음, 미반영(stale) 응답의 종료 코드 4,
+UTC→KST 변환을 검사한다. 검사는 `assert` 를 쓰지 않아 `python -O` 에서도 지워지지 않는다.
+매 실행마다 Mock 상태를 새로 만들고 종료 시 버린다. 실제 DB 상태 전이를 검증하는 시험은 아니다.
+
+이미지는 비루트 사용자로 실행하며 포트를 열지 않는 일회 배치다. 기본 정책 인자는
+`PER_BOARD`/`UNIT_PRICE`라는 **시험값**이며 PM 승인값이 아니다.
+키·원천 데이터가 빌드 컨텍스트에 들어가지 않도록 허용 파일만 보내는 빌드 스크립트를 사용한다.
+로컬 구형 빌더 검증 기준이며 BuildKit/Kaniko·CI 배포 검증은 별도다.
+실행 계약과 인프라 확인 사항은 `docs/ci-cd-awarding-handoff.yml`을 참고한다.
+
+### Python으로 직접 실행하기
+
 **1) 파일로만 판정** — 네트워크·전송 없음
 
 ```bash
@@ -115,6 +150,6 @@ BACKEND_INTERNAL_API_KEY=local-test-key python scripts/awarding/run_awarding_tes
 
 ## 이 경로에 없는 것
 
-- 1분 주기 실행(CronJob)과 컨테이너 이미지 — 후속 작업이다
+- 주기 실행(CronJob), 이미지 게시, CI/CD·Cloud 배포 — 후속 작업이다. 로컬 낙찰 전용 이미지는 위 명령으로 검증 가능하다
 - `hasNext` 가 `true` 일 때 이어서 조회하는 반복 — 한 번 실행만 한다
 - 가짜 Backend 는 실제 Backend 의 10개 묶음 트랜잭션 · DB 상태 전이 · 공동구매 생성을 흉내 내지 않는다

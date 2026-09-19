@@ -1,0 +1,54 @@
+# 낙찰 일회 배치 인계. 실행 가능한 Kubernetes/CI 매니페스트가 아니다.
+# 로컬 Mock 검증 범위이며 실제 Secret·배포 정책을 임의로 확정하지 않는다.
+repository: https://github.com/V-MoongCheap/MoongCheap-AI
+branch: develop
+status: "로컬 구현·Mock 검증. 현재 작업 브랜치의 미커밋 변경이며 develop 반영 전"
+dockerfile_path: docker/Dockerfile.awarding
+container_image_name: moongcheap/ai-awarding:local
+container_architecture: linux/amd64
+container_build_command: "bash scripts/awarding/build_image.sh moongcheap/ai-awarding:local linux/amd64"
+container_build_context: "build_image.sh의 명시적 파일 허용 목록만 gzip tar로 전달"
+runtime_requirements: packaging/awarding/requirements.txt
+local_builder: "Docker legacy builder; BuildKit/Kaniko 검증 안 함"
+test_command: "python -m pytest tests/seller_matching/test_offer_ranking.py tests/seller_matching/test_awarding_batch.py tests/seller_matching/test_awarding_test_drive.py"
+test_dependencies: "runtime_requirements + pytest>=8,<9 (별도 테스트 환경에 설치)"
+entrypoint: [python, scripts/awarding/run_awarding_test_drive.py]
+default_mode: "합성 파일 dry-run. 네트워크·전송 없음"
+workload_kind: "일회 배치. Job/CronJob 배포와 실행 주기는 인프라 합의 대기"
+application_port: null
+health_check_path: null
+metrics_path: null
+exit_codes:
+  0: "정상. skipped/hasNext/반영 및 stale 건수도 보고서에서 확인"
+  1: "실행 실패 또는 전송 반영 여부 미확인. 맹목적 재전송 금지"
+  2: "키 없음 (잘못된 CLI 인자에도 argparse가 2 반환)"
+  3: "조회 결과 전건 계약 오류로 판정 불가"
+  4: "전송 후 Backend 가 반영하지 않은 board 있음(stale). 맹목적 재전송 금지, Backend 이력 확인"
+secret_variables:
+  - name: BACKEND_INTERNAL_API_KEY
+    purpose: "실제 Backend 조회/전송 시 X-Internal-Api-Key 헤더로 사용"
+    source: "공급 경로·Secret 이름은 인프라 확인 대기. 값은 이미지에 넣지 않음"
+required_runtime_arguments:
+  - "--backend-url <승인된 dev 주소>"
+  - "--shipping-fee-unit <PM 승인값>"
+  - "--price-cap-basis <PM 승인값>"
+send_gate: "필드·정책·테스트 데이터 확인과 dry-run 검토 후 승인된 환경에서만 --send 추가"
+runtime_filesystem:
+  read_only_root: true
+  run_as_user: 65534
+  run_as_group: 65534
+  writable_paths: "기본 실행 없음. Mock smoke는 /tmp tmpfs 필요. --report 사용 시 별도 쓰기 가능한 마운트 필요"
+resources:
+  cpu: "미측정"
+  memory: "미측정"
+  gpu: false
+external_dependencies:
+  - "실제 모드: Backend HTTP API. Mock 모드: 없음(loopback만 사용)"
+open_items:
+  - "Backend 필수 5필드·PM 정책·dev 주소/키/판정 대기 데이터"
+  - "실제 Backend의 묶음 트랜잭션·DB 상태 전이·응답 유실 후 확인"
+  - "staleRejectedCount가 정상 중복과 묶음 롤백을 구분하지 않음. 분리 가능한 응답 필드를 Backend에 요청 대기"
+  - "hasNext 반복 처리 없음: 한 실행은 한 페이지. 운영 처리량·재조회 방식 확인"
+  - "스케줄·중복 실행 제어·재시작/backoff·실패 알림은 미구현/미확정"
+  - "현재 자동 POST 재시도 없음. 인프라 재기동으로 생길 재실행까지 방지하는 것은 아님"
+  - "이미지 게시·Cloud 변경·CI/CD 실행은 미수행"

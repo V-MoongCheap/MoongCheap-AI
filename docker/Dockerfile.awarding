@@ -1,0 +1,27 @@
+FROM python:3.13.12-slim-trixie
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+WORKDIR /app
+
+COPY packaging/awarding/requirements.txt ./packaging/awarding/requirements.txt
+RUN python -m pip install --no-cache-dir -r packaging/awarding/requirements.txt \
+    && python -m pip check
+
+# 전체 src/data/.env를 복사하지 않는다. 빌드 컨텍스트도 build_image.sh에서 허용 목록으로 만든다.
+COPY src/moongcheap_ai/__init__.py ./src/moongcheap_ai/__init__.py
+COPY src/moongcheap_ai/seller_matching/__init__.py \
+     src/moongcheap_ai/seller_matching/offer_ranking.py \
+     src/moongcheap_ai/seller_matching/awarding_batch.py ./src/moongcheap_ai/seller_matching/
+COPY scripts/awarding/run_awarding_test_drive.py \
+     scripts/awarding/mock_backend.py \
+     scripts/awarding/container_smoke.py \
+     scripts/awarding/sample_pending.json ./scripts/awarding/
+
+USER 65534:65534
+# 일회 배치다. HTTP 포트/상주 서버/헬스체크를 만들지 않는다.
+ENTRYPOINT ["python", "scripts/awarding/run_awarding_test_drive.py"]
+# 인자 없는 실행은 합성 파일만 읽는다. 시험 정책이며 PM 승인값이 아니다. 전송하지 않는다.
+CMD ["--pending-file", "scripts/awarding/sample_pending.json", "--shipping-fee-unit", "PER_BOARD", "--price-cap-basis", "UNIT_PRICE"]

@@ -1,5 +1,6 @@
 """시험 운전 스크립트를 가짜 Backend 에 실제 HTTP 로 붙여 본다."""
 
+import ast
 import importlib.util
 import json
 import threading
@@ -105,6 +106,15 @@ def test_stale_response_does_not_pass_as_success(backend, monkeypatch, tmp_path,
     assert code == 4
     assert "반영되지 않은 board" in capsys.readouterr().err
     assert json.loads(report.read_text(encoding="utf-8"))["reflection"]["staleRejectedCount"] == 3
+
+
+def test_container_smoke_does_not_rely_on_assert():
+    """`python -O` 는 assert 를 지운다. 컨테이너 시험이 거짓 PASS 하면 안 된다."""
+    source = (ROOT / "scripts" / "awarding" / "container_smoke.py").read_text(encoding="utf-8")
+
+    lines = [node.lineno for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Assert)]
+
+    assert lines == []
 
 
 def test_send_requires_backend_url():
