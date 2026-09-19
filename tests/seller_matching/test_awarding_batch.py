@@ -321,6 +321,20 @@ def test_non_200_success_response_is_not_accepted():
                     http_post=lambda *a, **k: _Response(201, payload))
 
 
+def test_report_separates_backend_reflection_from_judgement():
+    """반영 건수는 판정 건수가 아니다. stale 은 묶음 롤백일 수도 있어 따로 남긴다."""
+    stale_only = {"status": "APPLIED", "appliedCount": 0, "staleRejectedCount": 1}
+
+    report = run_once(_page(_board()), POLICY, now=NOW, send=lambda request: stale_only)
+
+    assert report["counts"]["judged"] == 1
+    assert report["reflection"] == {"submittedBoards": 1, "appliedCount": 0, "staleRejectedCount": 1}
+
+
+def test_report_has_no_reflection_when_nothing_was_sent():
+    assert run_once(_page(_board()), POLICY, now=NOW)["reflection"] is None
+
+
 def test_no_valid_board_does_not_claim_sent_or_call_sender():
     calls = []
     report = run_once(_page(_board(products=[])), POLICY, now=NOW, send=calls.append)

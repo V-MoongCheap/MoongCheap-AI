@@ -76,6 +76,7 @@ BACKEND_INTERNAL_API_KEY=local-test-key python scripts/awarding/run_awarding_tes
 | 1 | 조회·실행 실패 또는 결과 응답 계약 오류(반영 여부 미확인) |
 | 2 | `BACKEND_INTERNAL_API_KEY` 가 비어 있음 |
 | 3 | 조회는 됐는데 **한 건도 판정하지 못함** (전부 계약 오류) |
+| 4 | 전송은 됐는데 **Backend 가 반영하지 않은 board 가 있음** (stale) |
 
 ## 설정
 
@@ -95,6 +96,11 @@ BACKEND_INTERNAL_API_KEY=local-test-key python scripts/awarding/run_awarding_tes
 두 건수의 합이 제출 board 수와 같아야 수용한다. `APPLIED`여도 stale 건수를 실제 반영 건수로 세지 않는다.
 응답 오류·유실은 미반영 확정이 아니다. 자동 재전송하지 말고 Backend 조회/이력으로 확인한다.
 `judgedAt`은 입력 시간대를 KST로 변환한 뒤 시간대 표기를 제거한다.
+
+⛔ **`staleRejectedCount` 는 두 가지가 섞여 있다.** 이미 처리된 board 뿐 아니라, Backend 가 10개 묶음을
+통째로 롤백한 경우(`DemandBoardService.applyAwardingResult` 의 예외 처리)도 같은 건수에 합산된다.
+응답만으로는 구분되지 않으므로 이 값이 0 이 아니면 종료 코드 4 와 경고로 알리고 보고서 `reflection` 에 남긴다.
+**다시 보내지 않는다.** 반영 여부는 Backend 조회·이력으로 확인한다.
 
 ## 연동 전에 필요한 것
 

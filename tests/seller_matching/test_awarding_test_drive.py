@@ -93,6 +93,20 @@ def test_exit_code_is_zero_when_there_is_nothing_to_judge(tmp_path, monkeypatch)
     assert _load("run_awarding_test_drive").main(["--pending-file", str(payload), *ARGS]) == 0
 
 
+def test_stale_response_does_not_pass_as_success(backend, monkeypatch, tmp_path, capsys):
+    """묶음 롤백도 staleRejectedCount 로 온다. 주기 실행에서 조용히 지나가면 안 된다."""
+    server, url = backend
+    monkeypatch.setenv("BACKEND_INTERNAL_API_KEY", "test-key")
+    server.backend.apply = lambda body: (200, {"status": "APPLIED", "appliedCount": 0, "staleRejectedCount": len(body["results"])})
+    report = tmp_path / "report.json"
+
+    code = _load("run_awarding_test_drive").main(["--backend-url", url, *ARGS, "--send", "--report", str(report)])
+
+    assert code == 4
+    assert "반영되지 않은 board" in capsys.readouterr().err
+    assert json.loads(report.read_text(encoding="utf-8"))["reflection"]["staleRejectedCount"] == 3
+
+
 def test_send_requires_backend_url():
     with pytest.raises(SystemExit):
         _load("run_awarding_test_drive").main(["--pending-file", str(SAMPLE), *ARGS, "--send"])

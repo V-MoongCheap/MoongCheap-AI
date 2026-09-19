@@ -213,6 +213,20 @@ def validate_result_response(payload: Any, *, submitted_count: int) -> dict[str,
     return payload
 
 
+def summarize_reflection(requests: Sequence[Mapping[str, Any]], responses: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    """Backend 가 반영한 건수. 판정 건수와 다르다.
+
+    ⛔ `staleRejectedCount` 는 이미 처리된 board 뿐 아니라 **10개 묶음이 통째로 롤백된 경우**도 포함한다
+    (Backend `DemandBoardService.applyAwardingResult` 의 `DataAccessException`/`RuntimeException` 처리).
+    응답만으로는 둘을 구분할 수 없으므로 0 이 아니면 호출한 쪽이 알아채야 한다.
+    """
+    return {
+        "submittedBoards": sum(len(request["results"]) for request in requests),
+        "appliedCount": sum(response["appliedCount"] for response in responses),
+        "staleRejectedCount": sum(response["staleRejectedCount"] for response in responses),
+    }
+
+
 def post_result(base_url: str, internal_key: str, request: Mapping[str, Any], *, timeout_seconds: float, http_post: Callable[..., Any]) -> dict[str, Any]:
     """한 번만 보낸다. 상태를 바꾸는 요청이라 재시도하지 않는다."""
     base, key = _base_and_key(base_url, internal_key, timeout_seconds)
@@ -294,4 +308,5 @@ def run_once(
         "requests": requests,
         "sent": send is not None and bool(requests),
         "responses": responses,
+        "reflection": summarize_reflection(requests, responses) if send is not None and requests else None,
     }
