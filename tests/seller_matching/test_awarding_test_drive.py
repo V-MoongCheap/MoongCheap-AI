@@ -141,19 +141,50 @@ def test_summary_survives_a_report_without_reflection():
     drive._print_summary(report)
 
 
-def test_deploy_stage_of_the_awarding_image_has_no_test_code():
-    """Mock 서버와 loopback 시험은 시험 단계에만 둔다. 배포 이미지는 배치만 담는다."""
-    stages = {}
-    current = None
+def _dockerfile_stages():
+    """단계 이름 → (부모 단계, 본문). 부모가 없으면 None."""
+    stages, current = {}, None
     for line in (ROOT / "docker" / "Dockerfile.awarding").read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if stripped.upper().startswith("FROM "):
-            current = stripped.split(" AS ")[-1] if " AS " in stripped else stripped
-            stages[current] = []
+            source, _, name = stripped[5:].partition(" AS ")
+            current = (name or source).strip()
+            stages[current] = [source.strip(), []]
         elif current:
-            stages[current].append(stripped)
+            stages[current][1].append(stripped)
+    return stages
 
-    deploy = " ".join(stages[list(stages)[-1]])
+
+def _lines_of(stages, name):
+    """상속까지 따라간 누적 본문. 마지막 단계 텍스트만 보면 base 로 옮긴 COPY 를 놓친다."""
+    parent, body = stages[name]
+    inherited = _lines_of(stages, parent) if parent in stages else []
+    return inherited + body
+
+
+def test_deploy_stage_of_the_awarding_image_has_no_test_code():
+    """Mock 서버와 loopback 시험은 시험 단계에만 둔다. 배포 이미지는 배치만 담는다."""
+    stages = _dockerfile_stages()
+    deploy = " ".join(_lines_of(stages, list(stages)[-1]))
+    test_stage = " ".join(_lines_of(stages, "test"))
+
     assert "mock_backend.py" not in deploy
     assert "container_smoke.py" not in deploy
-    assert any("container_smoke.py" in " ".join(body) for name, body in stages.items() if name == "test")
+    assert "container_smoke.py" in test_stage
+    assert "run_awarding_test_drive.py" in deploy
+
+
+def test_a_single_unreflected_board_is_not_silent(backend, monkeypatch, tmp_path, capsys):
+    """미반영이 1건뿐일 때도 알린다. 경계에서 조용해지면 주기 실행에서 못 본다."""
+    server, url = backend
+    monkeypatch.setenv("BACKEND_INTERNAL_API_KEY", "test-key")
+    server.backend.apply = lambda body: (200, {"status": "APPLIED", "appliedCount": len(body["results"]) - 1,
+                                               "staleRejectedCount": 1})
+    report = tmp_path / "report.json"
+
+    code = _load("run_awarding_test_drive").main(["--backend-url", url, *ARGS, "--send", "--report", str(report)])
+
+    assert code == 4
+    assert "반영되지 않은 board 가 1건" in capsys.readouterr().err
+    assert json.loads(report.read_text(encoding="utf-8"))["reflection"] == {
+        "submittedBoards": 3, "appliedCount": 2, "staleRejectedCount": 1}

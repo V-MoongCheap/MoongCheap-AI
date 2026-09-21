@@ -10,7 +10,10 @@ container_image_name: ai-awarding  # ECR repository 최종 명칭은 인프라 �
 container_architecture: linux/amd64
 container_build_command: "bash scripts/awarding/build_image.sh <repo>:<env>-<git-short-sha> linux/amd64"
 container_build_target: runtime  # 기본값. loopback 시험 이미지는 세 번째 인자로 test
-container_build_context: "build_image.sh의 허용 목록(로컬 구형 빌더) 또는 docker/Dockerfile.awarding.dockerignore(BuildKit/Kaniko)"
+container_build_context: "build_image.sh의 명시적 파일 허용 목록(로컬 구형 빌더에서 검증)"
+# docker/Dockerfile.awarding.dockerignore 도 두었으나 CI 적용은 미검증이다.
+# Dockerfile별 ignore는 BuildKit 문법이며 Kaniko가 읽는지 확인하지 못했다.
+# 읽히지 않아도 이미지 내용물은 COPY 목록대로다. 컨텍스트 크기만 달라진다.
 runtime_requirements: packaging/awarding/requirements.txt
 local_builder: "Docker legacy builder; BuildKit/Kaniko 검증 안 함"
 test_command: "python -m pytest tests/seller_matching/test_offer_ranking.py tests/seller_matching/test_awarding_batch.py tests/seller_matching/test_awarding_test_drive.py"

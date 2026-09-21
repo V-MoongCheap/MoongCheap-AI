@@ -19,6 +19,7 @@ from moongcheap_ai.seller_matching.awarding_batch import (
     parse_pending,
     post_result,
     run_once,
+    summarize_reflection,
 )
 from moongcheap_ai.seller_matching.offer_ranking import RankingPolicy
 
@@ -386,3 +387,16 @@ def test_report_lists_skipped_boards():
 
     assert [b["boardId"] for b in report["boards"]] == [1]
     assert report["skipped"] == [{"boardId": 2, "reason": "no products"}]
+
+
+def test_reflection_sums_every_request_not_just_the_first():
+    """board 가 100개를 넘으면 요청이 나뉜다. 앞 요청만 세면 반영 건수가 줄어 보인다."""
+    # 첫 요청의 값과 합계가 모두 달라야 「첫 요청만 센다」 는 실수를 잡는다.
+    requests = [{"results": [{}, {}]}, {"results": [{}, {}, {}]}]
+    responses = [
+        {"status": "APPLIED", "appliedCount": 1, "staleRejectedCount": 1},
+        {"status": "APPLIED", "appliedCount": 1, "staleRejectedCount": 2},
+    ]
+
+    assert summarize_reflection(requests, responses) == {
+        "submittedBoards": 5, "appliedCount": 2, "staleRejectedCount": 3}
