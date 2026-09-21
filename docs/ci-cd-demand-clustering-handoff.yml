@@ -20,7 +20,7 @@ kubernetes:
   base_path: k8s/base/demand-clustering-job
   dev_example_path: k8s/overlays/demand-clustering-dev
   documentation: k8s/README.md
-  namespace_example: moongcheap-develop  # Cloud develop 4f450fb의 ApplicationSet 기준
+  namespace_example: moongcheap-develop  # Cloud develop 57cd52e의 ApplicationSet 기준
   service_account_name: demand-clustering-sa  # Cloud 규약: {service-or-component}-sa
   schedule: "45 * * * *"  # 초기안
   time_zone: Asia/Seoul
@@ -53,6 +53,7 @@ metrics_path: ""
 environment_variables:
   - name: BACKEND_BASE_URL
     purpose: "Backend HTTP(S) base URL"
+    develop_value: http://backend  # 같은 moongcheap-develop의 Service 80 -> Pod 8080
   - name: MFDS_CATALOG_PROFILES_PATH
     purpose: "Part A 상품도감 ID 기준의 MFDS profile CSV; DB 입력도 같은 ID 사용"
   - name: DEMAND_TAXONOMY_PATH
@@ -94,7 +95,7 @@ secret_variables:
     source:
       provider: aws-ssm-parameter-store
       type: SecureString
-    injection_status: "Cloud feat/gitops 75ae1d7에는 이 key가 없음; SSM 조회·동기화 및 backend-env 항목 공급 후 배포 가능"
+    injection_status: "Cloud develop 57cd52e에는 이 key가 없음; SSM 조회·동기화 및 backend-env 항목 공급 후 배포 가능"
     secret_name: backend-env
     secret_key: MOONGCHEAP_INTERNAL_API_KEY
 
@@ -158,7 +159,9 @@ notes: >-
   과거 슬롯을 전달하는 --planned-at/--batch-id 옵션과 checkpoint 볼륨은 사용하지 않는다.
   모델은 실행 시 다운로드하지 않는다. PVC 파일 공급과 artifact 버전 갱신은 이미지 CI/CD와
   별도로 연결한다. workload=backend-ai 라벨은 인프라가 실제 노드에 제공해야 한다.
-  BE·AI Worker는 Backend와 시스템 Pod도 공유하므로 합산 자원 여유를 확인한다.
+  Cloud develop 57cd52e의 be-ai NodePool은 workload=backend-ai, Linux amd64이며 taint가 없다.
+  ArgoCD·Karpenter·Jenkins Controller용 system 노드는 별도다. BE·AI Worker의 Backend·
+  다른 AI·노드별 시스템 Pod를 포함한 합산 자원 여유는 실제 클러스터에서 확인한다.
   이 매니페스트는 Node Group이나 노드 수를 정하지 않는다.
   B 배포는 전용 overlay 또는 Cloud의 B 전용 차트 중 하나만 사용한다.
   A도 포함하는 기존 공용 k8s/overlays/dev는 변경하지 않으며 B 전용 배포와 중복 적용하지 않는다.

@@ -74,11 +74,14 @@ tokenizer, SentenceTransformer 설정 파일이 모두 필요하다. Hugging Fac
 `BACKEND_INTERNAL_KEY`다. 기본 K8s 설정은 `backend-env`의 기존 DB 세 항목을 받아
 앱에서 PostgreSQL DSN을 조합한다. Backend DB 계정을 공유하되 B의 세션은 읽기 전용이다.
 기존 `SHARED_DATABASE_URL`도 지원하며, 비어 있지 않으면 DB 세 변수보다 우선한다.
+B 전용 개발 overlay는 `BACKEND_BASE_URL=http://backend`를 주입한다. 같은
+`moongcheap-develop`의 Backend Service 80번 포트가 Pod의 8080번 포트로 전달한다.
+이 주소는 클러스터 내부용이며 로컬 Docker 실행에서는 접근 가능한 Backend 주소를 사용한다.
 내부 키의 원본 저장소는
 Backend와 합의한 AWS Parameter Store `SecureString`이다. 배포 환경이 이를
 `BACKEND_INTERNAL_KEY`로 주입하며 앱은 `X-Internal-Key` 헤더로 전송한다.
 매니페스트는 `backend-env/MOONGCHEAP_INTERNAL_API_KEY`를 참조하지만, 확인한 Cloud
-`feat/gitops` (`75ae1d7`)에는 이 항목이 없다. Cloud에서 SSM 조회·동기화와 해당 항목의
+`develop` (`57cd52e`)에는 이 항목이 없다. Cloud에서 SSM 조회·동기화와 해당 항목의
 공급을 완료하기 전까지 배포를 활성화하지 않는다. 앱은 AWS 자격 증명이나 직접적인
 AWS API 호출을 요구하지 않는다.
 실제 Secret 값은 이미지·Git·로그에 넣지 않는다.
@@ -124,7 +127,7 @@ docker run --rm --read-only \
 스케줄·제한 시간과 자원 값은 실제 배치 부하에 맞게 인프라와 조정한다. BE·AI 노드 선택은
 특정 한 대에 대한 고정이 아니며 Backend·다른 AI·시스템 Pod의 자원을 합산해 배치 여유를 확인한다.
 노드 라벨·Namespace와 Helm 전환은 배포 설정에 해당하므로 현재 CPU 배치 Dockerfile은 그대로 사용한다.
-Cloud Jenkins 템플릿의 루트 `Dockerfile` 경로는 `docker/Dockerfile.demand-clustering`으로
+Cloud Jenkins 템플릿의 `DOCKERFILE_PATH`는 `docker/Dockerfile.demand-clustering`으로
 지정해야 한다. Python/uv/kubectl 준비와 Kaniko 실제 빌드 검증은 CI 연동 시 수행한다.
 Secret과 artifact 공급은 인프라가 준비한다. 첫 배포는 실제 연동 검증이 끝날 때까지 자동 실행을
 중지한 상태로 준비한다. 실패한 요청은 즉시 재시도하지 않고 다음 정기 배치에서

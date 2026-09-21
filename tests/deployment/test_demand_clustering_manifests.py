@@ -109,7 +109,12 @@ def test_generated_config_reference_and_runtime_settings(resources):
     ]
     config = configmap["data"]
     assert all(isinstance(value, str) for value in config.values())
-    assert config["BACKEND_BASE_URL"] == "https://backend.invalid"
+    expected_backend_url = (
+        "http://backend"
+        if configmap["metadata"].get("namespace") == "moongcheap-develop"
+        else "https://backend.invalid"
+    )
+    assert config["BACKEND_BASE_URL"] == expected_backend_url
     assert config["CLUSTER_MIN_PARTICIPANTS"] == "5"
     assert config["E5_BATCH_SIZE"] == "32"
     assert config["HF_HUB_OFFLINE"] == config["TRANSFORMERS_OFFLINE"] == "1"

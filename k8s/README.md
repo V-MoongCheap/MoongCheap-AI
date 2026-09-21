@@ -28,7 +28,7 @@ k8s/
     └── demand-clustering-dev/kustomization.yaml  # B만, moongcheap-develop
 ```
 
-- B 전용 개발 Namespace는 Cloud `develop` (`4f450fb`)의 GitOps 기준인
+- B 전용 개발 Namespace는 Cloud `develop` (`57cd52e`)의 GitOps 기준인
   `moongcheap-develop`이다. 같은 공간에 Secret/PVC를 준비한다. 기존 공용 예시의
   `moongcheap-ai-dev`와 A의 설정은 바꾸지 않는다.
 - 매시간 45분, `Asia/Seoul`, `suspend: true`로 시작한다.
@@ -57,6 +57,16 @@ Job과의 중첩을 막는 전체 AI 잠금은 아니다. 또한 스케줄러 �
 `configMapGenerator`로 만들고 `envFrom`으로 주입한다. Backend 주소, artifact·모델
 경로, 최소 참가자 수, timeout, CPU 스레드·오프라인 설정이 여기에 해당한다.
 내용에 따른 ConfigMap 이름 해시를 유지하므로 설정 변경은 새 Job의 Pod에 반영된다.
+
+기본값 `https://backend.invalid`는 미설정 상태를 나타내는 자리표시자다. B 전용
+`overlays/demand-clustering-dev`는 ConfigMap을 병합해 `BACKEND_BASE_URL=http://backend`로
+덮어쓴다. 같은 `moongcheap-develop`의 Service 이름 `backend`를 사용하며, HTTP 기본
+포트 `80`에서 Backend Pod의 `8080`으로 전달된다. Service에 요청하므로 URL에
+Pod 포트 `8080`이나 Pod IP를 넣지 않는다. 두 내부 API의 경로는 앱이 base URL 뒤에 붙인다.
+다른 Namespace에서 호출할 때는 `http://backend.moongcheap-develop`처럼 Namespace를
+포함한다. 기존 공용 `overlays/dev`는 Namespace가 다르므로 자리표시자를 유지한다.
+([Backend values](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/values/services/backend.yaml),
+[Service 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/charts/moongcheap-service/templates/service.yaml))
 
 현재 B 매니페스트는 Backend의 Kubernetes Secret `backend-env`에서 필요한 네 항목만
 참조한다. Pod와 같은 Namespace에 Secret과 해당 key가 모두 있어야 한다.
@@ -93,12 +103,12 @@ RDS 계정 저장 방식을 이 내부 키의 별도 합의에 그대로 적용�
 
 앱의 입력 계약은 `BACKEND_INTERNAL_KEY` 환경 변수다. 배포 환경이 Parameter Store를
 조회해 `backend-env`의 `MOONGCHEAP_INTERNAL_API_KEY` 항목을 공급해야 한다.
-2026-09-21 확인한 Cloud `feat/gitops` (`75ae1d7`)의 ExternalSecret 템플릿에는
+2026-09-21 확인한 Cloud `develop` (`57cd52e`)의 ExternalSecret 템플릿에는
 DB 세 항목은 있지만 내부 인증 키 항목은 없다. 따라서 이 참조 변경만으로 배포 준비가
 끝나지는 않는다. Parameter 경로·조회 권한·동기화 구성과 해당 key의 공급을 Cloud에서
 완료하기 전까지 `suspend: true`를 유지한다. 앱은 SSM을 직접 호출하지 않으며,
 `secretKeyRef` 자체가 SSM을 조회하지도 않는다.
-([Cloud ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/75ae1d7/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
+([Cloud ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
 
 Secret 공급 주체의 AWS 권한과 ECR 이미지 pull 권한은 별도의 인프라 설정이다.
 실제 비밀 값과 `.env`는 Git·이미지·로그에 넣지 않는다. 키 교체 시 Backend와 AI의
@@ -130,7 +140,8 @@ CI/CD만으로 외부 PVC의 파일까지 자동 갱신되지는 않으므로 ar
 
 ## 공유 BE·AI Worker에 배치
 
-Cloud V2 설계에 따라 Backend·AI·시스템 워크로드가 공유하는 노드를 선택한다.
+Cloud `be-ai` NodePool의 Backend·AI 공유 노드를 선택한다. ArgoCD·Karpenter·Jenkins
+Controller용 `workload=system` 고정 노드는 별도로 구성되어 있다.
 `nodeSelector`는 이미 존재하는 노드의 라벨을 검사하는 조건이며 Node Group을 생성하지 않는다.
 
 ```yaml
@@ -150,7 +161,7 @@ tolerations: []
   EKS Node Group의 AWS `tags`는 이 라벨을 대신하지 않는다.
 - 이 조건에 맞는 노드가 없거나 남은 자원이 부족하면 Pod는 `Pending` 상태가 될 수 있다.
   한 Pod의 요청 CPU `1` / 메모리 `3Gi`를 수용할 노드가 필요하며 여러 노드의 여유를 합쳐
-  한 Pod를 실행할 수는 없다. Backend·다른 AI·Jenkins·관측 도구·시스템 Pod를 함께 계산한다.
+  한 Pod를 실행할 수는 없다. 해당 노드의 Backend·다른 AI·노드별 시스템 Pod 등을 함께 계산한다.
 - 메모리 한도 `4Gi`는 구성요소 측정에 여유를 둔 초기안이다. 공용 차트의 `512Mi` 기본값으로
   낮추지 않고 실제 배치 전체 부하를 측정해 조정한다.
 - 특정 hostname이나 `nodeName`으로 고정하지 않는다. 노드 교체 시에도 같은 label을
@@ -164,21 +175,21 @@ Dockerfile은 실행 이미지의 내용과 시작 명령을 정하고, Kubernet
 만든다. 따라서 노드 라벨·Namespace 변경은 Dockerfile 수정 사유가 아니다.
 ([Helm values](https://helm.sh/docs/chart_template_guide/values_files/))
 
-2026-09-16 확인 기준 Cloud `develop` (`4f450fb`)에는 GitOps와
+2026-09-21 확인 기준 Cloud `develop` (`57cd52e`)에는 GitOps와
 `moongcheap-service` Helm 차트가 병합되어 있다. 현재 차트는 실행 리소스로
 Deployment를 렌더링한다. `env`, `envFrom`, 자원과 노드 선택 설정은 지원하지만,
 CronJob, ConfigMap 생성, ServiceAccount, 명시적인 `command`/`args`, 볼륨과
 보안 컨텍스트는 아직 지원하지 않는다. `values.yaml`에 항목을 추가할 때는
 해당 값을 사용하는 템플릿도 필요하다.
-([차트 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/4f450fb/gitops/charts/moongcheap-service/templates/deployment.yaml))
+([차트 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/charts/moongcheap-service/templates/deployment.yaml))
 
 개발 ApplicationSet은 `destination.namespace: moongcheap-develop`을 사용하고,
 AppProject는 `moongcheap-*` Namespace를 허용한다. B 전용 overlay를 이 기준에 맞췄다.
 설계 문서의 `ai` Namespace를 적용하려면 ArgoCD 정책까지 함께 바꿔야 하므로 여기서
 임의로 사용하지 않는다. CronJob, ConfigMap, ServiceAccount, 외부 Secret/PVC는
 같은 Namespace에 둔다.
-([개발 ApplicationSet](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/4f450fb/gitops/argocd/applicationset-services-develop.yaml),
-[AppProject](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/4f450fb/gitops/argocd/projects/services-project.yaml))
+([개발 ApplicationSet](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/argocd/applicationset-services-develop.yaml),
+[AppProject](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/argocd/projects/services-project.yaml))
 
 B는 `demand-clustering-batch`가 종료되는 배치이므로 **CronJob 템플릿이 필요**하다.
 Deployment로 감싸면 완료한 컨테이너가 반복 시작될 수 있다. Cloud 차트에서 배치 유형을
@@ -198,23 +209,25 @@ Deployment로 감싸면 완료한 컨테이너가 반복 시작될 수 있다. C
 HTTP 포트·Service·Ingress·HTTP probe·HPA는 B에 적용하지 않는다. 이 배치는
 PostgreSQL을 조회한 뒤 Backend 내부 API를 호출하므로 `BACKEND_BASE_URL`에는 실제
 Backend Service 주소를 넣는다. B 자체의 수신 Service를 만드는 흐름은 아니다.
+개발 환경은 B 전용 overlay와 동일하게 `http://backend`를 사용한다.
 
-Cloud Terraform의 최신 구조는 FE Managed Node Group과 BE·AI용 Karpenter다.
-FE에는 `workload=frontend` 라벨이 있고, Backend·AI Helm values는
-`workload=backend-ai`를 선택한다. GitOps 트리에서는 아직 Karpenter 설치 및
-NodePool/EC2NodeClass 정의를 확인하지 못했으므로, 실제 BE·AI 노드의 라벨·taint·
-아키텍처와 가용 자원은 Cloud가 확인해야 한다. 이 대조는 실제 EKS 상태 확인이 아니다.
-([FE 노드](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/4f450fb/terraform/modules/eks/node_groups.tf),
-[Karpenter 인프라](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/4f450fb/terraform/modules/karpenter/main.tf))
+Cloud Terraform은 FE·system Managed Node Group과 BE·AI용 Karpenter를 구성한다.
+GitOps에는 Karpenter controller 설정과 `be-ai` NodePool/EC2NodeClass 정의가 있다.
+NodePool의 `workload=backend-ai`, Linux amd64, taint 없음은 현재 B 설정과 일치한다.
+현재 인스턴스 유형은 `t3.large`, NodePool 전체 자원 상한은 CPU `8` / 메모리 `32Gi`다.
+이 상한은 한 Pod가 사용할 수 있는 자원을 뜻하지 않는다. 실제 노드의 가용 자원과
+PVC 연결 가능 여부는 Cloud가 확인해야 한다. 이 대조는 실제 EKS 상태 확인이 아니다.
+([FE·system 노드](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/terraform/modules/eks/node_groups.tf),
+[BE·AI NodePool](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/platform/karpenter/resources/nodepool-be-ai.yaml))
 
-Cloud의 `Jenkinsfile.template`은 루트 `Dockerfile`을 Kaniko로 빌드한다. B에 연결할 때는
-저장소 루트를 build context로 유지하고 경로를 `docker/Dockerfile.demand-clustering`으로
+Cloud의 `Jenkinsfile.template`은 `DOCKERFILE_PATH`의 파일을 Kaniko로 빌드한다.
+B에 연결할 때는 저장소 루트를 build context로 유지하고 이 값을 `docker/Dockerfile.demand-clustering`으로
 지정한다. 현재 `python-builder`는 Python 3.11이므로 B의 Python 3.12 이상 요구사항과
 `uv`, `kubectl` 준비를 CI 쪽에서 맞춘다. 이미지의 Python 3.13.12, 비밀 값 미포함 정책,
 배치 entrypoint는 유지한다. Docker/BuildKit 로컬 검증과 Cloud Kaniko 실제 빌드 검증은
 별개이며, Kaniko 실행 결과는 아직 확인하지 않았다.
-([Jenkins 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/4f450fb/gitops/jenkins/pipelines/Jenkinsfile.template),
-[빌드 에이전트](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/4f450fb/gitops/platform/jenkins/values.yaml))
+([Jenkins 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/jenkins/pipelines/Jenkinsfile.template),
+[빌드 에이전트](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/platform/jenkins/values.yaml))
 
 Backend `develop` (`89a4935`)에는 합의한 두 internal API와 `reject_history` migration이
 있다. 단, 인증 필터는 아직 `X-Internal-Api-Key`를 읽는다. AI의 합의된 `X-Internal-Key`를
@@ -254,12 +267,14 @@ Secret·노드·재시도·보안·볼륨 계약과 A 비포함 경계를 검사
 인프라의 환경별 GitOps 설정에서는 다음 값을 채운다.
 
 1. 실제 Namespace와 ECR 이미지 경로·Git SHA 태그.
-2. ConfigMap의 `BACKEND_BASE_URL`과 profile·taxonomy release 경로.
+2. ConfigMap의 Backend Service 주소(개발 예시는 `http://backend` 반영 완료)와
+   profile·taxonomy release 경로.
 3. `backend-env`의 DB 세 항목과 Parameter Store 내부 키 항목 공급,
    같은 Namespace의 데이터·모델이 들어 있는 두 PVC.
-4. BE·AI Node Group의 실제 라벨·taint 정책, 합산 CPU/메모리 여유와 DB·Backend 네트워크 연결.
+4. BE·AI NodePool의 실제 라벨·taint 정책, 합산 CPU/메모리 여유와 DB·Backend 네트워크 연결.
 5. 테스트 데이터로 실제 연동 검증 후 스케줄·제한 시간을 확인하고 `suspend: false`로 전환.
 
-현재의 `replace-with-git-sha`, `replace-with-artifact-version`, `https://backend.invalid`는
-배포 값이 아닌 자리표시자다. `suspend: true`는 정기 실행을 막지만 수동 Job 생성까지
+현재의 `replace-with-git-sha`, `replace-with-artifact-version`과 base·공용 dev의
+`https://backend.invalid`는 배포 값이 아닌 자리표시자다. B 전용 dev의 Backend 주소만
+채운 상태이며 나머지 공급·연동 검증은 필요하다. `suspend: true`는 정기 실행을 막지만 수동 Job 생성까지
 막지는 않으므로, 실제 DB 상태를 바꾸는 수동 실행은 별도 승인된 대상에서만 수행한다.
