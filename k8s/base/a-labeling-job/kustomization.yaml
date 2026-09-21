@@ -9,4 +9,5 @@ configMapGenerator:
   - name: a-labeling-config
     literals:
       - A_ALIAS_REGISTRY_PATH=/app/config/model1_aliases_reviewed_v2.json
+      - A_RULES_PATH=/app/config/demand_constraint_rules.json
       - A_BACKEND_HTTP_TIMEOUT_SECONDS=15

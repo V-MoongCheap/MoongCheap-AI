@@ -25,6 +25,8 @@ python -m moongcheap_ai.data_foundation.runtime_job `
 
 - `A_DATABASE_URL`: PostgreSQL DSN. 런타임은 read-only session으로 연결한다.
 - `A_TAXONOMY_PATH`: 승인된 Taxonomy artifact 경로
+- `A_RULES_PATH`: A 전용 입력 정책 규칙 파일 경로. 기본값은
+  `config/demand_constraint_rules.json`이다.
 - `A_PRODUCT_FACETS_PATH`: 선택적 Product Facet mapping artifact
 - `A_BACKEND_BASE_URL`: Backend base URL
 - `A_BACKEND_INTERNAL_KEY`: 배포 환경에서 주입하는 내부 API Secret

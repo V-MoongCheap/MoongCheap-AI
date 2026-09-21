@@ -206,6 +206,7 @@ def run_part_a_batch(
             status = str(result["status"])
             if status not in STATUSES:
                 status = "REVIEW"
+            completed = status in {"PARSED", "NONE", "NOT_APPLICABLE"}
             constraints = _contract_constraints(taxonomy, category_id, result)
             label, facet_values = _label(taxonomy, category_id, constraints)
             reason_codes = list(result.get("warnings", []))
@@ -228,7 +229,7 @@ def run_part_a_batch(
                 "label": label,
                 "facet_values": json.dumps(facet_values, ensure_ascii=False, separators=(",", ":")),
                 "parserVersion": RUNTIME_VERSION,
-                "processed_at": now,
+                "processed_at": now if completed else "",
             })
         except (KeyError, TypeError, ValueError, IndexError) as error:
             row.update({

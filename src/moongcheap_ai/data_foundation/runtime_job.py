@@ -14,6 +14,7 @@ from typing import Any
 import pandas as pd
 from dotenv import load_dotenv
 
+from ..demand_constraints import DemandConstraintParser
 from ..mvp_pipeline import ReviewedAliasMatcher, _apply_aliases
 from .backend_contract import build_label_result_payload, post_label_results
 from .labeling import (
@@ -25,6 +26,7 @@ from .labeling import (
 )
 from .postgres_reader import open_read_only_postgres, read_unprocessed_demands
 from .postgres_writer import open_postgres, write_label_results
+from .part_a_input_policy import PartAConstraintInputPolicy
 
 
 def _required(source: Mapping[str, str], key: str) -> str:
@@ -41,6 +43,7 @@ def run_batch(
     taxonomy_payload: dict[str, Any] | None = None,
     product_facets_path: Path | None = None,
     alias_registry_path: Path | None = None,
+    rules_path: Path | None = None,
     processed_at: str | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     timestamp = processed_at or datetime.now(UTC).isoformat()
@@ -58,7 +61,21 @@ def run_batch(
     facet_map = None
     if product_facets_path and product_facets_path.exists():
         facet_map = build_product_facet_map(pd.read_csv(product_facets_path, dtype=str).fillna(""))
-    labeled = label_demands(demands.fillna(""), loader, product_facet_map=facet_map)
+    requirement_interpreter = None
+    if rules_path and rules_path.is_file():
+        parser = DemandConstraintParser.from_taxonomy(
+            loader.taxonomy,
+            rules_path=rules_path,
+            aliases_path=alias_registry_path,
+            policy_cls=PartAConstraintInputPolicy,
+        )
+        requirement_interpreter = parser.interpret
+    labeled = label_demands(
+        demands.fillna(""),
+        loader,
+        product_facet_map=facet_map,
+        requirement_interpreter=requirement_interpreter,
+    )
     if alias_registry_path and alias_registry_path.exists():
         labeled, alias_hits, corrected_alias_hits, alias_conflicts = _apply_aliases(
             labeled, ReviewedAliasMatcher(alias_registry_path)
@@ -77,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--taxonomy", type=Path)
     parser.add_argument("--product-facets", type=Path)
     parser.add_argument("--alias-registry", type=Path)
+    parser.add_argument("--rules", type=Path)
     parser.add_argument("--output", type=Path, default=Path("data/processed/demands/runtime_labeled_v0.csv"))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -89,6 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         load_dotenv(args.env_file, override=False)
     source = os.environ
     taxonomy_path = args.taxonomy or Path(source.get("A_TAXONOMY_PATH", "config/facet_taxonomy_v2_2.json"))
+    rules_path = args.rules or Path(source.get("A_RULES_PATH", "config/demand_constraint_rules.json"))
 
     connection = None
     write_to_database = args.write_db or source.get("A_WRITE_DATABASE", "").strip().lower() in {"1", "true", "yes"}
@@ -115,6 +134,7 @@ def main(argv: list[str] | None = None) -> int:
             taxonomy_payload=taxonomy_payload,
             product_facets_path=args.product_facets or (Path(source["A_PRODUCT_FACETS_PATH"]) if source.get("A_PRODUCT_FACETS_PATH") else None),
             alias_registry_path=args.alias_registry or Path(source.get("A_ALIAS_REGISTRY_PATH", "config/model1_aliases_reviewed_v2.json")),
+            rules_path=rules_path,
         )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         labeled.to_csv(args.output, index=False, encoding="utf-8-sig")

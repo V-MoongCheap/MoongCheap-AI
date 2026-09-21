@@ -86,6 +86,32 @@ def test_writer_requires_demand_id() -> None:
         )
 
 
+def test_writer_rejects_invalid_completed_rows() -> None:
+    for row, message in [
+        ({"demand_id": "1", "label": "", "label_status": "LABELED"}, "label is required"),
+        ({"demand_id": "1", "label": "1", "label_status": "UNKNOWN"}, "unsupported label_status"),
+        ({"demand_id": float("nan"), "label": "1", "label_status": "LABELED"}, "demand_id"),
+    ]:
+        with pytest.raises(ValueError, match=message):
+            write_label_results(
+                FakeConnection(),
+                [row],
+                processed_at="2026-09-14T00:00:00+00:00",
+            )
+
+
+def test_writer_rejects_duplicate_demand_ids() -> None:
+    with pytest.raises(ValueError, match="duplicate demand_id"):
+        write_label_results(
+            FakeConnection(),
+            [
+                {"demand_id": "1", "label": "1", "label_status": "LABELED"},
+                {"demand_id": "1", "label": "2", "label_status": "LABELED"},
+            ],
+            processed_at="2026-09-14T00:00:00+00:00",
+        )
+
+
 def test_writer_returns_database_affected_count() -> None:
     count = write_label_results(
         FakeConnection(rowcount=0),

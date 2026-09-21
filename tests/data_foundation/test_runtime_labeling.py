@@ -46,6 +46,49 @@ def test_label_runtime_builds_backend_payload(tmp_path) -> None:
     assert payload["results"][0]["demandId"] == 1
 
 
+def test_runtime_job_uses_part_a_policy_when_rules_are_provided(tmp_path) -> None:
+    taxonomy = {
+        "categories": [
+            {
+                "category_id": "c1",
+                "facets": [
+                    {
+                        "name": "functional_ingredients",
+                        "order": 1,
+                        "values": [
+                            {"code": 0, "value": "ALL"},
+                            {"code": 1, "value": "오메가-3"},
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    path = tmp_path / "taxonomy.json"
+    path.write_text(json.dumps(taxonomy, ensure_ascii=False), encoding="utf-8")
+    demands = pd.DataFrame(
+        [
+            {
+                "demand_id": "1",
+                "catalog_id": "10",
+                "category_id": "c1",
+                "extra_requirement": "오메가3 함유 제품을 원해요.",
+                "is_substitutable": "true",
+            }
+        ]
+    )
+
+    labeled, _ = run_batch(
+        demands,
+        path,
+        rules_path=__import__("pathlib").Path("config/demand_constraint_rules.json"),
+        processed_at="2026-01-01T00:00:00+00:00",
+    )
+
+    assert labeled.loc[0, "label"] == "1"
+    assert labeled.loc[0, "label_status"] == "LABELED"
+
+
 def test_backend_response_requires_accepted_status() -> None:
     validate_backend_response({"status": "ACCEPTED", "acceptedCount": 1}, 1)
 
