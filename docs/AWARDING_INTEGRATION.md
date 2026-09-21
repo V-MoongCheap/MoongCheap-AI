@@ -58,14 +58,18 @@ docker run --rm --platform linux/amd64 --network none --read-only \
   --cap-drop ALL --security-opt no-new-privileges moongcheap/ai-awarding:local
 ```
 
+이미지는 두 단계다. 인자 없이 빌드하면 **배포 단계(runtime)** 가 나오고 배치 실행에 필요한 것만 담는다.
+Mock 서버와 loopback 시험은 **시험 단계(test)** 에만 있어 배포 이미지에 들어가지 않는다.
+
 기본 실행은 파일 판정만 한다. 예상 요약은 조회 4, 판정 3, 계약 오류 1, 낙찰 2이며 `sent: false`다.
 Mock 서버까지 포함한 자동 테스트 드라이브:
 
 ```bash
+bash scripts/awarding/build_image.sh moongcheap/ai-awarding:test linux/amd64 test
 docker run --rm --platform linux/amd64 --network none --read-only \
   --tmpfs /tmp:rw,nosuid,noexec,size=16m --cap-drop ALL \
   --security-opt no-new-privileges --entrypoint python \
-  moongcheap/ai-awarding:local scripts/awarding/container_smoke.py
+  moongcheap/ai-awarding:test scripts/awarding/container_smoke.py
 ```
 
 마지막 `status: PASS`와 종료 코드 0이 성공 기준이다. 키 누락/오류, dry-run 무전송,

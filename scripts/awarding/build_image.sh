@@ -4,6 +4,8 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 image_tag="${1:-moongcheap/ai-awarding:local}"
 target_platform="${2:-linux/amd64}"
+# 기본은 배포 단계다. loopback 시험 이미지는 세 번째 인자로 test 를 준다.
+build_target="${3:-runtime}"
 files=(
   docker/Dockerfile.awarding
   packaging/awarding/requirements.txt
@@ -25,4 +27,5 @@ done
 # 허용된 파일만 담는다. 로컬 키/원천 데이터는 컨텍스트에 보내지 않는다.
 COPYFILE_DISABLE=1 tar --no-xattrs --no-acls -czf - "${files[@]}" |
   DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-0}" docker build \
-    --platform "$target_platform" -f docker/Dockerfile.awarding -t "$image_tag" -
+    --platform "$target_platform" --target "$build_target" \
+    -f docker/Dockerfile.awarding -t "$image_tag" -

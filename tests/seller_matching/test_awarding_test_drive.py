@@ -139,3 +139,21 @@ def test_summary_survives_a_report_without_reflection():
               "responses": [], "counts": {"fetched": 0, "judged": 0, "skipped": 0, "awarded": 0}}
 
     drive._print_summary(report)
+
+
+def test_deploy_stage_of_the_awarding_image_has_no_test_code():
+    """Mock 서버와 loopback 시험은 시험 단계에만 둔다. 배포 이미지는 배치만 담는다."""
+    stages = {}
+    current = None
+    for line in (ROOT / "docker" / "Dockerfile.awarding").read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.upper().startswith("FROM "):
+            current = stripped.split(" AS ")[-1] if " AS " in stripped else stripped
+            stages[current] = []
+        elif current:
+            stages[current].append(stripped)
+
+    deploy = " ".join(stages[list(stages)[-1]])
+    assert "mock_backend.py" not in deploy
+    assert "container_smoke.py" not in deploy
+    assert any("container_smoke.py" in " ".join(body) for name, body in stages.items() if name == "test")

@@ -4,10 +4,13 @@ repository: https://github.com/V-MoongCheap/MoongCheap-AI
 branch: develop
 status: "로컬 구현·Mock 검증. 현재 작업 브랜치의 미커밋 변경이며 develop 반영 전"
 dockerfile_path: docker/Dockerfile.awarding
-container_image_name: moongcheap/ai-awarding:local
+container_image_name: ai-awarding  # ECR repository 최종 명칭은 인프라 확인.
+# ⚠️ terraform/modules/ecr 의 services 기본값은 ["frontend","backend","ai"] 뿐이라
+#    낙찰 배치용 저장소가 없다. 저장소를 늘릴지 태그로 나눌지 확인 필요.
 container_architecture: linux/amd64
-container_build_command: "bash scripts/awarding/build_image.sh moongcheap/ai-awarding:local linux/amd64"
-container_build_context: "build_image.sh의 명시적 파일 허용 목록만 gzip tar로 전달"
+container_build_command: "bash scripts/awarding/build_image.sh <repo>:<env>-<git-short-sha> linux/amd64"
+container_build_target: runtime  # 기본값. loopback 시험 이미지는 세 번째 인자로 test
+container_build_context: "build_image.sh의 허용 목록(로컬 구형 빌더) 또는 docker/Dockerfile.awarding.dockerignore(BuildKit/Kaniko)"
 runtime_requirements: packaging/awarding/requirements.txt
 local_builder: "Docker legacy builder; BuildKit/Kaniko 검증 안 함"
 test_command: "python -m pytest tests/seller_matching/test_offer_ranking.py tests/seller_matching/test_awarding_batch.py tests/seller_matching/test_awarding_test_drive.py"
