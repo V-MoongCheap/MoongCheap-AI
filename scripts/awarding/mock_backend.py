@@ -24,6 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+# 이 파일은 패키지를 import 하지 않고 단독 실행할 수 있어야 해서 KST 를 따로 둔다.
 KST = timezone(timedelta(hours=9))
 UNAUTHORIZED = {"success": False, "data": None, "error": {"code": "COMMON_401", "message": "인증이 필요합니다.", "fieldErrors": []}}
 

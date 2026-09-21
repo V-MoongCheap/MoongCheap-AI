@@ -28,13 +28,14 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from moongcheap_ai.seller_matching.awarding_batch import (
+    KST,
     fetch_pending,
     post_result,
     run_once,
@@ -45,7 +46,6 @@ from moongcheap_ai.seller_matching.offer_ranking import (
     RankingPolicy,
 )
 
-KST = timezone(timedelta(hours=9))
 KEY_ENV = "BACKEND_INTERNAL_API_KEY"
 
 
