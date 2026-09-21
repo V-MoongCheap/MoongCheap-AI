@@ -125,32 +125,21 @@ def test_generated_config_reference_and_runtime_settings(resources):
     profiles = PurePosixPath(config["MFDS_CATALOG_PROFILES_PATH"])
     taxonomy = PurePosixPath(config["DEMAND_TAXONOMY_PATH"])
     assert profiles.parent == taxonomy.parent
-    assert profiles.parent.parts[:3] == ("/", "artifacts", "releases")
+    assert str(profiles.parent) == "/artifacts"
     assert profiles.name == "catalog_profiles.csv"
     assert taxonomy.name == "taxonomy.json"
 
 
-def test_read_only_artifact_mounts_and_bounded_tmp(resources):
+def test_image_assets_are_not_hidden_by_volumes_and_only_tmp_is_writable(resources):
     pod = pod_spec(resources)
     container = pod["containers"][0]
     mounts = {mount["name"]: mount for mount in container["volumeMounts"]}
     volumes = {volume["name"]: volume for volume in pod["volumes"]}
-    assert set(mounts) == set(volumes) == {"artifacts", "e5-model", "tmp"}
-    for volume_name, mount_path, claim_name in (
-        ("artifacts", "/artifacts", "demand-clustering-artifacts"),
-        ("e5-model", "/models/multilingual-e5-small", "demand-clustering-e5-model"),
-    ):
-        assert mounts[volume_name]["mountPath"] == mount_path
-        assert mounts[volume_name]["readOnly"] is True
-        assert volumes[volume_name]["persistentVolumeClaim"] == {
-            "claimName": claim_name, "readOnly": True,
-        }
+    assert set(mounts) == set(volumes) == {"tmp"}
     assert mounts["tmp"]["mountPath"] == "/tmp"
     assert volumes["tmp"]["emptyDir"] == {"sizeLimit": "256Mi"}
     config = resources["ConfigMap"]["data"]
-    assert PurePosixPath(config["E5_MODEL_PATH"]).is_relative_to(
-        mounts["e5-model"]["mountPath"]
-    )
+    assert config["E5_MODEL_PATH"] == "/models/multilingual-e5-small"
 
 
 def test_non_root_without_kubernetes_api_token(resources):
@@ -207,3 +196,5 @@ def test_handoff_uses_part_b_paths_and_agreed_parameter_store_source():
     for name in ("DB_URL", "DB_USERNAME", "DB_PASSWORD"):
         assert secrets[name]["secret_name"] == "backend-env"
         assert secrets[name]["secret_key"] == name
+    assert handoff["runtime_filesystem"]["read_only_mounts"] == []
+    assert handoff["artifact_migration"]["image_only_rollout_supported"] is True

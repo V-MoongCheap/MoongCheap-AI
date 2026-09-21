@@ -8,7 +8,7 @@ GitOps에 반영하고, 이후 계약 변경도 함께 반영한다.
 이 문서와 B 전용 overlay의 범위는 수요 클러스터링 CronJob 하나다. 기존 공용
 `base`와 `overlays/dev`에는 A도 포함되므로 B만 전달할 때는 아래 전용 경로를 사용한다.
 B 전용 경로는 다른 AI 파트의 Deployment/CronJob, EKS Node Group, Namespace,
-Secret, PVC와 Secret 동기화 리소스를 생성하지 않는다.
+Secret과 Secret 동기화 리소스를 생성하지 않는다. B는 PVC를 사용하지 않는다.
 이미지 빌드·실측 자료는 [컨테이너 안내](../docs/DEMAND_CLUSTERING_CONTAINER.md),
 전달 항목은 [B파트 인계서](../docs/ci-cd-demand-clustering-handoff.yml)를 참고한다.
 
@@ -29,7 +29,7 @@ k8s/
 ```
 
 - B 전용 개발 Namespace는 Cloud `develop` (`57cd52e`)의 GitOps 기준인
-  `moongcheap-develop`이다. 같은 공간에 Secret/PVC를 준비한다. 기존 공용 예시의
+  `moongcheap-develop`이다. 같은 공간에 Secret을 준비한다. 기존 공용 예시의
   `moongcheap-ai-dev`와 A의 설정은 바꾸지 않는다.
 - 매시간 45분, `Asia/Seoul`, `suspend: true`로 시작한다.
 - `concurrencyPolicy: Forbid`, `backoffLimit: 0`, `restartPolicy: Never`다.
@@ -114,29 +114,25 @@ Secret 공급 주체의 AWS 권한과 ECR 이미지 pull 권한은 별도의 인
 실제 비밀 값과 `.env`는 Git·이미지·로그에 넣지 않는다. 키 교체 시 Backend와 AI의
 반영 시점을 맞추고, 이미 실행 중인 프로세스의 환경 변수가 자동 교체된다고 가정하지 않는다.
 
-## 모델과 상품 profile 공급
+## 모델과 상품 profile은 이미지에 포함
 
-기본안은 **이미 채워진 PVC를 읽기 전용으로 마운트**하는 방식이다. 아래 PVC는
-Pod와 같은 Namespace에 필요하다. StorageClass, 크기, access mode, 볼륨 채우기와
-갱신 작업은 여기서 생성하지 않으며 인프라가 실제 저장소에 맞게 정한다.
+B 담당자가 확정한 상품 profile·taxonomy와 E5 모델을 Dockerfile이 이미지에 넣는다.
+인프라는 이미지 빌드·배포를 수행하며 별도의 PVC 생성, 데이터 복사 Job이나 모델 선택이 필요 없다.
+`packaging/demand-clustering/runtime-assets/`에 상품 압축본·분류표와 검증 manifest가 있다.
+모델은 `model.json`의 고정 revision을 빌드 때 다운로드하고 파일별 SHA256을 검사한다.
 
-| PVC 이름 | 마운트 경로 | 필요한 내용 |
-| --- | --- | --- |
-| `demand-clustering-artifacts` | `/artifacts` | `releases/<artifact-version>/catalog_profiles.csv`와 `taxonomy.json` |
-| `demand-clustering-e5-model` | `/models/multilingual-e5-small` | E5의 `blobs/`와 `snapshots/<revision>/`을 포함한 모델 cache |
+| 이미지 내부 경로 | 내용 |
+| --- | --- |
+| `/artifacts/catalog_profiles.csv` | 확정된 상품 profile |
+| `/artifacts/taxonomy.json` | profile과 함께 검증한 A V2.2 분류표 |
+| `/models/multilingual-e5-small` | E5 가중치·tokenizer·SentenceTransformer 설정 |
 
-현재 E5 경로는 검증한 revision
-`614241f622f53c4eeff9890bdc4f31cfecc418b3`의 snapshot을 가리킨다.
-snapshot만 복사하면 `blobs/`를 향한 심볼릭 링크가 끊어질 수 있으므로 cache 전체를
-공급한다. 모델은 실행 중 다운로드하지 않는다. 모든 파일과 상위 디렉터리는 UID
-65534가 읽고 탐색할 수 있어야 한다. PVC의 AZ·접근 모드도 BE·AI 노드 배치와 호환되어야 한다.
-
-상품도감과 catalog ID의 기준은 Part A다. 현재 Part A 입력 기준의 profile 검증을
-활용해 진행하고, 후속 산출물은 새 release 경로에 공급한 뒤 profile·taxonomy 경로를
-함께 변경한다. 실행 중인 배치가 읽는 기존 release를 덮어쓰지 않는다. 코드 이미지의
-CI/CD만으로 외부 PVC의 파일까지 자동 갱신되지는 않으므로 artifact 게시·버전 반영을
-배포 과정에 연결해야 한다. 실제 DB 연동에서는 수요·보드의 ID와 이 상품도감의 ID가
-일치하는지 확인한다.
+ConfigMap은 위 경로를 그대로 지정한다. `/artifacts`와 `/models` 위에 볼륨을 마운트하면
+이미지에 들어 있는 파일을 가리므로 마운트하지 않는다. CronJob에는 `/tmp`용 `emptyDir`만 남긴다.
+파일은 non-root UID 65534가 읽을 수 있으며 실행 중 다운로드하지 않는다.
+자료 버전은 이미지 안의 `/artifacts/manifest.json`, 모델의 `image-model-manifest.json`에 기록된다.
+자료 갱신은 B 담당자가 [runtime-assets 갱신 절차](../packaging/demand-clustering/runtime-assets/README.md)에
+따라 커밋하고 이미지를 재빌드한다. 상품도감 ID와 DB 입력 ID의 일치 계약은 계속 적용한다.
 
 ## 공유 BE·AI Worker에 배치
 
@@ -186,7 +182,7 @@ CronJob, ConfigMap 생성, ServiceAccount, 명시적인 `command`/`args`, 볼륨
 개발 ApplicationSet은 `destination.namespace: moongcheap-develop`을 사용하고,
 AppProject는 `moongcheap-*` Namespace를 허용한다. B 전용 overlay를 이 기준에 맞췄다.
 설계 문서의 `ai` Namespace를 적용하려면 ArgoCD 정책까지 함께 바꿔야 하므로 여기서
-임의로 사용하지 않는다. CronJob, ConfigMap, ServiceAccount, 외부 Secret/PVC는
+임의로 사용하지 않는다. CronJob, ConfigMap, ServiceAccount, 외부 Secret은
 같은 Namespace에 둔다.
 ([개발 ApplicationSet](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/argocd/applicationset-services-develop.yaml),
 [AppProject](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/argocd/projects/services-project.yaml))
@@ -204,7 +200,7 @@ Deployment로 감싸면 완료한 컨테이너가 반복 시작될 수 있다. C
 | 노드 선택·ServiceAccount·Pod 보안·`restartPolicy: Never`·볼륨 | Job의 Pod 템플릿 |
 | 이미지·명령·환경 변수·Secret 참조·자원·마운트·컨테이너 보안 | Pod의 컨테이너 설정 |
 | Kustomize의 `configMapGenerator` | Helm ConfigMap 템플릿과 일치하는 `envFrom` 참조 |
-| B 전용 개발 Namespace `moongcheap-develop` | ArgoCD `destination.namespace` 및 해당 Namespace의 Secret/PVC |
+| B 전용 개발 Namespace `moongcheap-develop` | ArgoCD `destination.namespace` 및 해당 Namespace의 Secret |
 
 HTTP 포트·Service·Ingress·HTTP probe·HPA는 B에 적용하지 않는다. 이 배치는
 PostgreSQL을 조회한 뒤 Backend 내부 API를 호출하므로 `BACKEND_BASE_URL`에는 실제
@@ -215,8 +211,8 @@ Cloud Terraform은 FE·system Managed Node Group과 BE·AI용 Karpenter를 구�
 GitOps에는 Karpenter controller 설정과 `be-ai` NodePool/EC2NodeClass 정의가 있다.
 NodePool의 `workload=backend-ai`, Linux amd64, taint 없음은 현재 B 설정과 일치한다.
 현재 인스턴스 유형은 `t3.large`, NodePool 전체 자원 상한은 CPU `8` / 메모리 `32Gi`다.
-이 상한은 한 Pod가 사용할 수 있는 자원을 뜻하지 않는다. 실제 노드의 가용 자원과
-PVC 연결 가능 여부는 Cloud가 확인해야 한다. 이 대조는 실제 EKS 상태 확인이 아니다.
+이 상한은 한 Pod가 사용할 수 있는 자원을 뜻하지 않는다. 실제 노드에서 배치를 실행할
+CPU·메모리 여유는 Cloud가 확인해야 한다. 이 대조는 실제 EKS 상태 확인이 아니다.
 ([FE·system 노드](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/terraform/modules/eks/node_groups.tf),
 [BE·AI NodePool](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/platform/karpenter/resources/nodepool-be-ai.yaml))
 
@@ -224,8 +220,8 @@ Cloud의 `Jenkinsfile.template`은 `DOCKERFILE_PATH`의 파일을 Kaniko로 빌�
 B에 연결할 때는 저장소 루트를 build context로 유지하고 이 값을 `docker/Dockerfile.demand-clustering`으로
 지정한다. 현재 `python-builder`는 Python 3.11이므로 B의 Python 3.12 이상 요구사항과
 `uv`, `kubectl` 준비를 CI 쪽에서 맞춘다. 이미지의 Python 3.13.12, 비밀 값 미포함 정책,
-배치 entrypoint는 유지한다. Docker/BuildKit 로컬 검증과 Cloud Kaniko 실제 빌드 검증은
-별개이며, Kaniko 실행 결과는 아직 확인하지 않았다.
+배치 entrypoint는 유지한다. 2026-09-21 Docker/BuildKit 및 Cloud와 같은 Kaniko v1.23.2의
+로컬 `--no-push` 빌드를 통과했다. 실제 Jenkins 기동과 ECR push 권한·연결은 별도 확인 대상이다.
 ([Jenkins 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/jenkins/pipelines/Jenkinsfile.template),
 [빌드 에이전트](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/platform/jenkins/values.yaml))
 
@@ -244,7 +240,7 @@ Cloud의 ExternalSecret이 RDS Secret의 host/port/dbname/username/password를 B
 Cloud Helm으로 같은 CronJob을 각각 배포하지 않는다. 기존 공용 `overlays/dev`와
 B 전용 overlay도 동시에 배포하지 않는다. Namespace가 다르면 `Forbid`가 중복 실행을
 막지 못한다. 차트 작성 후에는 `helm lint`와
-`helm template`으로 렌더링하고 위 계약 및 기존 Secret/PVC 참조를 확인한다.
+`helm template`으로 렌더링하고 위 계약 및 기존 Secret 참조, PVC 미사용을 확인한다.
 
 ## 로컬·CI 검증 및 배포 전 교체 항목
 
@@ -259,7 +255,7 @@ uv run --project packaging/demand-clustering --no-sync pytest -c packaging/deman
 ```
 
 검증 스크립트는 base, 기존 공용 dev, B 전용 dev의 렌더링 결과를 파싱해
-Secret·노드·재시도·보안·볼륨 계약과 A 비포함 경계를 검사한다.
+Secret·노드·재시도·보안·이미지 내부 경로·PVC 미사용과 A 비포함 경계를 검사한다.
 렌더링과 검증 스크립트는 클러스터에 접속하거나 리소스를 적용하지 않는다. 전체 pytest는
 `kubectl`이 없으면 배포 테스트를 건너뛰므로, CI에는 누락 시 실패하는 위 검증 스크립트도
 등록한다. 이는 API 서버의 스키마·admission 검증이나 실제 Pod 기동 시험을 대체하지 않는다.
@@ -267,14 +263,13 @@ Secret·노드·재시도·보안·볼륨 계약과 A 비포함 경계를 검사
 인프라의 환경별 GitOps 설정에서는 다음 값을 채운다.
 
 1. 실제 Namespace와 ECR 이미지 경로·Git SHA 태그.
-2. ConfigMap의 Backend Service 주소(개발 예시는 `http://backend` 반영 완료)와
-   profile·taxonomy release 경로.
-3. `backend-env`의 DB 세 항목과 Parameter Store 내부 키 항목 공급,
-   같은 Namespace의 데이터·모델이 들어 있는 두 PVC.
+2. ConfigMap의 Backend Service 주소(개발 예시는 `http://backend` 반영 완료).
+   profile·taxonomy·모델 경로는 이미지 기본값을 유지한다.
+3. `backend-env`의 DB 세 항목과 Parameter Store 내부 키 항목 공급.
 4. BE·AI NodePool의 실제 라벨·taint 정책, 합산 CPU/메모리 여유와 DB·Backend 네트워크 연결.
 5. 테스트 데이터로 실제 연동 검증 후 스케줄·제한 시간을 확인하고 `suspend: false`로 전환.
 
-현재의 `replace-with-git-sha`, `replace-with-artifact-version`과 base·공용 dev의
+현재의 `replace-with-git-sha`와 base·공용 dev의
 `https://backend.invalid`는 배포 값이 아닌 자리표시자다. B 전용 dev의 Backend 주소만
-채운 상태이며 나머지 공급·연동 검증은 필요하다. `suspend: true`는 정기 실행을 막지만 수동 Job 생성까지
+채운 상태이며 Secret 공급·연동 검증은 필요하다. 모델·상품 자료는 이미지에 포함한다. `suspend: true`는 정기 실행을 막지만 수동 Job 생성까지
 막지는 않으므로, 실제 DB 상태를 바꾸는 수동 실행은 별도 승인된 대상에서만 수행한다.

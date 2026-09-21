@@ -87,24 +87,10 @@ spec:
                 capabilities:
                   drop: [ALL]
               volumeMounts:
-                - name: artifacts
-                  mountPath: /artifacts
-                  readOnly: true
-                - name: e5-model
-                  mountPath: /models/multilingual-e5-small
-                  readOnly: true
                 - name: tmp
                   mountPath: /tmp
           volumes:
-            # Existing, populated claims in the same namespace; not provisioned here.
-            - name: artifacts
-              persistentVolumeClaim:
-                claimName: demand-clustering-artifacts
-                readOnly: true
-            - name: e5-model
-              persistentVolumeClaim:
-                claimName: demand-clustering-e5-model
-                readOnly: true
+            # Catalog, taxonomy and E5 are baked into the image. No PVCs required.
             - name: tmp
               emptyDir:
                 sizeLimit: 256Mi

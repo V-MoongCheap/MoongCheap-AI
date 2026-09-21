@@ -1,19 +1,32 @@
 # syntax=docker/dockerfile:1
 FROM ghcr.io/astral-sh/uv:0.10.7 AS uv
-FROM python:3.13.12-slim-trixie AS builder
+FROM python:3.13.12-slim-trixie AS dependencies
 
 COPY --from=uv /uv /uvx /bin/
 ENV UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
-    UV_PROJECT_ENVIRONMENT=/opt/venv
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_NO_CACHE=1
 WORKDIR /build
 
 COPY packaging/demand-clustering/pyproject.toml packaging/demand-clustering/uv.lock ./packaging/demand-clustering/
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --project packaging/demand-clustering --locked --no-dev --extra embeddings --no-install-project
+RUN uv sync --project packaging/demand-clustering --locked --no-dev --extra embeddings --no-install-project
+
+# Download only the pinned, checksummed model files at build time.
+# This stage is cached independently of application and catalog changes.
+FROM dependencies AS model
+COPY scripts/deployment/prepare_demand_clustering_assets.py /build/prepare_assets.py
+COPY packaging/demand-clustering/runtime-assets/model.json /build/model.json
+RUN /opt/venv/bin/python /build/prepare_assets.py model \
+    --manifest /build/model.json --output /models/multilingual-e5-small
+
+FROM dependencies AS builder
 COPY src ./src
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --project packaging/demand-clustering --locked --no-dev --extra embeddings --no-editable
+RUN uv sync --project packaging/demand-clustering --locked --no-dev --extra embeddings --no-editable
+COPY scripts/deployment/prepare_demand_clustering_assets.py /build/prepare_assets.py
+COPY packaging/demand-clustering/runtime-assets/ /build/runtime-assets/
+RUN /opt/venv/bin/python /build/prepare_assets.py catalog \
+    --assets /build/runtime-assets --output /artifacts
 
 FROM python:3.13.12-slim-trixie AS runtime
 RUN apt-get update \
@@ -40,6 +53,8 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /artifacts /artifacts
+COPY --from=model /models /models
 COPY config/demand_constraint_rules.json config/model1_aliases_reviewed_v2.json config/demand_constraint_aliases.json ./config/
 
 USER 65534:65534
