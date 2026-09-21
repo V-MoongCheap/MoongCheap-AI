@@ -13,7 +13,7 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Protocol
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, quote, unquote, urlparse, urlsplit, urlunsplit
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -43,6 +43,9 @@ from .substitute_proposal_planner import (
 
 
 SHARED_DATABASE_URL_ENV = "SHARED_DATABASE_URL"
+DB_URL_ENV = "DB_URL"
+DB_USERNAME_ENV = "DB_USERNAME"
+DB_PASSWORD_ENV = "DB_PASSWORD"
 BACKEND_BASE_URL_ENV = "BACKEND_BASE_URL"
 BACKEND_INTERNAL_KEY_ENV = "BACKEND_INTERNAL_KEY"
 MFDS_CATALOG_PROFILES_PATH_ENV = "MFDS_CATALOG_PROFILES_PATH"
@@ -192,6 +195,52 @@ def _backend_base_url(value: str) -> str:
     return normalized
 
 
+def _database_url(source: Mapping[str, str]) -> str:
+    """Keep explicit DSNs, or build one from the Backend's split credentials."""
+
+    shared_url = source.get(SHARED_DATABASE_URL_ENV, "").strip()
+    if shared_url:
+        if shared_url.startswith("jdbc:"):
+            raise ConfigurationError(
+                f"{SHARED_DATABASE_URL_ENV} must use a PostgreSQL driver DSN, "
+                "not a JDBC URL"
+            )
+        return shared_url
+
+    backend_url = _required_value(source, DB_URL_ENV)
+    # Whitespace can be part of a database credential; do not strip it.
+    username = source.get(DB_USERNAME_ENV, "")
+    password = source.get(DB_PASSWORD_ENV, "")
+    for name, value in ((DB_USERNAME_ENV, username), (DB_PASSWORD_ENV, password)):
+        if not value:
+            raise ConfigurationError(f"{name} must not be empty")
+
+    try:
+        parsed = urlsplit(backend_url.removeprefix("jdbc:"))
+        if (
+            parsed.scheme not in {"postgresql", "postgres"}
+            or not parsed.hostname
+            or parsed.path in {"", "/"}
+            or parsed.username is not None
+            or parsed.fragment
+            or any(character.isspace() for character in backend_url)
+            or any(key in {"user", "password"} for key, _ in parse_qsl(parsed.query))
+        ):
+            raise ValueError("invalid database URL")
+        # Accessing port also checks malformed or out-of-range port numbers.
+        if parsed.port == 0:
+            raise ValueError("invalid database port")
+    except ValueError:
+        # Never include a URL or credential in startup errors.
+        raise ConfigurationError(
+            "DB_URL must be a PostgreSQL URL with a host and database, "
+            "without embedded credentials or a fragment"
+        ) from None
+
+    credentials = f"{quote(username, safe='')}:{quote(password, safe='')}"
+    return urlunsplit(parsed._replace(netloc=f"{credentials}@{parsed.netloc}"))
+
+
 def load_job_config(
     environ: Mapping[str, str] | None = None,
 ) -> DemandClusteringJobConfig:
@@ -202,12 +251,7 @@ def load_job_config(
     """
 
     source = os.environ if environ is None else environ
-    database_url = _required_value(source, SHARED_DATABASE_URL_ENV)
-    if database_url.startswith("jdbc:"):
-        raise ConfigurationError(
-            f"{SHARED_DATABASE_URL_ENV} must use a PostgreSQL driver DSN, "
-            "not a JDBC URL"
-        )
+    database_url = _database_url(source)
     try:
         e5 = E5RuntimeScorerConfig.from_environment(source)
     except ValueError as error:
@@ -394,7 +438,14 @@ def run_demand_clustering_job(
 def _safe_error_message(error: Exception, config: Any) -> str:
     message = str(error)
     if isinstance(config, DemandClusteringJobConfig):
-        for secret in (config.database_url, config.backend_internal_key):
+        secrets = [config.database_url, config.backend_internal_key]
+        try:
+            password = urlsplit(config.database_url).password
+        except ValueError:
+            password = None
+        if password:
+            secrets.extend((password, unquote(password)))
+        for secret in secrets:
             if secret:
                 message = message.replace(secret, "[REDACTED]")
     return message

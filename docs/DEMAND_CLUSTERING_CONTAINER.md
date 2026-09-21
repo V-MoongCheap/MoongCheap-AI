@@ -70,13 +70,17 @@ tokenizer, SentenceTransformer 설정 파일이 모두 필요하다. Hugging Fac
 사용하면 snapshot만 마운트하지 말고 `blobs/`를 포함한 모델 cache 전체를 마운트한다.
 이때 `E5_MODEL_PATH`는 마운트 내부의 `snapshots/<revision>`으로 지정한다.
 
-별도로 주입할 필수 값은 `SHARED_DATABASE_URL`, `BACKEND_BASE_URL`,
-`BACKEND_INTERNAL_KEY`다. DB 계정은 SELECT 전용이며 내부 키의 원본 저장소는
+별도로 주입할 필수 값은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `BACKEND_BASE_URL`,
+`BACKEND_INTERNAL_KEY`다. 기본 K8s 설정은 `backend-env`의 기존 DB 세 항목을 받아
+앱에서 PostgreSQL DSN을 조합한다. Backend DB 계정을 공유하되 B의 세션은 읽기 전용이다.
+기존 `SHARED_DATABASE_URL`도 지원하며, 비어 있지 않으면 DB 세 변수보다 우선한다.
+내부 키의 원본 저장소는
 Backend와 합의한 AWS Parameter Store `SecureString`이다. 배포 환경이 이를
 `BACKEND_INTERNAL_KEY`로 주입하며 앱은 `X-Internal-Key` 헤더로 전송한다.
-현재 매니페스트의 Kubernetes Secret 참조는 전달 방식의 예시이지 SSM 자동 연동이 아니다.
-Secret 경유 여부·조회 권한·주입 방식은 Cloud와 확정하고, 다른 방식이면 GitOps 참조도
-함께 바꾼다. 앱은 AWS 자격 증명이나 직접적인 AWS API 호출을 요구하지 않는다.
+매니페스트는 `backend-env/MOONGCHEAP_INTERNAL_API_KEY`를 참조하지만, 확인한 Cloud
+`feat/gitops` (`75ae1d7`)에는 이 항목이 없다. Cloud에서 SSM 조회·동기화와 해당 항목의
+공급을 완료하기 전까지 배포를 활성화하지 않는다. 앱은 AWS 자격 증명이나 직접적인
+AWS API 호출을 요구하지 않는다.
 실제 Secret 값은 이미지·Git·로그에 넣지 않는다.
 
 DB 조회 대상에는 `demand`, `demand_board`, `reject_history`가 포함된다.
@@ -114,7 +118,7 @@ docker run --rm --read-only \
 | CPU 스레드 | 이미지 기본 `OMP_NUM_THREADS=1`, `MKL_NUM_THREADS=1` |
 | 보안 | non-root, read-only root, 권한 상승 금지, capabilities drop ALL |
 | 쓰기 공간 | `/tmp`용 `emptyDir`, 초기 `sizeLimit: 256Mi`; checkpoint 볼륨 없음 |
-| 네트워크 | SELECT 전용 PostgreSQL과 Backend 내부 API에 연결; 모델 다운로드 불필요 |
+| 네트워크 | PostgreSQL에 읽기 전용 세션으로 연결하고 Backend 내부 API 호출; 모델 다운로드 불필요 |
 
 자원 값은 아래 측정에 여유를 둔 **초기 제안값**이지 운영 최대 부하 보장이 아니다.
 스케줄·제한 시간과 자원 값은 실제 배치 부하에 맞게 인프라와 조정한다. BE·AI 노드 선택은
@@ -175,7 +179,7 @@ docker run --rm --network none --read-only \
 | 이미지·E5 | 빌드, 오프라인 CPU 실행 검증 완료 | 인프라의 이미지 배포 및 모델 파일 공급 |
 | 상품 profile | 현재 Part A 분류 기준으로 재생성한 45,719건·15개 필드가 기존 profile과 모두 일치 | 같은 상품도감 ID를 사용하는 배포 입력 공급; 후속 산출물은 버전 갱신 |
 | taxonomy | 테스트 fixture가 현재 profile의 16개 카테고리를 포함하며 runtime 로드 확인 | 배포에 사용할 profile·taxonomy 파일을 같은 release로 공급 |
-| 연결 설정 | 확인한 로컬 환경 파일과 실행 환경에 배치용 DB 주소·Backend 주소·내부 키 미설정 | 테스트 대상 주소와 SELECT 전용 DB 계정, 내부 키의 안전한 주입 |
+| 연결 설정 | 실제 배포 연동 미검증; backend-env DB 세 항목 재사용, 내부 키 항목 공급 대기 | DB·Backend 연결 확인, 내부 키 주입과 헤더 이름 정합성 확인 |
 | Backend API | 합의한 두 API가 동작하는 배포 대상은 미확인 | 대상 환경에서 API 1·2 및 `X-Internal-Key` 계약 지원 여부 확인 |
 | 거절 이력 | 갱신 ERD 이미지 기준 `reject_history` 조회·후보 제외 구현 | 실제 테이블 배포, 거절과 상태 복귀의 원자적 저장, SELECT 권한 및 API 2의 동시성 재검증 확인 |
 
@@ -188,6 +192,6 @@ profile 45,719건이다. 이 중 claim 근거를 사용할 수 있는 44,919건�
 실제 연동 때는 PostgreSQL 수요·보드의 catalog ID가 이 상품도감과 일치하고 profile에
 존재하는지 확인한다. 현재 파일 재현 검증이 실제 DB의 ID 일치까지 확인한 것은 아니다.
 
-준비가 완료되면 SELECT 전용 연결 및 입력 ID 일치 여부부터 확인한다. 실제 API
+준비가 완료되면 읽기 전용 세션 및 입력 ID 일치 여부부터 확인한다. 실제 API
 반영 검증은 대상 환경과 사용할 테스트 수요를 명시적으로 정한 뒤 별도로 수행한다.
 현재까지 실제 DB 조회, Backend 상태 변경 API 호출, EKS 배포는 수행하지 않았다.

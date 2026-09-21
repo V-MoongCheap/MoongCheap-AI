@@ -52,19 +52,28 @@ spec:
                 - configMapRef:
                     name: demand-clustering-config
               env:
-                - name: SHARED_DATABASE_URL
+                - name: DB_URL
                   valueFrom:
                     secretKeyRef:
-                      name: ai-batch-reader-database
-                      key: url
+                      name: backend-env
+                      key: DB_URL
+                - name: DB_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: backend-env
+                      key: DB_USERNAME
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: backend-env
+                      key: DB_PASSWORD
                 - name: BACKEND_INTERNAL_KEY
-                  # Agreed source: SSM Parameter Store SecureString. This example
-                  # expects a pre-supplied Secret; it does not read SSM itself.
-                  # Cloud must confirm the delivery mechanism before deployment.
+                  # Cloud must supply this missing backend-env key from the
+                  # agreed SSM Parameter Store SecureString before unsuspending.
                   valueFrom:
                     secretKeyRef:
-                      name: ai-backend-internal-key
-                      key: internal-key
+                      name: backend-env
+                      key: MOONGCHEAP_INTERNAL_API_KEY
               resources:
                 requests:
                   cpu: "1"

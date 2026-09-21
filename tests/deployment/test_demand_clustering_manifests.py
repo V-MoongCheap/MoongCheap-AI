@@ -83,18 +83,18 @@ def test_shared_backend_ai_node_selector_without_dedicated_ai_taint(resources):
 def test_only_required_secrets_are_injected_by_reference(resources):
     container = pod_spec(resources)["containers"][0]
     assert container["env"] == [
-        {
-            "name": "SHARED_DATABASE_URL",
-            "valueFrom": {"secretKeyRef": {"name": "ai-batch-reader-database", "key": "url"}},
-        },
-        {
-            "name": "BACKEND_INTERNAL_KEY",
-            "valueFrom": {"secretKeyRef": {"name": "ai-backend-internal-key", "key": "internal-key"}},
-        },
+        {"name": name, "valueFrom": {"secretKeyRef": {"name": "backend-env", "key": key}}}
+        for name, key in (
+            ("DB_URL", "DB_URL"),
+            ("DB_USERNAME", "DB_USERNAME"),
+            ("DB_PASSWORD", "DB_PASSWORD"),
+            ("BACKEND_INTERNAL_KEY", "MOONGCHEAP_INTERNAL_API_KEY"),
+        )
     ]
     config = resources["ConfigMap"]["data"]
     for forbidden in (
         "SHARED_DATABASE_URL", "BACKEND_INTERNAL_KEY", "BACKEND_SERVICE_TOKEN",
+        "DB_URL", "DB_USERNAME", "DB_PASSWORD", "MOONGCHEAP_INTERNAL_API_KEY",
         "BATCH_STATE_DIR", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
     ):
         assert forbidden not in config
@@ -197,5 +197,8 @@ def test_handoff_uses_part_b_paths_and_agreed_parameter_store_source():
         "provider": "aws-ssm-parameter-store", "type": "SecureString",
     }
     assert "X-Internal-Key" in key["purpose"]
-    assert key["secret_name"] == "ai-backend-internal-key"
-    assert key["secret_key"] == "internal-key"
+    assert key["secret_name"] == "backend-env"
+    assert key["secret_key"] == "MOONGCHEAP_INTERNAL_API_KEY"
+    for name in ("DB_URL", "DB_USERNAME", "DB_PASSWORD"):
+        assert secrets[name]["secret_name"] == "backend-env"
+        assert secrets[name]["secret_key"] == name

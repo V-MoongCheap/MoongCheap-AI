@@ -58,15 +58,30 @@ Job과의 중첩을 막는 전체 AI 잠금은 아니다. 또한 스케줄러 �
 경로, 최소 참가자 수, timeout, CPU 스레드·오프라인 설정이 여기에 해당한다.
 내용에 따른 ConfigMap 이름 해시를 유지하므로 설정 변경은 새 Job의 Pod에 반영된다.
 
-현재 매니페스트 예시는 비밀 값 두 항목을 Kubernetes Secret의 이름과 key로 참조한다.
-이 방식을 사용할 때는 Pod와 같은 Namespace에 Secret을 먼저 준비해야 한다.
-이는 아래의 원본 저장소 합의와 구분되는 **전달 방식의 예시**다.
+현재 B 매니페스트는 Backend의 Kubernetes Secret `backend-env`에서 필요한 네 항목만
+참조한다. Pod와 같은 Namespace에 Secret과 해당 key가 모두 있어야 한다.
+B 전용 overlay는 Cloud와 같은 `moongcheap-develop`을 사용한다. 기존 공용
+`overlays/dev`를 사용하면 `moongcheap-ai-dev`에도 별도 Secret 공급이 필요하다.
 ([Kubernetes Secret](https://kubernetes.io/docs/concepts/configuration/secret/))
 
 | Pod 환경 변수 | Kubernetes Secret | key | 용도 |
 | --- | --- | --- | --- |
-| `SHARED_DATABASE_URL` | `ai-batch-reader-database` | `url` | SELECT 전용 PostgreSQL DSN; JDBC URL 아님 |
-| `BACKEND_INTERNAL_KEY` | `ai-backend-internal-key` | `internal-key` | Backend와 공유하는 `X-Internal-Key` 값 |
+| `DB_URL` | `backend-env` | `DB_URL` | Backend JDBC URL; 앱에서 `jdbc:` 제거 |
+| `DB_USERNAME` | `backend-env` | `DB_USERNAME` | Backend와 같은 DB 계정 |
+| `DB_PASSWORD` | `backend-env` | `DB_PASSWORD` | 해당 DB 계정 비밀번호 |
+| `BACKEND_INTERNAL_KEY` | `backend-env` | `MOONGCHEAP_INTERNAL_API_KEY` | Backend와 공유하는 `X-Internal-Key` 값; Cloud 공급 추가 필요 |
+
+앱은 DB 세 값을 읽어 PostgreSQL DSN을 조합한다. 계정·비밀번호는 공백을 보존하고
+URL 인코딩하며, IPv6 주소와 libpq 호환 query(`sslmode` 등)는 유지한다. `DB_URL`에
+별도 계정·비밀번호가 포함되면 설정 오류로 중단한다. `backend-env` 전체를 `envFrom`으로
+가져오지 않으므로 OAuth·암호화 키 등 다른 Backend 비밀 값은 AI에 전달하지 않는다.
+기존 로컬 실행의 `SHARED_DATABASE_URL`도 지원하며, 비어 있지 않으면 DB 세 값보다
+우선한다. 이 직접 DSN에는 JDBC URL을 넣을 수 없다. 기본 매니페스트는 직접 DSN을
+주입하지 않으며, Cloud에 새 DB 환경변수나 AI 전용 DB Secret을 요구하지 않는다.
+
+이 구성은 Backend DB 계정을 공유한다. AI의 PostgreSQL 연결은 기존대로
+`default_transaction_read_only=on`을 적용하지만, DB role 자체를 SELECT 전용으로
+바꾸지는 않는다.
 
 AI DB 계정에는 `demand`, `demand_board`, `reject_history`의 SELECT 권한이 필요하다.
 `reject_history`는 Backend가 배포·기록하며, 거절한 수요·보드 조합은 재제안에서
@@ -77,11 +92,13 @@ HTTP 헤더 이름은 **`X-Internal-Key`**다. Cloud의 일반 Secrets Manager �
 RDS 계정 저장 방식을 이 내부 키의 별도 합의에 그대로 적용하지 않는다.
 
 앱의 입력 계약은 `BACKEND_INTERNAL_KEY` 환경 변수다. 배포 환경이 Parameter Store를
-조회하여 값을 전달하며 앱은 SSM을 직접 호출하지 않는다. 현재 예시처럼 Kubernetes
-Secret을 중간에 사용할 수 있지만, `secretKeyRef`만으로 SSM이 자동 연결되지는 않는다.
-Parameter 경로, 조회 권한, Kubernetes Secret 경유 여부와 주입 주체는 Cloud와 확정한다.
-Secret을 거치지 않는 방식으로 정하면 GitOps의 해당 주입 설정을 함께 바꿔야 한다.
-이 저장소에서는 동기화 도구를 설치하거나 앱에 AWS SDK·조회용 IAM 역할을 추가하지 않는다.
+조회해 `backend-env`의 `MOONGCHEAP_INTERNAL_API_KEY` 항목을 공급해야 한다.
+2026-09-21 확인한 Cloud `feat/gitops` (`75ae1d7`)의 ExternalSecret 템플릿에는
+DB 세 항목은 있지만 내부 인증 키 항목은 없다. 따라서 이 참조 변경만으로 배포 준비가
+끝나지는 않는다. Parameter 경로·조회 권한·동기화 구성과 해당 key의 공급을 Cloud에서
+완료하기 전까지 `suspend: true`를 유지한다. 앱은 SSM을 직접 호출하지 않으며,
+`secretKeyRef` 자체가 SSM을 조회하지도 않는다.
+([Cloud ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/75ae1d7/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
 
 Secret 공급 주체의 AWS 권한과 ECR 이미지 pull 권한은 별도의 인프라 설정이다.
 실제 비밀 값과 `.env`는 Git·이미지·로그에 넣지 않는다. 키 교체 시 Backend와 AI의
@@ -199,16 +216,16 @@ Cloud의 `Jenkinsfile.template`은 루트 `Dockerfile`을 Kaniko로 빌드한다
 ([Jenkins 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/4f450fb/gitops/jenkins/pipelines/Jenkinsfile.template),
 [빌드 에이전트](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/4f450fb/gitops/platform/jenkins/values.yaml))
 
-Backend `develop` (`01b1810`)에는 합의한 두 internal API와 `reject_history` migration이
+Backend `develop` (`89a4935`)에는 합의한 두 internal API와 `reject_history` migration이
 있다. 단, 인증 필터는 아직 `X-Internal-Api-Key`를 읽는다. AI의 합의된 `X-Internal-Key`를
 바꾸지 않고 Backend에서 정합성을 맞춘 뒤 연동한다. AI의 `BACKEND_INTERNAL_KEY`와
 Backend의 `MOONGCHEAP_INTERNAL_API_KEY`에는 같은 키 값을 각각 주입해야 한다.
-([Backend 인증 필터](https://github.com/V-MoongCheap/MoongCheap-Backend/blob/01b1810/src/main/java/com/moongcheap_backend/auth/infrastructure/InternalApiKeyFilter.java))
+([Backend 인증 필터](https://github.com/V-MoongCheap/MoongCheap-Backend/blob/89a4935/src/main/java/com/moongcheap_backend/auth/infrastructure/InternalApiKeyFilter.java))
 
-DB 주소와 B용 SELECT 전용 계정은 아직 확인하지 않았다. Cloud의 RDS Secret은
-host/port/dbname/username/password JSON이고 B 입력은 PostgreSQL DSN 문자열이므로
-그 JSON을 `SHARED_DATABASE_URL`에 그대로 넣지 않는다. 별도 읽기 전용 계정의 접속
-정보·SSL 조건과 `demand`, `demand_board`, `reject_history` 권한을 확인해 주입한다.
+Cloud의 ExternalSecret이 RDS Secret의 host/port/dbname/username/password를 Backend용
+`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`로 바꾼다. B는 이 세 값을 재사용해 자체 DSN을
+만든다. 실제 DB 접속·SSL 조건과 `demand`, `demand_board`, `reject_history` 조회 권한은
+검증하지 않았으며, 공유 계정에서도 B의 읽기 전용 세션 설정은 유지한다.
 
 실제 배포 매니페스트는 Cloud GitOps에서 관리한다. 이 저장소의 Kustomize 예시와
 Cloud Helm으로 같은 CronJob을 각각 배포하지 않는다. 기존 공용 `overlays/dev`와
@@ -238,7 +255,7 @@ Secret·노드·재시도·보안·볼륨 계약과 A 비포함 경계를 검사
 
 1. 실제 Namespace와 ECR 이미지 경로·Git SHA 태그.
 2. ConfigMap의 `BACKEND_BASE_URL`과 profile·taxonomy release 경로.
-3. Parameter Store 내부 키의 전달 방식, 현재 참조하는 두 Secret 또는 대체 주입 설정,
+3. `backend-env`의 DB 세 항목과 Parameter Store 내부 키 항목 공급,
    같은 Namespace의 데이터·모델이 들어 있는 두 PVC.
 4. BE·AI Node Group의 실제 라벨·taint 정책, 합산 CPU/메모리 여유와 DB·Backend 네트워크 연결.
 5. 테스트 데이터로 실제 연동 검증 후 스케줄·제한 시간을 확인하고 `suspend: false`로 전환.

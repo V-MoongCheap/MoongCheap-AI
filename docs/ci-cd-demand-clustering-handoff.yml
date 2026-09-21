@@ -77,18 +77,33 @@ environment_variables:
     purpose: "Demand Clustering 신규 Board 생성 최소 참여자 수 (선택, 기본값: 5)"
 
 secret_variables:
-  - name: SHARED_DATABASE_URL
-    purpose: "SELECT 전용 PostgreSQL DSN; JDBC URL 아님"
-    secret_name: ai-batch-reader-database
-    secret_key: url
+  - name: DB_URL
+    purpose: "Backend JDBC URL; 앱에서 jdbc: 제거 후 계정·비밀번호와 PostgreSQL DSN으로 조합"
+    secret_name: backend-env
+    secret_key: DB_URL
+  - name: DB_USERNAME
+    purpose: "Backend와 공유하는 DB 계정; B는 읽기 전용 세션으로 연결"
+    secret_name: backend-env
+    secret_key: DB_USERNAME
+  - name: DB_PASSWORD
+    purpose: "DB 비밀번호; 앱에서 공백 보존 및 URL 인코딩"
+    secret_name: backend-env
+    secret_key: DB_PASSWORD
   - name: BACKEND_INTERNAL_KEY
     purpose: "합의한 X-Internal-Key 값; Parameter Store 원본을 배포 환경이 Pod 환경 변수로 주입"
     source:
       provider: aws-ssm-parameter-store
       type: SecureString
-    injection_status: "전달 방식 미확정; 아래 Secret 참조는 현 Kustomize 예시이며 SSM을 직접 조회하지 않음"
-    secret_name: ai-backend-internal-key
-    secret_key: internal-key
+    injection_status: "Cloud feat/gitops 75ae1d7에는 이 key가 없음; SSM 조회·동기화 및 backend-env 항목 공급 후 배포 가능"
+    secret_name: backend-env
+    secret_key: MOONGCHEAP_INTERNAL_API_KEY
+
+database_configuration:
+  explicit_dsn_override: SHARED_DATABASE_URL
+  precedence: "비어 있지 않은 SHARED_DATABASE_URL이 DB_URL/DB_USERNAME/DB_PASSWORD보다 우선; JDBC 직접 주입 불가"
+  shared_backend_account: true
+  read_only_session: true
+  create_new_database_secret: false
 
 resources:
   requests:
@@ -124,13 +139,17 @@ external_dependencies:
   - "Shared PostgreSQL (SELECT on demand, demand_board, reject_history)"
   - "Backend formation-plans and substitute-offer-plans APIs"
   - "Versioned taxonomy, Part A catalog profile, and local CPU E5 model artifacts"
-  - "AWS Parameter Store SecureString to BACKEND_INTERNAL_KEY delivery by the deployment environment (mechanism TBD)"
+  - "Same-namespace backend-env with DB_URL, DB_USERNAME, DB_PASSWORD"
+  - "AWS Parameter Store SecureString to backend-env/MOONGCHEAP_INTERNAL_API_KEY delivery by the deployment environment (not yet configured)"
 
 notes: >-
   이 값들은 수요 클러스터링 배치 기준이다. 기본 CronJob과 dev 예시는 AI 저장소에서
   제공하며 실제 배포 설정의 기준은 인프라 GitOps 저장소다. 이미지 push, GitOps 갱신,
   ArgoCD/EKS 연결과 운영 배포는 인프라 측 작업이다. 내부 키의 Parameter Store 조회 권한과
   Pod 전달은 배포 환경이 담당하며 앱은 AWS API를 직접 호출하지 않는다.
+  DB는 Backend 계정을 공유하며 기존 세 변수로 접속 URL을 조합한다. B의 DB 세션은
+  읽기 전용으로 유지한다. backend-env에 내부 인증 키가 공급될 때까지 suspend=true를
+  유지한다. Backend X-Internal-Api-Key와 AI X-Internal-Key의 헤더 불일치도 배포 전 해결한다.
   Kubernetes Secret을 거치지 않는 방식으로 확정되면 GitOps의 주입 설정을 함께 바꾼다.
   Namespace, Secret, PVC, Node Group 자체는 이 매니페스트가 생성하지 않는다.
   실패한 요청은 저장하거나 재전송하지 않고 다음 정기 실행에서 DB를 새로 읽는다.
