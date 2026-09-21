@@ -120,3 +120,22 @@ def test_container_smoke_does_not_rely_on_assert():
 def test_send_requires_backend_url():
     with pytest.raises(SystemExit):
         _load("run_awarding_test_drive").main(["--pending-file", str(SAMPLE), *ARGS, "--send"])
+
+
+def test_every_dockerfile_has_a_dockerignore():
+    """빌드 컨텍스트 제한은 CI(Kaniko)에서도 남아야 한다. 스크립트만으로는 CI 에 적용되지 않는다."""
+    docker_dir = ROOT / "docker"
+
+    missing = [f.name for f in sorted(docker_dir.glob("Dockerfile.*")) if not f.name.endswith(".dockerignore")
+               and not (docker_dir / f"{f.name}.dockerignore").exists()]
+
+    assert missing == []
+
+
+def test_summary_survives_a_report_without_reflection():
+    """보고서를 다른 경로로 만들었을 때 요약이 죽지 않는다."""
+    drive = _load("run_awarding_test_drive")
+    report = {"policy": {}, "hasNext": False, "boards": [], "skipped": [], "requests": [], "sent": False,
+              "responses": [], "counts": {"fetched": 0, "judged": 0, "skipped": 0, "awarded": 0}}
+
+    drive._print_summary(report)

@@ -84,7 +84,7 @@ def _print_summary(report: dict) -> None:
     print(f"전송 요청 {len(report['requests'])}건 · 전송 {'함' if report['sent'] else '안 함 (dry run)'}")
     for response in report["responses"]:
         print(f"  응답: {response}")
-    reflection = report["reflection"]
+    reflection = report.get("reflection")
     if reflection is not None:
         print(f"  반영 {reflection['appliedCount']}건 · 미반영(stale) {reflection['staleRejectedCount']}건 / 보낸 board {reflection['submittedBoards']}건")
 
@@ -139,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"판정한 board 가 없다 — 조회 {counts['fetched']}건이 모두 건너뛰어졌다", file=sys.stderr)
         _write_report(args.report, report)
         return 3
-    reflection = report["reflection"]
+    reflection = report.get("reflection")
     if reflection is not None and reflection["staleRejectedCount"]:
         # stale 은 이미 처리된 board 일 수도, 10개 묶음이 통째로 롤백된 것일 수도 있다. 응답으로는 구분되지 않는다.
         # ⛔ 다시 보내지 않는다. Backend 조회·이력으로 확인한다.

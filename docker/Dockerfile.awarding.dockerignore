@@ -1,0 +1,15 @@
+# 낙찰 배치 이미지의 빌드 컨텍스트. Dockerfile 이 COPY 하는 파일만 남긴다.
+# build_image.sh 는 로컬 구형 빌더용 허용 목록이라 CI(Kaniko/BuildKit)에는 적용되지 않는다.
+# 이 파일이 같은 제한을 CI 에서도 건다.
+*
+!packaging/awarding/requirements.txt
+!src/moongcheap_ai/__init__.py
+!src/moongcheap_ai/seller_matching/__init__.py
+!src/moongcheap_ai/seller_matching/offer_ranking.py
+!src/moongcheap_ai/seller_matching/awarding_batch.py
+!scripts/awarding/run_awarding_test_drive.py
+!scripts/awarding/mock_backend.py
+!scripts/awarding/container_smoke.py
+!scripts/awarding/sample_pending.json
+**/__pycache__/
+**/*.py[cod]
