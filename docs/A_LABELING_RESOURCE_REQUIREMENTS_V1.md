@@ -2,9 +2,13 @@
 
 ## Recommended MVP Deployment
 
-Use `Rule-first Hybrid` for Demand labeling. Rule/Alias labeling runs first; an LLM is called only for unresolved or conflicting requests. The LLM response is taxonomy-validated and failed cases go to review.
+Use `Rule/Alias` labeling for the first server deployment. The current server Pod
+does not include a local LLM. Unresolved or conflicting requests remain in
+`REVIEW`; they must not be replaced by an unverified model answer.
 
-For the first deployment, keep the LLM outside the B clustering CronJob as an API or separate batch worker. Do not load a local 3B/8B model into the same 4Gi container as the clustering job.
+For a future LLM experiment, keep the model outside the A labeling CronJob and B
+clustering CronJob as a separate worker. Do not load a local 3B/7B model into the
+current 3Gi A container.
 
 ## Resource Plan
 
@@ -17,7 +21,7 @@ For the first deployment, keep the LLM outside the B clustering CronJob as an AP
 
 If A and B remain separate CronJobs, reserve their requests independently: at least 2 CPU and 5Gi memory in total when both can run concurrently. The limits are 4 CPU and 7Gi memory for the two separate jobs, excluding a remote model service.
 
-## Local Model Option
+## Local Model Option (not selected for current deployment)
 
 Local model results from the 200-row comparison were not good enough to make a model-only production choice. If a local fallback is still required:
 
@@ -25,6 +29,11 @@ Local model results from the 200-row comparison were not good enough to make a m
 - Qwen 3 8B: start at CPU 8, memory 12Gi; limit CPU 8, memory 16Gi. The measured 200-row run used 1,226 seconds and had 79 model failures, so it is not the MVP default.
 
 These local-model values are capacity starting points, not measured Kubernetes guarantees. The model runtime should be a separate worker or service so a slow/failing LLM cannot block clustering.
+
+An additional `qwen3:4b` Q4_K_M test used about 2.9GB of Ollama resident model
+memory and returned all 15 Supported Gold requests, but it produced a non-default
+label for only 2 of 10 Gold requests that contained expected constraints. It was
+therefore rejected on quality grounds despite being smaller than the 7B model.
 
 ## Alias Application Status
 

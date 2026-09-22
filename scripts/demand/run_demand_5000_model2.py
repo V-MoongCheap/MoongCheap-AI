@@ -147,7 +147,9 @@ def main() -> None:
     if args.reuse_llm_sample and sample_output.exists():
         model_result = pd.read_csv(sample_output, dtype=str).fillna("")
         model_meta = {"provider": "ollama", "model": model or None, "status": "COMPLETED_REUSED", "call_count": (len(sample) + args.batch_size - 1) // args.batch_size, "runtime_seconds": None}
-    elif model_available:
+    # A configured model must not cause an implicit server-side model load.
+    # Experimental LLM execution is opt-in together with the fallback flag.
+    elif fallback_enabled:
         model_result, model_meta = _model_result(sample, args.taxonomy, args.product_facets, model, args.batch_size)
     _write(model_result, sample_output)
     print({"stage": "sample_written", "model_available": model_available}, flush=True)

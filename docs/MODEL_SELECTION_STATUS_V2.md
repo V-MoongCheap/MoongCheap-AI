@@ -6,7 +6,7 @@
 최종 Taxonomy나 Label의 자동 승인 근거로 사용하지 않는다.
 
 - Model 1: `kakaocorp/kanana-nano-2.1b-instruct`를 오프라인 후보 생성기로 사용한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다.
-- Model 2: `Rule-first`를 운영 기본값으로 확정한다. LLM은 Rule이 `REVIEW`인 행에 한해 선택적으로 보조 호출할 수 있지만, 기본 설정은 비활성화한다.
+- Model 2: `Rule/Alias`를 서버 운영 방식으로 확정한다. 현재 배포 리소스와 품질 검증을 통과한 LLM fallback이 없으므로 운영 경로에서는 LLM을 호출하지 않는다.
 - LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
 ### 현재 로컬 후보의 범위
@@ -89,6 +89,30 @@ LLM_ONLY
 
 Rule-first Hybrid가 Rule-only보다 유의미하게 개선되지 않으면 Model 2 LLM fallback은 사용하지 않는다. 현재 최신 Gold 15건에서는 Rule-first의 의미 일치가 15/15였으므로, fallback은 기본 비활성 상태로 유지한다.
 
+### 서버 배포 제약을 반영한 추가 모델 평가
+
+현재 A labeling CronJob은 CPU 1 / Memory 2Gi request, CPU 2 / Memory 3Gi limit이며,
+Docker 이미지에 Ollama와 모델 가중치를 포함하지 않는다. 따라서 로컬 GPU에서
+정상 실행되는 것만으로는 서버 후보로 승격하지 않는다.
+
+| 후보 | 양자화/크기 | 동일 Gold 및 샘플 측정 | 결론 |
+| --- | --- | --- | --- |
+| `qwen2.5:7b-instruct` | Q4_K_M / 4.7GB | 85건 153초, 실패 0건. 현재 Pod 리소스 초과 | 제외 |
+| `qwen3:4b` | Q4_K_M / Ollama 상주 약 2.9GB | Gold 15건 성공. 조건 포함 10건 중 비기본 결과 2건. 200건 303초 | 품질 부족으로 제외 |
+| `llama3.2:3b` | Q4_K_M / 2.0GB | Gold 15건 중 6건 실패 및 Taxonomy 오류 | 제외 |
+| `exaone3.5:2.4b` | Q4_K_M / 1.6GB | Gold 15건 전건 HTTP 500 | 제외 |
+
+Qwen 3 4B의 200건 결과는 Mac GPU 실행이라 Kubernetes CPU 처리량을 보장하지
+않는다. 또한 응답 성공률과 조건 해석 정확도는 별개다. 현재 후보 중 서버
+리소스와 품질을 동시에 만족한 LLM은 없다.
+
+따라서 최종 Model 2 운영 방식은 다음과 같다.
+
+1. Rule/Alias 기반 Labeling을 기본 서버 경로로 사용한다.
+2. `ALL`, 부정 조건, 충돌 조건, Taxonomy 외 조건은 규칙에 따라 처리하고 불확실한 행은 `REVIEW`로 남긴다.
+3. 로컬 LLM fallback은 현재 배포하지 않는다.
+4. LLM을 다시 도입하려면 별도 Worker/Pod와 별도 리소스, CPU 환경 재평가가 선행되어야 한다.
+
 ## 다음 실행 순서
 
 1. Model 1 후보 모델을 동일한 multisource 입력으로 실행
@@ -110,6 +134,7 @@ PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
 ```
 
 Model 2 5천 건 생성기의 LLM fallback은 `LABELING_LLM_FALLBACK_ENABLED=false`가
-기본값이며, 실험적으로 허용할 때만 `--enable-llm-fallback`을 명시한다.
+기본값이며, 현재 서버 운영에서는 활성화하지 않는다. 후보 재실험이 필요할 때만
+`--enable-llm-fallback`을 명시한다.
 
 실제 모델 가중치·Ollama/Hugging Face/API 환경이 없는 경우에는 모델을 실행한 것처럼 처리하지 않고, 해당 후보를 `NOT_RUN`으로 기록한다.
