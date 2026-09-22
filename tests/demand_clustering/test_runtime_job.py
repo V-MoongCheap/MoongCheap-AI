@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from urllib.parse import quote
 
 import pandas as pd
 import pytest
@@ -221,6 +222,105 @@ def test_rejects_jdbc_database_url(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigurationError, match="not a JDBC URL"):
         load_job_config(environment)
+
+
+@pytest.mark.parametrize("shared_url", [None, "", "  "])
+def test_builds_database_dsn_from_backend_credentials(tmp_path, shared_url):
+    conninfo_to_dict = pytest.importorskip("psycopg.conninfo").conninfo_to_dict
+    environment = _environment(tmp_path)
+    del environment["SHARED_DATABASE_URL"]
+    if shared_url is not None:
+        environment["SHARED_DATABASE_URL"] = shared_url
+    environment.update({
+        "DB_URL": "jdbc:postgresql://postgres:5432/moongcheap?sslmode=require",
+        "DB_USERNAME": " app:@/한% ",
+        "DB_PASSWORD": " p@ss:/?#%+&한글 ",
+    })
+
+    config = load_job_config(environment)
+
+    # Use the actual driver's parser: encoded credentials must round-trip exactly.
+    assert conninfo_to_dict(config.database_url) == {
+        "host": "postgres", "port": "5432", "dbname": "moongcheap",
+        "user": environment["DB_USERNAME"], "password": environment["DB_PASSWORD"],
+        "sslmode": "require",
+    }
+
+
+@pytest.mark.parametrize("url", [
+    "jdbc:postgresql://[::1]:5432/moongcheap",
+    "postgresql://[::1]:5432/moongcheap",
+    "postgres://[::1]:5432/moongcheap",
+])
+def test_backend_database_url_supports_ipv6_and_native_postgres(tmp_path, url):
+    conninfo_to_dict = pytest.importorskip("psycopg.conninfo").conninfo_to_dict
+    environment = _environment(tmp_path)
+    del environment["SHARED_DATABASE_URL"]
+    environment.update({"DB_URL": url, "DB_USERNAME": "app", "DB_PASSWORD": "pass"})
+
+    parsed = conninfo_to_dict(load_job_config(environment).database_url)
+
+    assert parsed["host"] == "::1"
+    assert parsed["port"] == "5432"
+    assert parsed["user"] == "app"
+
+
+def test_explicit_shared_database_url_takes_precedence(tmp_path):
+    environment = _environment(tmp_path)
+    environment.update({"DB_URL": "invalid", "DB_USERNAME": "", "DB_PASSWORD": ""})
+
+    assert load_job_config(environment).database_url == environment["SHARED_DATABASE_URL"]
+
+
+@pytest.mark.parametrize("missing", ["DB_URL", "DB_USERNAME", "DB_PASSWORD"])
+@pytest.mark.parametrize("value", [None, ""])
+def test_backend_database_credentials_require_all_three_values(tmp_path, missing, value):
+    environment = _environment(tmp_path)
+    del environment["SHARED_DATABASE_URL"]
+    environment.update({
+        "DB_URL": "jdbc:postgresql://postgres/moongcheap",
+        "DB_USERNAME": "app", "DB_PASSWORD": "pass",
+    })
+    if value is None:
+        del environment[missing]
+    else:
+        environment[missing] = value
+
+    with pytest.raises(ConfigurationError, match=missing):
+        load_job_config(environment)
+
+
+@pytest.mark.parametrize("url", [
+    "jdbc:mysql://postgres:5432/moongcheap",
+    "jdbc:postgresql:///moongcheap",
+    "jdbc:postgresql://postgres:invalid/moongcheap",
+    "jdbc:postgresql://postgres:70000/moongcheap",
+    "jdbc:postgresql://postgres:0/moongcheap",
+    "jdbc:postgresql://[broken/moongcheap",
+    "jdbc:postgresql://postgres/",
+    "jdbc:postgresql://postgres/moongcheap#fragment",
+    "jdbc:postgresql://app:embedded-secret@postgres/moongcheap",
+    "jdbc:postgresql://postgres/moongcheap?password=embedded-secret",
+    "jdbc:postgresql://postgres/moongcheap?user=another-user",
+])
+def test_invalid_backend_database_url_fails_without_exposing_values(tmp_path, capsys, url):
+    environment = _environment(tmp_path)
+    del environment["SHARED_DATABASE_URL"]
+    environment.update({
+        "DB_URL": url, "DB_USERNAME": "private-user", "DB_PASSWORD": "private-password",
+    })
+
+    def must_not_run(*args, **kwargs):
+        pytest.fail("invalid database configuration must stop before the batch runs")
+
+    assert main([], environ=environment, job_runner=must_not_run) == 2
+    output = capsys.readouterr()
+    assert not output.out
+    payload = json.loads(output.err)
+    assert payload["status"] == "CONFIGURATION_ERROR"
+    assert "DB_URL" in payload["message"]
+    for value in (url, "private-user", "private-password", "embedded-secret"):
+        assert value not in output.err
 
 
 def test_requires_parameter_store_key_injected_into_environment(tmp_path: Path) -> None:
@@ -550,3 +650,27 @@ def test_main_redacts_runtime_secrets_on_failure(
     assert error_payload["status"] == "FAILED"
     assert "secret" not in error_payload["message"]
     assert error_payload["message"].count("[REDACTED]") == 2
+
+
+def test_main_redacts_composed_dsn_and_raw_or_encoded_database_password(tmp_path, capsys):
+    environment = _environment(tmp_path)
+    del environment["SHARED_DATABASE_URL"]
+    password = " db@password:/?#%+ "
+    environment.update({
+        "DB_URL": "jdbc:postgresql://postgres/moongcheap",
+        "DB_USERNAME": "app", "DB_PASSWORD": password,
+    })
+
+    def fail(config, **kwargs):
+        raise RuntimeError(
+            f"{config.database_url} | {password} | {quote(password, safe='')} | "
+            f"{config.backend_internal_key}"
+        )
+
+    assert main([], environ=environment, job_runner=fail) == 1
+    output = capsys.readouterr()
+    assert not output.out
+    assert password not in output.err
+    assert quote(password, safe="") not in output.err
+    assert "service-secret" not in output.err
+    assert json.loads(output.err)["message"].count("[REDACTED]") == 4

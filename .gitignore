@@ -50,7 +50,8 @@ reports/
 *.tfstate.*
 .terraform.lock.hcl
 
-# Local data: raw and generated artifacts are never committed
+# Local raw/generated data stays untracked. Reviewed image inputs are explicitly
+# versioned under packaging/demand-clustering/runtime-assets/.
 data/models/
 data/raw/*
 !data/raw/**/.gitkeep

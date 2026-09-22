@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "demand-clustering-image-catalog.v1",
+  "release": "v2_2_20260921_image",
+  "taxonomyVersion": "v2.2",
+  "profileCount": 45996,
+  "profileSha256": "3611a7fbd86441eac66a95549cf36a514f3916243061d75fb6b1d1a6606db90e",
+  "compressedSha256": "cd45c13f92e68cc20910d662fba02dbe4e7107ec12aa58cb1cf178f6774b45bd",
+  "taxonomySha256": "807a9e8055286812ec2b4350070af8a750d81eb0be573701f83e80c9fad30b6f",
+  "identityContract": "catalog_id equals MFDS source_product_id in this evidence artifact; bind it to Backend product_catalog.id separately",
+  "sourceManifest": {
+    "schemaVersion": "mfds-substitution-function-evidence.v2",
+    "catalogMappings": 45996,
+    "uniqueProductReferences": 45996,
+    "exactI0030Join": 45996,
+    "profileStatusCounts": {
+      "EVIDENCE_READY": 44919,
+      "INSUFFICIENT_EVIDENCE": 1077
+    },
+    "profileReasonCounts": {
+      "REFERENCE_AMBIGUOUS": 55,
+      "REFERENCE_FUNCTION_MISSING": 10,
+      "REFERENCE_PARTIAL": 290,
+      "REFERENCE_UNRESOLVED": 342,
+      "SOURCE_FIELDS_INCOMPLETE": 380
+    },
+    "evidenceReadyRate": 0.976585,
+    "categoryProfileStatusCounts": {
+      "health-functional-food:blood_sugar_metabolic": {
+        "EVIDENCE_READY": 306,
+        "INSUFFICIENT_EVIDENCE": 13
+      },
+      "health-functional-food:dietary_fiber": {
+        "EVIDENCE_READY": 2185,
+        "INSUFFICIENT_EVIDENCE": 105
+      },
+      "health-functional-food:eye_health": {
+        "EVIDENCE_READY": 306,
+        "INSUFFICIENT_EVIDENCE": 19
+      },
+      "health-functional-food:heart_blood": {
+        "EVIDENCE_READY": 555,
+        "INSUFFICIENT_EVIDENCE": 17
+      },
+      "health-functional-food:joint_health": {
+        "EVIDENCE_READY": 776,
+        "INSUFFICIENT_EVIDENCE": 101
+      },
+      "health-functional-food:liver_health": {
+        "EVIDENCE_READY": 366,
+        "INSUFFICIENT_EVIDENCE": 7
+      },
+      "health-functional-food:male_health": {
+        "EVIDENCE_READY": 108,
+        "INSUFFICIENT_EVIDENCE": 2
+      },
+      "health-functional-food:omega_fatty_acid": {
+        "EVIDENCE_READY": 631,
+        "INSUFFICIENT_EVIDENCE": 111
+      },
+      "health-functional-food:other_functional": {
+        "EVIDENCE_READY": 2112,
+        "INSUFFICIENT_EVIDENCE": 161
+      },
+      "health-functional-food:probiotics": {
+        "EVIDENCE_READY": 7762,
+        "INSUFFICIENT_EVIDENCE": 57
+      },
+      "health-functional-food:propolis": {
+        "EVIDENCE_READY": 467,
+        "INSUFFICIENT_EVIDENCE": 2
+      },
+      "health-functional-food:protein": {
+        "EVIDENCE_READY": 579,
+        "INSUFFICIENT_EVIDENCE": 8
+      },
+      "health-functional-food:red_ginseng": {
+        "EVIDENCE_READY": 5044,
+        "INSUFFICIENT_EVIDENCE": 36
+      },
+      "health-functional-food:skin_collagen": {
+        "EVIDENCE_READY": 847,
+        "INSUFFICIENT_EVIDENCE": 21
+      },
+      "health-functional-food:theanine_sleep": {
+        "EVIDENCE_READY": 246,
+        "INSUFFICIENT_EVIDENCE": 2
+      },
+      "health-functional-food:vitamin_mineral": {
+        "EVIDENCE_READY": 22629,
+        "INSUFFICIENT_EVIDENCE": 415
+      }
+    },
+    "profileFingerprintSha256": "aa8b6e3b808880f6bafe01068d0ce77ffe33347dc900c1e5934832ff181f2472",
+    "responsibilityBoundary": "EVIDENCE_READY means deterministic function-evidence reconstruction succeeded. Catalog eligibility is an upstream input and is not inferred from product names, export markers, or record types.",
+    "scope": "PART_A_MAPPED_MFDS_HEALTH_CATALOG",
+    "identityContract": "catalog_id equals MFDS source_product_id in this evidence artifact; bind it to Backend product_catalog.id separately",
+    "mappingSummary": {
+      "sourceRows": 45996,
+      "includedCatalogMappings": 45996,
+      "excludedUnmappedRows": 0
+    },
+    "taxonomyVersion": "v2.2",
+    "taxonomySha256": "807a9e8055286812ec2b4350070af8a750d81eb0be573701f83e80c9fad30b6f",
+    "createdAt": "2026-09-21T13:08:52+00:00",
+    "sourcePaths": {
+      "categoryMapping": "data/processed/category_v2_1/product_service_category_mapping_v2_1.csv",
+      "products": "../kdt-ai-2-team2-integrated/data/interim/facet_discovery/i0030_products_clean_dedup.csv",
+      "references": "../kdt-ai-2-team2-integrated/data/interim/facet_discovery/i2710_reference.csv",
+      "claims": "data/reports/mfds_function_claim_candidates_v1.csv",
+      "taxonomy": "config/facet_taxonomy_v2_2.json"
+    },
+    "catalogMappingFile": "catalog_mappings.csv",
+    "profileFile": "catalog_profiles.csv"
+  }
+}

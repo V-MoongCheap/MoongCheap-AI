@@ -51,11 +51,12 @@ Part B는 `constraints`의 `MUST`/`EXCLUDE`만 hard gate로 사용하고, `PREFE
 ## 상품 profile 준비
 
 > **배포 전환 필수:** 기존 V2.1 profile을 그대로 둔 채 새 이미지만 배포하면 버전 검증에서
-> 기동이 중단된다. V2.2 `catalog_profiles.csv`와 그 생성에 사용한 `taxonomy.json`을 같은
-> 새 release 경로에 공급하고, 두 환경변수 경로를 함께 변경한 뒤 배포해야 한다.
+> 기동이 중단된다. V2.2 `catalog_profiles.csv`와 그 생성에 사용한 `taxonomy.json`을 함께
+> 이미지에 넣어 배포한다. 현재 Dockerfile은 확정된 두 파일을 기본으로 포함한다.
 
 profile 갱신은 담당자가 원재료를 준비하고 생성·검증한 뒤 배포 버전을 확정하는 작업이다.
-코드 CI/CD와 별도로 수행하고, 확정한 profile과 분류표를 같은 버전으로 묶어 마운트한다.
+확정한 profile과 분류표를 `packaging/demand-clustering/runtime-assets/`에 묶어 커밋하고
+코드와 함께 이미지를 빌드한다. 인프라에서 별도로 파일을 준비하거나 마운트하지 않는다.
 
 | 입력 | 기본 위치 |
 | --- | --- |
@@ -83,14 +84,25 @@ PYTHONPATH=src python scripts/evaluation/build_catalog_wide_mfds_profiles.py \
 생성기는 원재료를 결합하고 분류표 버전 및 카테고리 ID 존재 여부를 확인한 뒤
 `catalog_profiles.csv`, `catalog_mappings.csv`, `taxonomy.json`, `manifest.json`을 저장한다.
 분류표는 A 원본을 그대로 복사한다. manifest에 입력 경로, 생성 시각, 분류표 버전·해시,
-profile 내용의 fingerprint를 기록한다. 생성 파일은 Git에 포함하지 않는다.
+profile 내용의 fingerprint를 기록한다. 원재료와 중간 생성 파일은 로컬에 보관하며,
+검증한 배포본만 아래 방식으로 압축해 Git에 포함한다.
 
 현재 근거용 profile의 `catalog_id`는 MFDS `source_product_id`다. 실제 배포에는 Backend
 `product_catalog.id`와의 연결을 확인하고, 입력 수요·보드와 같은 상품 ID를 사용해야 한다.
 카테고리 ID 존재 검사는 상품 분류의 의미적 정확성까지 판정하지 않는다.
 
-완성된 profile과 분류표를 각각 `/artifacts/catalog_profiles.csv`, `/artifacts/taxonomy.json`에
-읽기 전용으로 연결한다. [컨테이너 실행 안내](DEMAND_CLUSTERING_CONTAINER.md)의 마운트 절차를 따른다.
+완성된 release를 다음 명령으로 이미지 입력에 반영한다.
+
+```bash
+python scripts/deployment/prepare_demand_clustering_assets.py pack \
+  --release data/reports/b_profile_releases/v2_2_20260911 \
+  --assets packaging/demand-clustering/runtime-assets
+```
+
+이는 갱신 예시이며 실제로는 검증을 마친 새 release 경로를 지정한다.
+Dockerfile이 CSV 압축을 풀고 분류표와 함께 `/artifacts/`에 넣는다.
+[자료 갱신 안내](../packaging/demand-clustering/runtime-assets/README.md)와
+[컨테이너 실행 안내](DEMAND_CLUSTERING_CONTAINER.md)를 따른다.
 
 ## 별칭·자연어 해석 회귀 검증
 
