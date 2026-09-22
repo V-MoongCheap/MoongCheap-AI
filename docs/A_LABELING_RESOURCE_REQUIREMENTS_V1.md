@@ -2,13 +2,14 @@
 
 ## Recommended MVP Deployment
 
-Use `Rule/Alias` labeling for the first server deployment. The current server Pod
-does not include a local LLM. Unresolved or conflicting requests remain in
-`REVIEW`; they must not be replaced by an unverified model answer.
+Use `Rule-first Hybrid` for the server deployment. The A Pod performs Rule/Alias
+labeling, then sends only unresolved or conflicting requests to a separate LLM
+Worker. The current A Pod does not contain the model weights or Ollama runtime.
 
-For a future LLM experiment, keep the model outside the A labeling CronJob and B
-clustering CronJob as a separate worker. Do not load a local 3B/7B model into the
-current 3Gi A container.
+Keep the model outside the A labeling CronJob and B clustering CronJob as a
+separate worker. Do not load a local 3B/7B model into the current 3Gi A container.
+The selected worker candidate is `qwen2.5:7b-instruct` Q4_K_M; its worker needs a
+separate memory budget and is not included in the A Pod budget.
 
 ## Resource Plan
 
@@ -21,7 +22,7 @@ current 3Gi A container.
 
 If A and B remain separate CronJobs, reserve their requests independently: at least 2 CPU and 5Gi memory in total when both can run concurrently. The limits are 4 CPU and 7Gi memory for the two separate jobs, excluding a remote model service.
 
-## Local Model Option (not selected for current deployment)
+## Local Model Option (separate worker)
 
 Local model results from the 200-row comparison were not good enough to make a model-only production choice. If a local fallback is still required:
 

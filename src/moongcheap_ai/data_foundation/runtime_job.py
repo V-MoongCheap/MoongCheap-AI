@@ -27,6 +27,7 @@ from .labeling import (
 from .postgres_reader import open_read_only_postgres, read_unprocessed_demands
 from .postgres_writer import open_postgres, write_label_results
 from .part_a_input_policy import PartAConstraintInputPolicy
+from .demand_label_comparison import LLMLabelingError, OllamaDemandLabeler, _apply_model_result
 
 
 def _required(source: Mapping[str, str], key: str) -> str:
@@ -45,6 +46,11 @@ def run_batch(
     alias_registry_path: Path | None = None,
     rules_path: Path | None = None,
     processed_at: str | None = None,
+    llm_model: str | None = None,
+    llm_endpoint: str = "http://localhost:11434",
+    llm_timeout: int = 300,
+    llm_batch_size: int = 5,
+    llm_max_rows: int = 100,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     timestamp = processed_at or datetime.now(UTC).isoformat()
     if demands.empty:
@@ -84,6 +90,82 @@ def run_batch(
         labeled["alias_hits"] = alias_hits
         labeled["corrected_alias_hits"] = corrected_alias_hits
         labeled["alias_conflicts"] = alias_conflicts
+    llm_summary = {"enabled": bool(llm_model), "model": llm_model, "calls": 0, "applied": 0, "review": 0}
+    if llm_model and not labeled.empty:
+        source_by_id = {
+            str(row["demand_id"]): row
+            for _, row in demands.fillna("").iterrows()
+            if str(row.get("demand_id", "")).strip()
+        }
+        target = labeled[
+            labeled["label_status"].astype(str).isin({"REVIEW", "CONFLICT", "PASSTHROUGH"})
+            & labeled["demand_id"].astype(str).isin(source_by_id)
+        ].head(max(0, llm_max_rows))
+        if not target.empty:
+            labeler = OllamaDemandLabeler(llm_model, endpoint=llm_endpoint, timeout=llm_timeout)
+            for start in range(0, len(target), max(1, llm_batch_size)):
+                batch = target.iloc[start : start + max(1, llm_batch_size)]
+                payload = []
+                for _, result_row in batch.iterrows():
+                    source = source_by_id[str(result_row["demand_id"])]
+                    defaults, _ = loader.product_defaults(
+                        str(source.get("category_id", "")),
+                        (facet_map or {}).get(str(source.get("catalog_id", "")), []),
+                    )
+                    payload.append({
+                        "demand_id": str(source["demand_id"]),
+                        "category_id": str(source.get("category_id", "")),
+                        "extra_requirement": str(source.get("extra_requirement", "")),
+                        "product_defaults": defaults,
+                    })
+                try:
+                    model_values = labeler.classify(payload, loader)
+                except LLMLabelingError:
+                    model_values = {}
+                for _, result_row in batch.iterrows():
+                    demand_id = str(result_row["demand_id"])
+                    source = source_by_id[demand_id]
+                    raw_values = model_values.get(demand_id)
+                    row_index = labeled.index[labeled["demand_id"].astype(str).eq(demand_id)]
+                    if not len(row_index) or raw_values is None:
+                        continue
+                    defaults, warnings = _apply_model_result(
+                        source,
+                        raw_values,
+                        loader,
+                        (facet_map or {}).get(str(source.get("catalog_id", "")), []),
+                    )
+                    # The model output is only allowed to resolve a row when it
+                    # supplied every facet and did not silently turn a non-empty
+                    # requirement into ALL. Negation remains parser-owned.
+                    allowed_facets = set(
+                        str(item["name"])
+                        for item in (loader.category(str(source.get("category_id", ""))) or {}).get("facets", [])
+                    )
+                    negative_markers = ("피하고", "제외", "금지", "없는", "않", "안 ")
+                    requirement = str(source.get("extra_requirement", ""))
+                    supplied = {str(key) for key in raw_values}
+                    if allowed_facets - supplied:
+                        warnings.append("LLM omitted one or more taxonomy facets")
+                    if requirement.strip() and not any(
+                        int(value.get("code", 0) or 0) != 0 for value in defaults.values()
+                    ):
+                        warnings.append("LLM returned only ALL for a non-empty requirement")
+                    if any(marker in requirement for marker in negative_markers):
+                        warnings.append("negative constraints remain parser-owned")
+                    target_index = row_index[0]
+                    if warnings:
+                        labeled.at[target_index, "llm_status"] = "REVIEW"
+                        labeled.at[target_index, "llm_warnings"] = json.dumps(warnings, ensure_ascii=False)
+                        llm_summary["review"] += 1
+                        continue
+                    labeled.at[target_index, "label"] = loader.encode(defaults)
+                    labeled.at[target_index, "facet_values"] = json.dumps(defaults, ensure_ascii=False, separators=(",", ":"))
+                    labeled.at[target_index, "label_status"] = "PARSED"
+                    labeled.at[target_index, "interpretation_method"] = "RULE_LLM_FALLBACK"
+                    labeled.at[target_index, "llm_status"] = "APPLIED"
+                    llm_summary["applied"] += 1
+            llm_summary["calls"] = labeler.call_count
     return labeled, build_label_result_payload(labeled, processed_at=timestamp)
 
 
@@ -108,6 +190,8 @@ def main(argv: list[str] | None = None) -> int:
     source = os.environ
     taxonomy_path = args.taxonomy or Path(source.get("A_TAXONOMY_PATH", "config/facet_taxonomy_v2_2.json"))
     rules_path = args.rules or Path(source.get("A_RULES_PATH", "config/demand_constraint_rules.json"))
+    llm_enabled = source.get("A_LLM_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    llm_model = source.get("A_LLM_MODEL", "").strip() if llm_enabled else None
 
     connection = None
     write_to_database = args.write_db or source.get("A_WRITE_DATABASE", "").strip().lower() in {"1", "true", "yes"}
@@ -135,6 +219,11 @@ def main(argv: list[str] | None = None) -> int:
             product_facets_path=args.product_facets or (Path(source["A_PRODUCT_FACETS_PATH"]) if source.get("A_PRODUCT_FACETS_PATH") else None),
             alias_registry_path=args.alias_registry or Path(source.get("A_ALIAS_REGISTRY_PATH", "config/model1_aliases_reviewed_v2.json")),
             rules_path=rules_path,
+            llm_model=llm_model,
+            llm_endpoint=source.get("A_LLM_ENDPOINT", "http://localhost:11434"),
+            llm_timeout=int(source.get("A_LLM_TIMEOUT_SECONDS", "300")),
+            llm_batch_size=int(source.get("A_LLM_BATCH_SIZE", "5")),
+            llm_max_rows=int(source.get("A_LLM_MAX_ROWS", "100")),
         )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         labeled.to_csv(args.output, index=False, encoding="utf-8-sig")

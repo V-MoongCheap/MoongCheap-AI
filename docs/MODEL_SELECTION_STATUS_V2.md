@@ -6,7 +6,7 @@
 최종 Taxonomy나 Label의 자동 승인 근거로 사용하지 않는다.
 
 - Model 1: `kakaocorp/kanana-nano-2.1b-instruct`를 오프라인 후보 생성기로 사용한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다.
-- Model 2: `Rule/Alias`를 서버 운영 방식으로 확정한다. 현재 배포 리소스와 품질 검증을 통과한 LLM fallback이 없으므로 운영 경로에서는 LLM을 호출하지 않는다.
+- Model 2: `Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 명확한 행은 Rule/Alias가 처리하고, `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 별도 LLM Worker의 Qwen 모델로 보조한다.
 - LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
 ### 현재 로컬 후보의 범위
@@ -109,9 +109,10 @@ Qwen 3 4B의 200건 결과는 Mac GPU 실행이라 Kubernetes CPU 처리량을 �
 따라서 최종 Model 2 운영 방식은 다음과 같다.
 
 1. Rule/Alias 기반 Labeling을 기본 서버 경로로 사용한다.
-2. `ALL`, 부정 조건, 충돌 조건, Taxonomy 외 조건은 규칙에 따라 처리하고 불확실한 행은 `REVIEW`로 남긴다.
-3. 로컬 LLM fallback은 현재 배포하지 않는다.
-4. LLM을 다시 도입하려면 별도 Worker/Pod와 별도 리소스, CPU 환경 재평가가 선행되어야 한다.
+2. `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 별도 LLM Worker로 보낸다.
+3. LLM 결과는 Taxonomy 검증과 Evidence Gate를 통과한 경우에만 적용한다.
+4. 부정 조건은 Rule Parser가 최종 판정하며, LLM은 부정 조건을 덮어쓰지 않는다.
+5. 별도 LLM Worker는 Qwen 2.5 7B Q4를 사용하며 A Pod에 모델 가중치를 넣지 않는다.
 
 ## 다음 실행 순서
 
@@ -133,8 +134,9 @@ PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
   --output <model1_quality_audit.json>
 ```
 
-Model 2 5천 건 생성기의 LLM fallback은 `LABELING_LLM_FALLBACK_ENABLED=false`가
-기본값이며, 현재 서버 운영에서는 활성화하지 않는다. 후보 재실험이 필요할 때만
-`--enable-llm-fallback`을 명시한다.
+오프라인 5천 건 생성기의 LLM fallback은 `LABELING_LLM_FALLBACK_ENABLED=false`가
+기본값이다. 서버 런타임은 `A_LLM_ENABLED=true`, `A_LLM_ENDPOINT`,
+`A_LLM_MODEL=qwen2.5:7b-instruct`를 별도 Worker와 함께 주입할 때만 활성화한다.
+오프라인 실험에서는 `--enable-llm-fallback`을 명시한다.
 
 실제 모델 가중치·Ollama/Hugging Face/API 환경이 없는 경우에는 모델을 실행한 것처럼 처리하지 않고, 해당 후보를 `NOT_RUN`으로 기록한다.
