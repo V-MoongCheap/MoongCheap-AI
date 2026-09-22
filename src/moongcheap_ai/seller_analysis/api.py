@@ -25,6 +25,7 @@ import hmac
 import json
 import logging
 import os
+import threading
 import traceback
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,20 @@ BID_GUIDE_PATH = "/internal/v1/seller/bid-guide"
 INTERNAL_KEY_HEADER = "X-Internal-Key"
 INTERNAL_KEY_ENV = "SELLER_ANALYSIS_INTERNAL_KEY"
 ALLOW_UNAUTHENTICATED_ENV = "SELLER_ANALYSIS_ALLOW_UNAUTHENTICATED"
+
+# 운영 지표 — 인프라 요청(2026-09-22). KEDA 가 RPS 로 파드를 늘리려면 이 API 가
+# 자기 요청 수를 Prometheus 형식으로 내보내야 한다. HPA 는 CPU 만 본다.
+#
+# ⛔ 경로 라벨은 **등록된 라우트 이름만** 쓴다. 들어온 경로를 그대로 라벨에 넣으면
+#    없는 주소를 두드릴 때마다 시계열이 생겨 Prometheus 카디널리티가 터진다.
+# 새 의존성을 넣지 않고 표준 라이브러리로 쓴다. 노출 형식이 단순하고(카운터 한 종류)
+# uvicorn 을 워커 하나로 띄우므로 프로세스 간 합산이 필요 없다.
+# `prometheus_client` 로 바꿔야 한다면 이 블록만 들어내면 된다.
+METRICS_PATH = "/metrics"
+PROMETHEUS_CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8"
+OTHER_PATH_LABEL = "<other>"
+OTHER_METHOD_LABEL = "<other>"
+COUNTED_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")
 
 # 계약 스키마는 저장소 규칙대로 `docs/contracts/` 에 둔다
 # (`docs/PACKAGE_LAYOUT.md` · `demand_clustering` 의 plan 계약들과 같은 자리).
@@ -117,7 +132,7 @@ def create_app(internal_key=None):
     expected_key = _resolve_internal_key(internal_key)
 
     from fastapi import Depends, FastAPI, Request
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import JSONResponse, PlainTextResponse
     from fastapi.security import APIKeyHeader
 
     # ⛔ `auto_error=False` 다. FastAPI 가 스스로 403 을 내면 계약이 정한 오류 바디를
@@ -131,6 +146,39 @@ def create_app(internal_key=None):
     error_schema = _load_schema("seller_bid_guide_error_v01.schema.json")
 
     app = FastAPI(title="Seller Demand Analysis", version=METRICS_VERSION)
+
+    # 앱마다 따로 센다. 모듈 전역에 두면 시험끼리 값이 섞인다.
+    counter_lock = threading.Lock()
+    request_counts: dict[tuple[str, str, int], int] = {}
+    counted_paths = frozenset({"/health", METRICS_PATH, BID_GUIDE_PATH})
+
+    @app.middleware("http")
+    async def _count_requests(request, call_next):
+        response = await call_next(request)
+        # 라우팅이 끝난 뒤라야 어떤 라우트에 걸렸는지 알 수 있다.
+        matched = getattr(request.scope.get("route"), "path", None)
+        path = matched if matched in counted_paths else OTHER_PATH_LABEL
+        method = request.method if request.method in COUNTED_METHODS else OTHER_METHOD_LABEL
+        with counter_lock:
+            key = (method, path, response.status_code)
+            request_counts[key] = request_counts.get(key, 0) + 1
+        return response
+
+    # ⛔ 내부 키를 요구하지 않는다. Prometheus 는 키를 모르고, 여기 담기는 것은
+    #    요청 수뿐이라 본문·헤더 값이 새지 않는다. OpenAPI 계약에는 넣지 않는다.
+    @app.get(METRICS_PATH, include_in_schema=False)
+    def metrics() -> PlainTextResponse:
+        lines = [
+            "# HELP http_requests_total 이 서비스가 처리한 HTTP 요청 수.",
+            "# TYPE http_requests_total counter",
+        ]
+        with counter_lock:
+            snapshot = sorted(request_counts.items())
+        lines += [
+            f'http_requests_total{{method="{method}",path="{path}",status="{status}"}} {count}'
+            for (method, path, status), count in snapshot
+        ]
+        return PlainTextResponse("\n".join(lines) + "\n", media_type=PROMETHEUS_CONTENT_TYPE)
 
     def _error(status: int, code: str, message: str, request_id=None) -> JSONResponse:
         """「AI API Contract」 2절 「공통 규격」 의 Error Format 을 그대로 쓴다.
