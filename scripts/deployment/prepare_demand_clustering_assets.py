@@ -18,8 +18,11 @@ def file_sha256(path: Path) -> str:
 
 
 def verify_sha256(path: Path, expected: str) -> None:
-    if file_sha256(path) != expected:
-        raise ValueError(f"SHA256 mismatch: {path.name}")
+    actual = file_sha256(path)
+    if actual != expected:
+        raise ValueError(
+            f"SHA256 mismatch: {path.name}; expected={expected}; actual={actual}"
+        )
 
 
 def pack_catalog(release: Path, assets: Path) -> None:
@@ -54,6 +57,17 @@ def prepare_catalog(assets: Path, output: Path) -> dict:
     manifest = json.loads((assets / "catalog.json").read_text(encoding="utf-8"))
     compressed = assets / "catalog_profiles.csv.gz"
     taxonomy_file = assets / "taxonomy.json"
+    source_manifest = manifest.get("sourceManifest", {})
+    source_taxonomy_sha = source_manifest.get("taxonomySha256")
+    if source_taxonomy_sha and source_taxonomy_sha != manifest["taxonomySha256"]:
+        raise ValueError(
+            "catalog manifest taxonomySha256 differs from sourceManifest taxonomySha256"
+        )
+    source_taxonomy_version = source_manifest.get("taxonomyVersion")
+    if source_taxonomy_version and source_taxonomy_version != manifest["taxonomyVersion"]:
+        raise ValueError(
+            "catalog manifest taxonomyVersion differs from sourceManifest taxonomyVersion"
+        )
     verify_sha256(compressed, manifest["compressedSha256"])
     verify_sha256(taxonomy_file, manifest["taxonomySha256"])
     taxonomy = json.loads(taxonomy_file.read_text(encoding="utf-8"))

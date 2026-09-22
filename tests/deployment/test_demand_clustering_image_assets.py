@@ -81,3 +81,27 @@ def test_invalid_release_stops_image_assembly(release, tmp_path, damage):
     manifest_path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError):
         prepare_catalog(assets, tmp_path / "image")
+
+
+def test_manifest_rejects_nested_taxonomy_hash_drift(release, tmp_path):
+    assets = tmp_path / "assets"
+    pack_catalog(release, assets)
+    manifest_path = assets / "catalog.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["sourceManifest"]["taxonomySha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match="sourceManifest taxonomySha256"):
+        prepare_catalog(assets, tmp_path / "image")
+
+
+def test_manifest_rejects_nested_taxonomy_version_drift(release, tmp_path):
+    assets = tmp_path / "assets"
+    pack_catalog(release, assets)
+    manifest_path = assets / "catalog.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["sourceManifest"]["taxonomyVersion"] = "v0.0"
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match="sourceManifest taxonomyVersion"):
+        prepare_catalog(assets, tmp_path / "image")
