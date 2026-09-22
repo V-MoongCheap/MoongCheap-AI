@@ -2,10 +2,11 @@
 
 ## 결론 요약
 
-현재 확정된 것은 실행 구조이며, 특정 LLM 모델명은 아직 최종 확정하지 않았다.
+현재 운영 구조와 기본 모델 사용 정책을 확정한다. LLM 후보의 탐색 결과를
+최종 Taxonomy나 Label의 자동 승인 근거로 사용하지 않는다.
 
-- Model 1: 상품 데이터에서 Facet 후보를 도출한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다.
-- Model 2: Demand 자연어를 Label로 변환한다. `Rule-first Hybrid`를 기본 구조로 사용하되, LLM fallback 모델은 비교 후 결정한다.
+- Model 1: `kakaocorp/kanana-nano-2.1b-instruct`를 오프라인 후보 생성기로 사용한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다.
+- Model 2: `Rule-first`를 운영 기본값으로 확정한다. LLM은 Rule이 `REVIEW`인 행에 한해 선택적으로 보조 호출할 수 있지만, 기본 설정은 비활성화한다.
 - LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
 ### 현재 로컬 후보의 범위
@@ -86,7 +87,7 @@ LLM_ONLY
 - Rule 대비 개선폭
 - 처리 시간과 비용
 
-Rule-first Hybrid가 Rule-only보다 유의미하게 개선되지 않으면 Model 2 LLM fallback은 사용하지 않는다.
+Rule-first Hybrid가 Rule-only보다 유의미하게 개선되지 않으면 Model 2 LLM fallback은 사용하지 않는다. 현재 최신 Gold 15건에서는 Rule-first의 의미 일치가 15/15였으므로, fallback은 기본 비활성 상태로 유지한다.
 
 ## 다음 실행 순서
 
@@ -94,7 +95,21 @@ Rule-first Hybrid가 Rule-only보다 유의미하게 개선되지 않으면 Mode
 2. Model 1 후보 결과를 Evidence gate와 Human Review queue로 평가
 3. Model 2 후보 모델을 동일한 Dev/Holdout/Challenge 입력으로 실행
 4. Rule-only와 Hybrid의 개선폭 비교
-5. Model 1과 Model 2의 최종 모델 또는 비사용 결론 결정
+5. Model 1 Evidence Gate와 Model 2 Rule-first 회귀 결과를 CI에서 검증
 6. 승인된 Taxonomy와 Labeling policy를 `category.facet` 및 런타임 문서에 반영
+
+## 자동 검증 명령
+
+Model 1 후보는 아래 Evidence Gate를 통과한 뒤에만 검토 큐로 보낸다.
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
+  --input <multisource_model_input.jsonl> \
+  --candidates <multisource_model_candidates.csv> \
+  --output <model1_quality_audit.json>
+```
+
+Model 2 5천 건 생성기의 LLM fallback은 `LABELING_LLM_FALLBACK_ENABLED=false`가
+기본값이며, 실험적으로 허용할 때만 `--enable-llm-fallback`을 명시한다.
 
 실제 모델 가중치·Ollama/Hugging Face/API 환경이 없는 경우에는 모델을 실행한 것처럼 처리하지 않고, 해당 후보를 `NOT_RUN`으로 기록한다.
