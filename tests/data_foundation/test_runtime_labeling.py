@@ -4,7 +4,19 @@ import pandas as pd
 
 from moongcheap_ai.data_foundation.backend_contract import validate_backend_response
 from moongcheap_ai.data_foundation.labeling import taxonomy_from_category_facet_rows
-from moongcheap_ai.data_foundation.runtime_job import run_batch
+from moongcheap_ai.data_foundation.runtime_job import _first_env, run_batch
+
+
+def test_runtime_accepts_cloud_develop_model2_environment_aliases() -> None:
+    source = {
+        "A_MODEL2_FALLBACK_ENABLED": "true",
+        "A_MODEL2_FALLBACK_MODEL": "qwen2.5:3b",
+        "A_MODEL2_OLLAMA_BASE_URL": "http://127.0.0.1:11434",
+    }
+
+    assert _first_env(source, "A_LLM_ENABLED", "A_MODEL2_FALLBACK_ENABLED") == "true"
+    assert _first_env(source, "A_LLM_MODEL", "A_MODEL2_FALLBACK_MODEL") == "qwen2.5:3b"
+    assert _first_env(source, "A_LLM_ENDPOINT", "A_MODEL2_OLLAMA_BASE_URL") == "http://127.0.0.1:11434"
 
 
 def test_label_runtime_builds_backend_payload(tmp_path) -> None:

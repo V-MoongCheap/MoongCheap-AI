@@ -92,7 +92,8 @@ Rule-first Hybrid가 Rule-only보다 유의미하게 개선되지 않으면 Mode
 ### 서버 배포 제약을 반영한 추가 모델 평가
 
 현재 A labeling CronJob은 CPU 1 / Memory 2Gi request, CPU 2 / Memory 3Gi limit이며,
-Docker 이미지에 Ollama와 모델 가중치를 포함하지 않는다. 따라서 로컬 GPU에서
+Docker 이미지에 Ollama와 모델 가중치를 포함하지 않는다. 모델은 별도 Worker Pod에서
+제공한다. 따라서 로컬 GPU에서
 정상 실행되는 것만으로는 서버 후보로 승격하지 않는다.
 
 | 후보 | 양자화/크기 | 동일 Gold 및 샘플 측정 | 결론 |
@@ -112,7 +113,9 @@ Qwen 3 4B의 200건 결과는 Mac GPU 실행이라 Kubernetes CPU 처리량을 �
 2. `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 별도 LLM Worker로 보낸다.
 3. LLM 결과는 Taxonomy 검증과 Evidence Gate를 통과한 경우에만 적용한다.
 4. 부정 조건은 Rule Parser가 최종 판정하며, LLM은 부정 조건을 덮어쓰지 않는다.
-5. 별도 LLM Worker는 Qwen 2.5 7B Q4를 사용하며 A Pod에 모델 가중치를 넣지 않는다.
+5. 별도 LLM Worker는 Qwen 2.5 7B Q4를 현재 운영 후보로 사용하며 A Pod에 모델
+   가중치를 넣지 않는다. 실제 Worker Service endpoint와 리소스는 Cloud 배포 설정에서
+   주입한다.
 
 ## 다음 실행 순서
 
@@ -135,7 +138,7 @@ PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
 ```
 
 오프라인 5천 건 생성기의 LLM fallback은 `LABELING_LLM_FALLBACK_ENABLED=false`가
-기본값이다. 서버 런타임은 `A_LLM_ENABLED=true`, `A_LLM_ENDPOINT`,
+기본값이다. 서버 런타임은 별도 Worker가 배포된 뒤 `A_LLM_ENABLED=true`, `A_LLM_ENDPOINT`,
 `A_LLM_MODEL=qwen2.5:7b-instruct`를 별도 Worker와 함께 주입할 때만 활성화한다.
 오프라인 실험에서는 `--enable-llm-fallback`을 명시한다.
 

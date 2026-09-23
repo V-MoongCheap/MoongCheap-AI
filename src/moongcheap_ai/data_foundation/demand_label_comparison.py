@@ -24,23 +24,39 @@ def _allowed(loader: TaxonomyLoader, category_id: str) -> dict[str, list[dict[st
 
 
 def _prompt(rows: list[dict[str, Any]], loader: TaxonomyLoader) -> str:
-    categories = {}
+    category_specs = {}
+    compact_rows = []
     for row in rows:
         category_id = str(row["category_id"])
-        categories[category_id] = _allowed(loader, category_id)
-    facet_order = {}
-    for category_id, facet_values in categories.items():
-        facet_order[category_id] = list(facet_values)
+        allowed = _allowed(loader, category_id)
+        category_specs[category_id] = {
+            "facet_names": list(allowed),
+            "values": {
+                name: [
+                    {"code": item.get("code"), "value": item.get("value", "")}
+                    for item in values
+                ]
+                for name, values in allowed.items()
+            },
+        }
+        compact_rows.append(
+            {
+                "demand_id": str(row["demand_id"]),
+                "category_id": category_id,
+                "extra_requirement": str(row.get("extra_requirement", "")),
+                "product_defaults": row.get("product_defaults", {}),
+            }
+        )
     return (
-        "You classify Korean consumer demand into the provided taxonomy. Return JSON only. "
-        "Return exactly one result for every input demand_id, with no omitted or invented IDs. "
-        "For every demand return demand_id and facet_values, mapping the exact facet names listed below to an integer code. "
-        "Use product_defaults unless extra_requirement explicitly conflicts; then extra_requirement wins. "
-        "Never use numeric facet names, shortened names, or invent a facet or code. Code 0 means ALL.\n"
-        f"Facet names by category, in order: {json.dumps(facet_order, ensure_ascii=False)}\n"
-        f"Taxonomy: {json.dumps(categories, ensure_ascii=False)}\n"
-        f"Demands: {json.dumps(rows, ensure_ascii=False)}\n"
-        'Schema: {"results":[{"demand_id":"...","facet_values":{"facet_name":0}}]}'
+        "Classify Korean consumer demand. Return JSON only, with no explanation. "
+        "Return exactly one result for each demand_id. For each result, facet_values "
+        "must be a flat object whose keys are the exact facet_names for that demand's "
+        "category. Never use a category_id as a facet key, never nest facet_values, "
+        "never invent a facet/code, and use code 0 for ALL. Use product_defaults when "
+        "extra_requirement is empty.\n"
+        f"Category specifications: {json.dumps(category_specs, ensure_ascii=False)}\n"
+        f"Demands: {json.dumps(compact_rows, ensure_ascii=False)}\n"
+        'Schema: {"results":[{"demand_id":"...","facet_values":{"exact_facet_name":0}}]}'
     )
 
 

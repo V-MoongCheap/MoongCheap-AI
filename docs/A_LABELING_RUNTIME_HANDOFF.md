@@ -3,11 +3,12 @@
 ## 흐름
 
 ```text
-PostgreSQL read-only
+PostgreSQL read/write (A CronJob deployment)
   demand -> product_catalog -> category.facet
   -> TaxonomyLoader / product facet defaults
-  -> demand label + facet_values
-  -> Backend internal API
+  -> Rule/Alias labeling
+  -> unresolved rows only: external Model 2 Worker
+  -> demand.label / demand.processed_at UPDATE
 ```
 
 DB 연결정보와 Backend Endpoint가 아직 확정되지 않은 환경에서는 다음처럼
@@ -23,41 +24,50 @@ python -m moongcheap_ai.data_foundation.runtime_job `
 
 ## 환경변수
 
-- `A_DATABASE_URL`: PostgreSQL DSN. 런타임은 read-only session으로 연결한다.
+- `A_DATABASE_URL`: PostgreSQL read/write DSN. `--write-db` 배포에서는
+  `demand.label`과 `demand.processed_at` UPDATE 권한이 필요하다.
 - `A_TAXONOMY_PATH`: 승인된 Taxonomy artifact 경로
 - `A_RULES_PATH`: A 전용 입력 정책 규칙 파일 경로. 기본값은
   `config/demand_constraint_rules.json`이다.
 - `A_PRODUCT_FACETS_PATH`: 선택적 Product Facet mapping artifact
-- `A_BACKEND_BASE_URL`: Backend base URL
-- `A_BACKEND_INTERNAL_KEY`: 배포 환경에서 주입하는 내부 API Secret
-- `A_LABEL_RESULT_ENDPOINT`: Backend와 합의한 라벨 결과 Endpoint. 임의 기본값을 두지 않는다.
+- `A_BACKEND_BASE_URL`, `A_BACKEND_INTERNAL_KEY`, `A_LABEL_RESULT_ENDPOINT`:
+  Backend API 제출 경로를 별도로 사용할 때만 필요한 선택 설정이다. 현재 A
+  CronJob의 기본 저장 경로는 PostgreSQL 직접 UPDATE다.
 - `A_BACKEND_HTTP_TIMEOUT_SECONDS`: 기본 15초
-- `A_LLM_ENABLED`: `true`일 때만 애매한 행에 대한 Model 2 LLM 보조를 활성화한다. 기본값은 `false`다.
-- `A_LLM_MODEL`: 별도 LLM Worker의 모델 이름. 현재 후보는 `qwen2.5:7b-instruct` Q4다.
-- `A_LLM_ENDPOINT`: Ollama-compatible LLM Worker endpoint. A Pod 안에 Ollama를 실행하지 않는다.
+- `A_LLM_ENABLED`: 배포에서는 `true`가 필수다. `false`는 외부 Worker 없이
+  로컬 Rule 회귀 테스트를 할 때만 허용한다.
+- `A_LLM_MODEL`: 별도 LLM Worker의 모델 이름. 현재 운영 후보는
+  `qwen2.5:7b-instruct` Q4다.
+- `A_LLM_ENDPOINT`: 별도 LLM Worker의 Ollama-compatible endpoint. 실제 Service
+  이름과 포트는 Cloud가 주입하며, A Pod 안에 Ollama를 실행하지 않는다.
+- Cloud develop의 기존 `A_MODEL2_FALLBACK_*`, `A_MODEL2_OLLAMA_BASE_URL` 이름도
+  과도기 호환용으로 읽지만, 새 설정의 표준 이름은 `A_LLM_*`다.
 - `A_LLM_TIMEOUT_SECONDS`: LLM 요청 timeout. 기본 300초
 - `A_LLM_BATCH_SIZE`: 한 번에 보낼 행 수. 기본 5
 - `A_LLM_MAX_ROWS`: 한 배치에서 LLM으로 보낼 최대 행 수. 기본 100
 
 ## Backend 계약
 
-현재 제출 스키마는 `demand-label-result.v0.1` 초안이다. 실제 Backend API가
-확정되기 전까지는 `--dry-run`만 사용한다.
+Backend API 제출 스키마는 별도 연동 경로의 초안이다. 현재 A 운영 경로는
+Backend API를 거치지 않고 직접 DB에 반영한다.
 
 - `demandId`, `catalogId`, `categoryId`
 - `label`, `facetValues`, `labelStatus`, `warnings`
 - `processedAt`
 
-AI 런타임은 DB에 직접 UPDATE하지 않는다. Backend가 결과를 검증하고 상태를
-반영하는 Endpoint를 소유해야 한다.
+`--write-db` 실행에서는 AI 런타임이 DB에 직접 UPDATE한다. 따라서 Cloud는
+`A_DATABASE_URL`에 해당 권한을 가진 Secret을 주입해야 한다. Backend API 제출
+경로를 채택하는 경우에만 위의 Backend 계약과 내부 인증 키가 필요하다.
 
 ## Kubernetes/운영 원칙
 
 - CronJob은 배치 1회 실행 후 종료한다.
 - Taxonomy와 Product Facet artifact는 버전 경로로 마운트한다.
-- DB URL와 Internal Key는 Secret으로 주입한다.
+- DB URL은 Secret으로 주입한다. Backend API 경로를 사용할 때만 Internal Key도
+  추가로 주입한다.
 - API 호출 실패 시 임의 재시도하지 않고 다음 배치에서 미처리 수요를 재조회한다.
-- LLM Worker는 별도 Pod로 운영하며, A Pod에는 모델 가중치나 Ollama를 포함하지 않는다.
+- 모델은 필수지만 A 이미지에 모델 가중치나 Ollama를 넣지 않는다. 별도 LLM Worker
+  Pod를 통해 호출하며, Worker의 Service endpoint는 Cloud 배포 설정으로 주입한다.
 - Rule이 이미 처리한 행은 LLM으로 덮어쓰지 않는다. `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 LLM 후보로 보낸다.
 - LLM 결과는 Taxonomy에 존재하는 Facet/Value를 모두 반환하고, 비어 있지 않은 요구사항을 `ALL`로 만들지 않을 때만 적용한다.
 - 부정 표현은 Rule Parser가 담당하며 LLM은 부정 조건을 최종 확정하지 않는다.

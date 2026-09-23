@@ -37,6 +37,15 @@ def _required(source: Mapping[str, str], key: str) -> str:
     return value
 
 
+def _first_env(source: Mapping[str, str], *keys: str, default: str = "") -> str:
+    """Read the current A names, while accepting the Cloud develop aliases."""
+    for key in keys:
+        value = source.get(key, "").strip()
+        if value:
+            return value
+    return default
+
+
 def run_batch(
     demands: pd.DataFrame,
     taxonomy_path: Path | None,
@@ -190,8 +199,13 @@ def main(argv: list[str] | None = None) -> int:
     source = os.environ
     taxonomy_path = args.taxonomy or Path(source.get("A_TAXONOMY_PATH", "config/facet_taxonomy_v2_2.json"))
     rules_path = args.rules or Path(source.get("A_RULES_PATH", "config/demand_constraint_rules.json"))
-    llm_enabled = source.get("A_LLM_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
-    llm_model = source.get("A_LLM_MODEL", "").strip() if llm_enabled else None
+    llm_enabled = _first_env(
+        source,
+        "A_LLM_ENABLED",
+        "A_MODEL2_FALLBACK_ENABLED",
+        default="false",
+    ).lower() in {"1", "true", "yes", "on"}
+    llm_model = _first_env(source, "A_LLM_MODEL", "A_MODEL2_FALLBACK_MODEL") if llm_enabled else None
 
     connection = None
     write_to_database = args.write_db or source.get("A_WRITE_DATABASE", "").strip().lower() in {"1", "true", "yes"}
@@ -220,10 +234,15 @@ def main(argv: list[str] | None = None) -> int:
             alias_registry_path=args.alias_registry or Path(source.get("A_ALIAS_REGISTRY_PATH", "config/model1_aliases_reviewed_v2.json")),
             rules_path=rules_path,
             llm_model=llm_model,
-            llm_endpoint=source.get("A_LLM_ENDPOINT", "http://localhost:11434"),
-            llm_timeout=int(source.get("A_LLM_TIMEOUT_SECONDS", "300")),
-            llm_batch_size=int(source.get("A_LLM_BATCH_SIZE", "5")),
-            llm_max_rows=int(source.get("A_LLM_MAX_ROWS", "100")),
+            llm_endpoint=_first_env(
+                source,
+                "A_LLM_ENDPOINT",
+                "A_MODEL2_OLLAMA_BASE_URL",
+                default="http://localhost:11434",
+            ),
+            llm_timeout=int(_first_env(source, "A_LLM_TIMEOUT_SECONDS", "A_MODEL2_FALLBACK_TIMEOUT_SECONDS", default="300")),
+            llm_batch_size=int(_first_env(source, "A_LLM_BATCH_SIZE", "A_MODEL2_FALLBACK_BATCH_SIZE", default="5")),
+            llm_max_rows=int(_first_env(source, "A_LLM_MAX_ROWS", default="100")),
         )
         args.output.parent.mkdir(parents=True, exist_ok=True)
         labeled.to_csv(args.output, index=False, encoding="utf-8-sig")

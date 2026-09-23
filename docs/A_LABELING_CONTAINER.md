@@ -47,7 +47,13 @@ secret_variables:
     purpose: "A 전용 PostgreSQL read/write DSN"
 ```
 
-Cloud의 최종 ECR 이름은 `moongcheap/{service}` 규칙에 맞춰 확정한다. 현재 Kubernetes 예시는 `moongcheap/ai-labeling:replace-with-git-sha`를 사용한다.
+Cloud `develop` GitOps 기준 ECR은 다음과 같이 AI 공용 저장소와 컴포넌트별 태그를 사용한다.
+
+```text
+840851421204.dkr.ecr.ap-northeast-2.amazonaws.com/moongcheap/ai:<component>-<environment>-<git-sha>
+```
+
+현재 A 컴포넌트 예시는 `labeling-develop-<git-sha>`이며, 최종 태그 생성은 Cloud Jenkins 설정을 따른다.
 
 ## Kubernetes
 
@@ -56,8 +62,27 @@ Cloud의 최종 ECR 이름은 `moongcheap/{service}` 규칙에 맞춰 확정한�
 - `concurrencyPolicy: Forbid`
 - 실패 Job은 자동 재시도하지 않고 다음 배치에서 미처리 Demand를 재조회
 - Secret 이름: `ai-labeling-database`, key: `url`
+- NodeSelector: `workload=backend-ai`, `kubernetes.io/os=linux`, `kubernetes.io/arch=amd64`
 - Namespace와 실제 Secret 공급 방식은 Cloud GitOps overlay에서 지정
 - HTTP Service/Ingress/Probe는 만들지 않음
+
+Cloud `develop`에는 기존 `A_MODEL2_*` 환경변수 이름이 남아 있을 수 있다. A 런타임은
+현재 표준인 `A_LLM_*` 이름을 우선 사용하면서 해당 Cloud 별칭도 호환한다. 모델을 A Pod
+내부에 포함하지 않고 별도 Worker Pod에서 호출하는 것을 현재 기준으로 한다.
+
+현재 결정 기준은 **A CronJob + 별도 Model 2 Worker Pod**다. 따라서 A 이미지에는
+모델 가중치나 Ollama를 포함하지 않으며, Cloud는 다음 값을 배포 전에 반영해야 한다.
+
+- `A_LLM_ENABLED=true`
+- `A_LLM_MODEL=qwen2.5:7b-instruct` (현재 운영 후보)
+- `A_LLM_ENDPOINT=<실제 Worker Service endpoint>`
+- A CronJob이 참조하는 `ai-labeling-database` Secret과 `url` key
+
+Cloud develop의 현재 예시에는 `A_MODEL2_FALLBACK_ENABLED=false`와
+`A_MODEL2_OLLAMA_BASE_URL=http://ollama:11434`가 남아 있고, 이 저장소가 확인한
+GitOps 파일에는 해당 Worker Service 정의가 없다. 이는 호환 코드로 해결할 수 있는
+환경변수 이름 차이와 별개로, Worker 배포 및 Secret 생성이 완료되어야 해결되는
+배포 전제다.
 
 실제 Dev 반영 시 Cloud가 다음 placeholder를 교체한다.
 
