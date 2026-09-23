@@ -100,11 +100,11 @@ B 전용 개발 overlay는 `BACKEND_BASE_URL=http://backend`를 주입한다. �
 이 주소는 클러스터 내부용이며 로컬 Docker 실행에서는 접근 가능한 Backend 주소를 사용한다.
 내부 키의 원본 저장소는
 Backend와 합의한 AWS Parameter Store `SecureString`이다. 배포 환경이 이를
-`BACKEND_INTERNAL_KEY`로 주입하며 앱은 `X-Internal-Key` 헤더로 전송한다.
+`BACKEND_INTERNAL_KEY`로 주입하며 앱은 `X-Internal-Api-Key` 헤더로 전송한다.
 매니페스트는 `backend-env/MOONGCHEAP_INTERNAL_API_KEY`를 참조하지만, 확인한 Cloud
-`develop` (`57cd52e`)에는 이 항목이 없다. Cloud에서 SSM 조회·동기화와 해당 항목의
-공급을 완료하기 전까지 배포를 활성화하지 않는다. 앱은 AWS 자격 증명이나 직접적인
-AWS API 호출을 요구하지 않는다.
+`develop` (`8fd7e20`)의 ExternalSecret 템플릿에는 이 항목이 매핑돼 있다. 실제 AWS
+원본 값과 클러스터 동기화 성공 여부를 확인하고 DB·Backend 연동 검증을 마치기 전까지
+배포를 활성화하지 않는다. 앱은 AWS 자격 증명이나 직접적인 AWS API 호출을 요구하지 않는다.
 실제 Secret 값은 이미지·Git·로그에 넣지 않는다.
 
 DB 조회 대상에는 `demand`, `demand_board`, `reject_history`가 포함된다.
@@ -198,7 +198,7 @@ docker run --rm --network none --read-only \
 | 상품 profile | 현재 Part A 분류 기준으로 재생성한 45,719건·15개 필드가 기존 profile과 모두 일치 | 현재 이미지에는 V2.2 45,996건을 포함; DB ID 계약 확인은 별도 |
 | taxonomy | 테스트 fixture가 현재 profile의 16개 카테고리를 포함하며 runtime 로드 확인 | 현재 profile·taxonomy를 이미지에 함께 포함 |
 | 연결 설정 | 실제 배포 연동 미검증; backend-env DB 세 항목 재사용, 내부 키 항목 공급 대기 | DB·Backend 연결 확인, 내부 키 주입과 헤더 이름 정합성 확인 |
-| Backend API | 합의한 두 API가 동작하는 배포 대상은 미확인 | 대상 환경에서 API 1·2 및 `X-Internal-Key` 계약 지원 여부 확인 |
+| Backend API | 합의한 두 API가 동작하는 배포 대상은 미확인 | 대상 환경에서 API 1·2 및 `X-Internal-Api-Key` 계약 지원 여부 확인 |
 | 거절 이력 | 갱신 ERD 이미지 기준 `reject_history` 조회·후보 제외 구현 | 실제 테이블 배포, 거절과 상태 복귀의 원자적 저장, SELECT 권한 및 API 2의 동시성 재검증 확인 |
 
 상품도감과 catalog ID의 기준은 Part A이며 Part B가 별도 ID를 만들거나 Backend

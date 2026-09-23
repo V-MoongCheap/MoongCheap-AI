@@ -158,7 +158,7 @@ def test_formation_limits_each_array_without_losing_metadata_or_board_keys(
     def http_post(url, **kwargs):
         assert url == "https://backend.example/custom-formation"
         assert kwargs["timeout"] == 7
-        assert kwargs["headers"]["X-Internal-Key"] == "test-key"
+        assert kwargs["headers"]["X-Internal-Api-Key"] == "test-key"
         assert kwargs["allow_redirects"] is False
         request = kwargs["json"]
         assert_wire_schema("formation", request)
@@ -228,7 +228,7 @@ def test_substitution_uses_announced_50_limit_and_sums_all_outcome_types(count):
     def http_post(url, **kwargs):
         assert url == "https://backend.example/custom-substitution"
         assert kwargs["timeout"] == 9
-        assert kwargs["headers"]["X-Internal-Key"] == "test-key"
+        assert kwargs["headers"]["X-Internal-Api-Key"] == "test-key"
         assert kwargs["allow_redirects"] is False
         request = kwargs["json"]
         assert_wire_schema("substitution", request)

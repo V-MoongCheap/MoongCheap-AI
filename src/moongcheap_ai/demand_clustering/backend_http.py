@@ -107,7 +107,7 @@ def post_plan_json(
     response = http_post(
         base_url + endpoint,
         headers={
-            "X-Internal-Key": key,
+            "X-Internal-Api-Key": key,
             "Content-Type": "application/json",
             "Accept": "application/json",
         },
