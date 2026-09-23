@@ -18,6 +18,7 @@ SET label = %(label)s,
     processed_at = %(processed_at)s,
     updated_at = NOW()
 WHERE id = %(demand_id)s
+  AND status = 'UNASSIGNED'
   AND processed_at IS NULL
 """.strip()
 
@@ -42,8 +43,9 @@ def write_label_results(
 ) -> int:
     """Write non-review labeling rows atomically and return updated row count.
 
-    The ``processed_at IS NULL`` guard makes retries safe: a row already
-    processed by a previous run is not overwritten accidentally.
+    The ``status = 'UNASSIGNED'`` and ``processed_at IS NULL`` guards make
+    retries safe: a row already processed or assigned by another batch is not
+    overwritten accidentally.
     ``REVIEW`` rows are intentionally not persisted as completed labels.
     """
     timestamp = processed_at.isoformat() if isinstance(processed_at, datetime) else str(processed_at).strip()

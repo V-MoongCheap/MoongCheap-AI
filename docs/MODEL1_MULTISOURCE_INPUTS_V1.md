@@ -8,9 +8,8 @@ Model 1은 원본 파일을 직접 모델에 넘기지 않는다. 각 Source Loa
 |---|---|---|---|
 | MFDS_PRODUCT | `data/interim/facet_discovery/i0030_products_clean_dedup.csv` | 상품의 규제·제형·원료 사실 | `product_name`, `product_form`, `functional_ingredients`, `regulated_function` |
 | SELLER_LISTING | `data/processed/domeggook/seller_offers_core.csv` | 판매 공고의 상품 표현·가격·MOQ | `product_name`, `package_spec`, `ingredients_raw`, `functionality_raw`, `intake_raw`, `base_unit_price`, `moq` |
-| GROUNDED_DEMAND_SYNTHETIC | `data/synthetic/consumer_reference/grounded_demand_v2_1000.csv` | 상품 데이터에 근거한 가상 구매 요청 | `catalog_id`, `extra_requirement`, `facet_requirements`, `price_option`, `quantity` |
-| DEMAND_BOARD_SYNTHETIC | `F:\downloadF\demand_board_snapshot_5000.json` | 가상 수요 보드의 조건 집계 | `catalogId`, `priceMin`, `priceMax`, `participantCount`, `status` |
 | CONSUMER_SEARCH | `data/interim/facet_evidence/kuaiseach_health_queries_ko_reviewed_v27.parquet` | 번역된 검색 표현·관심 신호 | `query_translated`, `source_record_id` |
+| EVIDENCE_UNIFIED | `data/interim/facet_discovery/facet_evidence_unified.parquet` | 리뷰·국내 검색·집계 Evidence 보강 | `service_category`, `source_type`, `document_id`, `text_raw`, `normalized_attribute`, `normalized_value` |
 
 ## 공통 입력 컬럼
 
@@ -31,9 +30,10 @@ Model 1은 원본 파일을 직접 모델에 넘기지 않는다. 각 Source Loa
 
 ## 샘플링과 모델 호출
 
-- MFDS와 판매 공고는 Category별 최대 8건을 샘플링한다.
-- Demand는 Category별 최대 8건을 사용한다.
-- 소비자 검색은 Category별 최대 4건을 사용한다.
+- MFDS와 판매 공고는 Category별 제한 건수를 샘플링한다.
+- 소비자 검색은 Category별 제한 건수를 사용한다.
+- 통합 Evidence는 명시적인 `health-functional-food:<category>`가 있는 행만 Category별 제한 건수로 사용한다.
+- `health-functional-food`처럼 구체적인 Category가 없는 Evidence는 별도 Review 산출물에만 남기고 모델 입력에서 제외한다.
 - Source ID 중복을 제거한 뒤 Category별로 한 번씩 모델을 호출한다.
 - 실행 시 생성되는 실제 모델 입력은 `data/processed/model1_multisource_v1/multisource_model_input_v1.jsonl`이다.
 
@@ -41,9 +41,8 @@ Model 1은 원본 파일을 직접 모델에 넘기지 않는다. 각 Source Loa
 
 - MFDS 상품 필드: 상품 사실과 규제 근거
 - 판매 공고: 시장에서 사용되는 상품명·조건 표현
-- 합성 Demand: 구매 조건의 형식 확인용이며 실제 시장 인기도로 해석하지 않음
-- Demand Board: 가격·참여자 수가 시뮬레이션 값이므로 실제 수요 통계로 해석하지 않음
 - 소비자 검색: 검색 표현 신호일 뿐 구매 확정이나 상품 적합성의 증거가 아님
+- 리뷰·검색·집계 Evidence: 상품 사실의 보조 근거이며, MFDS·판매자 상품 근거와 동일한 강도로 자동 확정하지 않음
 
 ## 검토 흐름
 
@@ -57,3 +56,6 @@ Model 1은 원본 파일을 직접 모델에 넘기지 않는다. 각 Source Loa
 → review_queue에서 사람 결정
 → human_accepted 결과
 ```
+
+합성 Demand와 Demand Board는 Model 1 입력에 포함하지 않는다. 이 데이터는 Model 2
+Labeling과 B/C Clustering 검증용으로만 사용한다.

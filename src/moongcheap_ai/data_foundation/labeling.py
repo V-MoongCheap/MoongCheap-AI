@@ -126,7 +126,7 @@ class TaxonomyLoader:
             candidates: list[tuple[int, int, dict[str, Any], str]] = []
             for value in facet.get("values", []):
                 code = int(value["code"])
-                if code == 0:
+                if code == 0 or str(value.get("status", "")).upper() == "DEPRECATED":
                     continue
                 aliases = [value.get("value", ""), *(value.get("aliases") or [])]
                 for alias in aliases:
@@ -221,7 +221,7 @@ def build_product_facet_map(frame: pd.DataFrame) -> dict[str, list[dict[str, Any
     result: dict[str, list[dict[str, Any]]] = {}
     normalized = frame.fillna("")
     if "mapping_status" in normalized:
-        normalized = normalized[normalized["mapping_status"].astype(str).str.upper().eq("MAPPED")]
+        normalized = normalized[normalized["mapping_status"].astype(str).str.upper().isin({"MAPPED"})]
     for payload in normalized.to_dict(orient="records"):
         source_id = _text(payload.get("source_product_id"))
         keys = {

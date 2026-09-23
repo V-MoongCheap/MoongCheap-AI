@@ -29,7 +29,11 @@ application_port: 8081
 # ⚠️ Cloud develop(4f450fb) values/services/ai.yaml 의 containerPort 는 8000 이다(초기 틀).
 #    이 이미지는 8081 에서만 듣는다. 배포 시 containerPort 를 8081 로 맞춰야 한다.
 health_check_path: /health
-metrics_path: ""  # 메트릭 엔드포인트 없음
+metrics_path: /metrics  # Prometheus 노출 형식 0.0.4. 내부 키를 요구하지 않는다
+# 2026-09-22 인프라 KEDA 요청으로 추가. 지표는 http_requests_total 카운터 하나이며
+# method·path·status 라벨을 붙인다. path 라벨은 등록된 라우트만 쓰고 나머지는
+# <other> 로 묶어 시계열이 늘어나지 않게 했다. RPS 는 rate(http_requests_total[1m]) 로 얻는다.
+# 새 의존성 없음 — 표준 라이브러리로 구현했고 uvicorn 워커 1개 기준이다.
 
 kubernetes:
   workload_kind: Deployment  # 상주 HTTP 서버. Cloud moongcheap-service 차트가 Deployment·Service 를 렌더링한다

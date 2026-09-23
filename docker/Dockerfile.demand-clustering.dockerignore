@@ -1,9 +1,17 @@
-# Allowlist the inputs for this image; never send secrets, datasets, or models.
+# Only reviewed runtime assets join the source inputs; exclude raw data and secrets.
 **
 !packaging/
 !packaging/demand-clustering/
 !packaging/demand-clustering/pyproject.toml
 !packaging/demand-clustering/uv.lock
+!packaging/demand-clustering/runtime-assets/
+!packaging/demand-clustering/runtime-assets/catalog_profiles.csv.gz
+!packaging/demand-clustering/runtime-assets/catalog.json
+!packaging/demand-clustering/runtime-assets/taxonomy.json
+!packaging/demand-clustering/runtime-assets/model.json
+!scripts/
+!scripts/deployment/
+!scripts/deployment/prepare_demand_clustering_assets.py
 !src/
 !src/moongcheap_ai/
 !src/moongcheap_ai/**

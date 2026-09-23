@@ -1,0 +1,35 @@
+# 낙찰 일회 배치. 배포 단계(runtime)에는 배치 실행에 필요한 것만 담고,
+# Mock 서버와 loopback 시험은 test 단계에만 둔다.
+FROM python:3.13.12-slim-trixie AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+WORKDIR /app
+
+COPY packaging/awarding/requirements.txt ./packaging/awarding/requirements.txt
+RUN python -m pip install --no-cache-dir -r packaging/awarding/requirements.txt \
+    && python -m pip check
+
+# 전체 src/data/.env를 복사하지 않는다. 빌드 컨텍스트도 .dockerignore 로 제한한다.
+COPY src/moongcheap_ai/__init__.py ./src/moongcheap_ai/__init__.py
+COPY src/moongcheap_ai/seller_matching/__init__.py \
+     src/moongcheap_ai/seller_matching/offer_ranking.py \
+     src/moongcheap_ai/seller_matching/awarding_batch.py ./src/moongcheap_ai/seller_matching/
+COPY scripts/awarding/run_awarding_test_drive.py \
+     scripts/awarding/sample_pending.json ./scripts/awarding/
+
+USER 65534:65534
+# 일회 배치다. HTTP 포트/상주 서버/헬스체크를 만들지 않는다.
+ENTRYPOINT ["python", "scripts/awarding/run_awarding_test_drive.py"]
+# 인자 없는 실행은 합성 파일만 읽는다. 시험 정책이며 PM 승인값이 아니다. 전송하지 않는다.
+CMD ["--pending-file", "scripts/awarding/sample_pending.json", "--shipping-fee-unit", "PER_BOARD", "--price-cap-basis", "UNIT_PRICE"]
+
+# 시험 단계 — loopback Mock 으로 한 번에 확인할 때만 쓴다. `--target test` 로 빌드한다.
+FROM base AS test
+COPY scripts/awarding/mock_backend.py \
+     scripts/awarding/container_smoke.py ./scripts/awarding/
+
+# ⛔ 배포 단계는 마지막에 둔다. --target 없이 빌드해도 시험 코드가 섞이지 않는다.
+FROM base AS runtime

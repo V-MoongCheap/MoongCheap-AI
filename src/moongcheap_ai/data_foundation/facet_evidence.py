@@ -1014,7 +1014,7 @@ def build_audit(
         "- NAVER Shopping Insight ratio is relative click trend, not absolute search volume.",
         "- KuaiSearch is Chinese reference data.",
         "- AI-Hub is not a health-functional-food-only review corpus.",
-        "- Korean health-functional-food review data is NOT_AVAILABLE under the current access policy.",
+        "- Korean review evidence is included only when explicitly enabled and remains review evidence, not product truth.",
         "- Missing or unknown license information is not inferred as permission.",
         "- Human review is required before taxonomy or alias approval.",
     ]
@@ -1028,12 +1028,11 @@ def run_pipeline(
     max_reviews_per_product: int | None = None,
 ) -> dict[str, Any]:
     """Run the Korean HFF evidence pipeline without synthetic or foreign ecommerce facts."""
-    del enable_reviews
     output_dir.mkdir(parents=True, exist_ok=True)
     mfds = root / "data/interim/facet_discovery/i0030_products_clean_dedup.csv"
     mapping = (
         root
-        / "data/processed/category_v2_1_current/product_service_category_mapping_v2_1.csv"
+        / "data/processed/category_v2_1/product_service_category_mapping_v2_1.csv"
     )
     evidence: list[pd.DataFrame] = []
     statuses: list[dict[str, Any]] = []
@@ -1152,34 +1151,35 @@ def run_pipeline(
             "rows": len(consumer_metrics),
         }
     )
-    review_paths = {
-        "nutrime": sorted((root / "data/raw/reviews/nutrime").glob("*.jsonl")),
-        "chongkundang": sorted(
-            (root / "data/raw/reviews/chongkundang").glob("*.jsonl")
-        ),
+    review_sources = {
+        "nutrime": root / "data/raw/reviews/nutrime",
+        "chongkundang": root / "data/raw/reviews/chongkundang",
     }
-    for source, paths in review_paths.items():
-        path = paths[-1] if paths else root / f"data/raw/reviews/{source}/missing.jsonl"
+    for source, directory in review_sources.items():
+        if not enable_reviews:
+            statuses.append({
+                "source": source,
+                "source_type": "KOREAN_HFF_RAW_REVIEW",
+                "status": "NOT_ENABLED",
+                "rows": 0,
+            })
+            continue
+        paths = sorted(directory.glob("*.jsonl"))
+        path = paths[-1] if paths else directory / "missing.jsonl"
         review_frame, review_stats = build_review_evidence(
             path, source, max_reviews_per_product=max_reviews_per_product
         )
         evidence.append(review_frame)
-        statuses.append(
-            {
-                "source": source,
-                "source_type": "KOREAN_HFF_RAW_REVIEW",
-                "status": "AVAILABLE"
-                if review_stats["review_count"]
-                else "BLOCKED_OR_EMPTY",
-                "rows": len(review_frame),
-                "review_count": review_stats["review_count"],
-                "sampled_review_count": review_stats["sampled_review_count"],
-                "mapped_count": review_stats["mapped_count"],
-                "medical_outcome_sentence_count": review_stats[
-                    "medical_outcome_sentence_count"
-                ],
-            }
-        )
+        statuses.append({
+            "source": source,
+            "source_type": "KOREAN_HFF_RAW_REVIEW",
+            "status": "AVAILABLE" if review_stats["review_count"] else "BLOCKED_OR_EMPTY",
+            "rows": len(review_frame),
+            "review_count": review_stats["review_count"],
+            "sampled_review_count": review_stats["sampled_review_count"],
+            "mapped_count": review_stats["mapped_count"],
+            "medical_outcome_sentence_count": review_stats["medical_outcome_sentence_count"],
+        })
 
     unified = pd.concat(evidence, ignore_index=True) if evidence else _empty()
     aggregate = aggregate_evidence(unified)

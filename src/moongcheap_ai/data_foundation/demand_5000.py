@@ -14,22 +14,35 @@ import pandas as pd
 from .demand_synthetic import PRICE_OPTIONS, prepare_demand_input
 
 DATA_ORIGIN = "SYNTHETIC_GROUNDED"
-TAXONOMY_VERSION = "v2.1"
+TAXONOMY_VERSION = "v2.2"
 SCENARIOS = (
-    "NORMAL_SINGLE_FACET", "NORMAL_MULTI_FACET", "NO_EXTRA_REQUIREMENT",
-    "ALIAS_EXPRESSION", "PARAPHRASE", "SHORT_QUERY", "FULL_SENTENCE",
-    "NEGATION", "AMBIGUOUS", "CONFLICT", "OUT_OF_TAXONOMY", "MULTI_VALUE_CANDIDATE",
+    "NO_EXTRA_REQUIREMENT",
+    "SINGLE_FACET",
+    "MULTI_FACET",
+    "PREFERENCE",
+    "NEGATION",
+    "AMBIGUOUS",
+    "CONFLICT",
+    "OUT_OF_TAXONOMY",
 )
+SCENARIO_RATIOS = {
+    "NO_EXTRA_REQUIREMENT": 0.20,
+    "SINGLE_FACET": 0.25,
+    "MULTI_FACET": 0.20,
+    "PREFERENCE": 0.10,
+    "NEGATION": 0.10,
+    "AMBIGUOUS": 0.05,
+    "CONFLICT": 0.05,
+    "OUT_OF_TAXONOMY": 0.05,
+}
 SCENARIO_TEMPLATES = {
-    "NORMAL_SINGLE_FACET": "{pairs}",
-    "NORMAL_MULTI_FACET": "{pairs} 제품이면 좋겠어요.",
-    "PARAPHRASE": "가능하면 {pairs}인 제품으로 부탁해요.",
-    "SHORT_QUERY": "{short}",
-    "FULL_SENTENCE": "구매할 제품을 찾고 있어요. {pairs} 조건을 만족하면 좋겠습니다.",
+    "SINGLE_FACET": "{pairs}",
+    "MULTI_FACET": "{pairs} 제품이면 좋겠어요.",
+    "PREFERENCE": "가능하면 {pairs}인 제품으로 부탁해요.",
     "NEGATION": "{pairs}은 피하고 싶어요.",
     "CONFLICT": "{pairs}이면서 {conflict}인 제품으로 부탁해요.",
+    "AMBIGUOUS": "가능하면 부담 적고 괜찮은 제품으로 부탁해요.",
     "OUT_OF_TAXONOMY": "딸기맛 제품이면 좋겠어요.",
-    "MULTI_VALUE_CANDIDATE": "{pairs} 또는 {alternative}도 괜찮아요.",
 }
 
 
@@ -57,9 +70,25 @@ def load_taxonomy(path: Path) -> dict[str, dict[str, Any]]:
 
 def load_catalog(products_path: Path, mapping_path: Path) -> pd.DataFrame:
     products = _read_csv(products_path)
+    # Current local Catalog Seed already contains the category crosswalk.
+    # Preserve its stable IDs instead of forcing the legacy I0030 mapping path.
+    if {"catalog_id", "category_id"}.issubset(products.columns):
+        catalog = products.copy()
+        catalog["source_product_id"] = catalog["source_product_id"].astype(str)
+        catalog["catalog_id"] = catalog["catalog_id"].astype(str)
+        catalog["service_category_candidate_key"] = catalog["category_id"].map(
+            lambda value: str(value).strip().rsplit(":", 1)[-1].upper()
+        )
+        catalog["service_category_name"] = catalog.get("category_name", "")
+        return catalog[catalog["service_category_candidate_key"].ne("")].drop_duplicates("catalog_id")
     mapping = _read_csv(mapping_path)
     mapping = mapping.rename(columns={"product_name": "name"})
-    product_columns = [column for column in ("source_product_id", "name", "product_form", "functional_ingredients", "intake_method") if column in products]
+    provenance_columns = (
+        "source_review_id", "source_keyword", "source_document_id", "source_text",
+        "source", "license_status", "description", "spec_summary", "product_form",
+        "functional_ingredients", "intake_method",
+    )
+    product_columns = [column for column in ("source_product_id", "name", *provenance_columns) if column in products]
     products = products[product_columns].drop_duplicates("source_product_id")
     columns = ["source_product_id", "name", "service_category_candidate_key", "service_category_name"]
     mapping = mapping[[column for column in columns if column in mapping]].drop_duplicates("source_product_id")
@@ -93,8 +122,14 @@ def _json(value: Any) -> str:
 
 
 def _scenario_counts(count: int) -> dict[str, int]:
-    base, remainder = divmod(count, len(SCENARIOS))
-    return {scenario: base + (index < remainder) for index, scenario in enumerate(SCENARIOS)}
+    raw = {scenario: int(count * SCENARIO_RATIOS[scenario]) for scenario in SCENARIOS}
+    remainder = count - sum(raw.values())
+    for scenario in SCENARIOS:
+        if remainder <= 0:
+            break
+        raw[scenario] += 1
+        remainder -= 1
+    return raw
 
 
 def generate_demand_5000(
@@ -159,7 +194,7 @@ def generate_demand_5000(
         profile_slot = index % 32
         first_facet, first_value = candidates[profile_slot % len(candidates)]
         selected = {first_facet: first_value}
-        if scenario in {"NORMAL_MULTI_FACET", "FULL_SENTENCE", "CONFLICT"} and len(candidates) > 1:
+        if scenario in {"MULTI_FACET", "PREFERENCE", "CONFLICT"} and len(candidates) > 1:
             second_facet, second_value = candidates[(profile_slot + 1) % len(candidates)]
             if second_facet != first_facet:
                 selected[second_facet] = second_value
@@ -170,11 +205,13 @@ def generate_demand_5000(
         conflict = next((value["value"] for facet, value in candidates if facet == first_facet and value["value"] != first_value["value"]), alternative)
         if scenario == "NO_EXTRA_REQUIREMENT":
             requirement = ""
-        elif scenario == "ALIAS_EXPRESSION":
+        elif scenario == "AMBIGUOUS":
+            requirement = SCENARIO_TEMPLATES[scenario]
+        elif scenario == "SINGLE_FACET" and first_value.get("aliases"):
             aliases = first_value.get("aliases") or []
             requirement = str(aliases[0] if aliases else first_value["value"])
         else:
-            requirement = SCENARIO_TEMPLATES.get(scenario, "{pairs}").format(pairs=pairs, short=str(first_value["value"]), alternative=alternative, conflict=conflict)
+            requirement = SCENARIO_TEMPLATES.get(scenario, "{pairs}").format(pairs=pairs, alternative=alternative, conflict=conflict)
         option, minimum, maximum = rng.choice(PRICE_OPTIONS)
         rows.append({
             "demand_id": f"synthetic-grounded-demand-{index + 1:05d}",
@@ -206,8 +243,8 @@ def generate_demand_5000(
             ),
             "scenario_type": scenario,
             "data_origin": DATA_ORIGIN,
-            "reference_source": "ESCI+xPQA+grounded_demand_v2_1000",
-            "augmentation_method": "PROFILE_TEMPLATE_WITH_REFERENCE_STYLE",
+            "reference_source": product.get("source") or "CANONICAL_PRODUCT_EVIDENCE",
+            "augmentation_method": "TAXONOMY_GROUNDED_SCENARIO_TEMPLATE",
             "price_origin": "MOCK_POLICY",
             "quantity_origin": "MOCK_POLICY",
             "substitution_origin": "MOCK_POLICY",
@@ -216,6 +253,12 @@ def generate_demand_5000(
             "processed_at": "",
             "synthetic": True,
             "source_note": "synthetic grounded demand; not observed user demand",
+            "source_product_id": source_product_id,
+            "source_review_id": product.get("source_review_id", ""),
+            "source_keyword": product.get("source_keyword", ""),
+            "source_document_id": product.get("source_document_id", source_product_id),
+            "generation_method": "TAXONOMY_VALUE_TEMPLATE_FROM_CANONICAL_PRODUCT",
+            "source_evidence_text": product.get("source_text", ""),
             "generation_status": "CANDIDATE_NEEDS_LABELING",
         })
     result = prepare_demand_input(pd.DataFrame(rows), allow_open_ended_price=True)

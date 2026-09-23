@@ -7,6 +7,7 @@
 | MFDS 상품 | `data/interim/facet_discovery/i0030_products_clean_dedup.csv` | 상품명, 제형, 기능성 성분, 규제 기능 문장 | 공식 상품 속성과 기능성 표현 |
 | 판매자 공고 | `data/processed/domeggook/seller_offers_core.csv` | 상품명, 포장·제형, 성분, 기능성 표현, 섭취법 | 실제 판매 현장에서 쓰이는 상품 표현 |
 | 소비자 검색 | `data/interim/facet_evidence/kuaiseach_health_queries_ko_reviewed_v27.parquet` | 번역·검토된 검색어 | 소비자가 상품을 찾을 때 사용하는 표현 |
+| 통합 Evidence | `data/interim/facet_discovery/facet_evidence_unified.parquet` | 명시적 서비스 Category가 있는 리뷰·국내 검색·집계 근거 | 보조 Evidence이며 상품 사실의 단독 확정 근거로 사용하지 않음 |
 
 MFDS와 판매자 공고는 상품 속성의 주 근거다. 소비자 검색어는 표현 보강 자료이며, 검색량이나 검색어 자체를 상품 속성으로 확정하지 않는다.
 
@@ -18,7 +19,9 @@ MFDS와 판매자 공고는 상품 속성의 주 근거다. 소비자 검색어�
 
 ## 판매자 데이터 추가 확보 판단
 
-현재 판매자 공고 2,778건은 초기 보강 자료로 사용할 수 있다. 추가 수집은 다음 조건을 만족할 때 의미가 있다.
+현재 판매자 공고 2,778건은 초기 보강 자료로 사용할 수 있다. 리뷰·검색·집계 Evidence는
+별도 Evidence 파이프라인에서 생성한 뒤, 명시적 서비스 Category가 있는 행만 Model 1
+멀티소스 입력에 연결한다. 추가 수집은 다음 조건을 만족할 때 의미가 있다.
 
 - 기존 공고와 다른 상품·브랜드·제형·포장 표현이 포함될 것
 - `ingredients_raw`, `functionality_raw`, `intake_raw`, `package_spec` 중 실제 값이 충분할 것

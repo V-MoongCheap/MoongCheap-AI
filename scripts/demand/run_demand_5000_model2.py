@@ -96,7 +96,7 @@ def _model_result(sample: pd.DataFrame, taxonomy_path: Path, facets_path: Path, 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate and label 5,000 grounded consumer demands")
     parser.add_argument("--products", type=Path, default=Path("data/interim/facet_discovery/i0030_products_clean_dedup.csv"))
-    parser.add_argument("--mapping", type=Path, default=Path("data/processed/category_v2_1_current3/product_service_category_mapping_v2_1.csv"))
+    parser.add_argument("--mapping", type=Path, default=Path("data/processed/category_v2_1/product_service_category_mapping_v2_1.csv"))
     parser.add_argument("--taxonomy", type=Path, default=Path("data/processed/downstream_v2_1/taxonomy_candidate_v2_1.json"))
     parser.add_argument("--product-facets", type=Path, default=Path("data/processed/model1_v0_refresh4/product_facet_mapping_v0.csv"))
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed/demand_5000_v1"))

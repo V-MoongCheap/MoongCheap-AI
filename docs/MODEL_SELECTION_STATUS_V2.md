@@ -1,6 +1,6 @@
 # Model 1 / Model 2 선택 상태 V2
 
-## 결론 요약
+## 현재 결정
 
 현재 운영 구조와 기본 모델 사용 정책을 확정한다. LLM 후보의 탐색 결과를
 최종 Taxonomy나 Label의 자동 승인 근거로 사용하지 않는다.
@@ -9,24 +9,17 @@
 - Model 2: `Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 명확한 행은 Rule/Alias가 처리하고, `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 Qwen 모델 런타임으로 보조한다. 런타임 배치 위치는 미정이다.
 - LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
-### 현재 로컬 후보의 범위
+## 안전한 fallback 경계
 
-Kimi 계열을 전체 제외하지 않는다. 공식 Moonshot 후보인
-`moonshotai/Moonlight-16B-A3B-Instruct`는 총 16B 파라미터의 MoE 모델이며
-활성 파라미터가 약 3B인 별도 비교 후보로 둔다. 다만 24GB Apple Silicon에서는
-원본 BF16 가중치가 현실적인 기본 경로가 아니므로, 4-bit MLX/GGUF 양자화판을
-별도 런타임에서 평가한다. `Kimi-K2/K2.6/K3` 같은 초대형 계열은 현재 로컬
-MPS 평가 범위에서 제외한다. Kimi-VL은 멀티모달 모델이므로 현재 텍스트 전용
-Facet/Label 비교의 기본 후보로 사용하지 않는다.
+Qwen은 이미 `PARSED` 또는 `NONE`인 Rule 결과를 덮어쓰지 않는다. 명시적 제외나 충돌을 긍정 조건으로 변환하지 않으며, Taxonomy에 없는 Facet/Value를 만들지 않는다. typed constraint를 만들 수 없는 응답도 저장하지 않는다.
 
-Kanana는 기존 Transformers 4 계열 환경에서 평가한다. Transformers 5 계열
-환경으로 옮겨서 판단하지 않는다.
+호출 실패, timeout, 누락 결과, Taxonomy 불일치, 정보가 없는 결과는 `REVIEW`로 남긴다. `A_MODEL2_FALLBACK_ENABLED` 기본값은 `false`이며, Ollama 서비스가 준비된 환경에서만 `true`로 바꾼다.
 
-## 현재까지의 측정
+## 실험 해석
 
-### Model 2 Rule baseline
+동일 200건에서 Rule-only 138/200(69%), Qwen model-only 118/200(59%), Rule-first Hybrid 142/200(71%)이었다. 80건 최신 실행은 model-only만 측정했으므로 Hybrid 성능 측정으로 대체하지 않는다. 이 수치는 프로젝트용 합성·검토 데이터의 상대 비교이며 실제 사용자 정확도 증명이 아니다.
 
-현재 검토 Gold 200건을 Dev 100 / Holdout 50 / Challenge 50으로 평가했다.
+## 검증 전제
 
 | Partition | Row pass |
 | --- | ---: |

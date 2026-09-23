@@ -18,6 +18,11 @@ def main() -> int:
     parser.add_argument("--taxonomy", type=Path, default=Path("config/facet_taxonomy_v2_2.json"))
     parser.add_argument("--rules", type=Path, default=Path("config/demand_constraint_rules.json"))
     parser.add_argument("--alias-registry", type=Path, default=Path("config/model1_aliases_reviewed_v2.json"))
+    parser.add_argument(
+        "--compatibility-alias-registry",
+        type=Path,
+        default=Path("config/demand_constraint_aliases.json"),
+    )
     parser.add_argument("--catalog", type=Path)
     parser.add_argument("--summary", type=Path)
     args = parser.parse_args()
@@ -28,6 +33,7 @@ def main() -> int:
         args.taxonomy,
         args.rules,
         args.alias_registry,
+        compatibility_alias_registry_path=args.compatibility_alias_registry,
         catalog=catalog,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -41,4 +47,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

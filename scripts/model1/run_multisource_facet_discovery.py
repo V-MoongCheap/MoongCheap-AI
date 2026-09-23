@@ -29,7 +29,7 @@ SMOKE_CATEGORY_KEYS = {
     "health-functional-food:probiotics",
     "health-functional-food:skin_collagen",
 }
-CATEGORY_KEYS = SMOKE_CATEGORY_KEYS
+CATEGORY_KEYS: set[str] | None = None
 SOURCE_COLUMNS = [
     "category_key",
     "category_name",
@@ -169,7 +169,8 @@ def load_demands(path: Path) -> pd.DataFrame:
             "evidence_text": requirement,
         }
     )
-    normalized = normalized[normalized["category_key"].isin(CATEGORY_KEYS)]
+    if CATEGORY_KEYS is not None:
+        normalized = normalized[normalized["category_key"].isin(CATEGORY_KEYS)]
     rows = []
     for category_key, group in normalized.groupby("category_key", sort=True):
         rows.append(group.head(8))
@@ -186,7 +187,7 @@ def load_boards(path: Path) -> pd.DataFrame:
     rows = []
     for board in payload.get("demandBoards", []):
         category_key = _text(board.get("categoryId"))
-        if category_key not in CATEGORY_KEYS:
+        if CATEGORY_KEYS is not None and category_key not in CATEGORY_KEYS:
             continue
         evidence = f"participants={board.get('participantCount', '')}; price={board.get('priceMin', '')}-{board.get('priceMax', '')}; status={board.get('status', '')}"
         rows.append(
@@ -263,6 +264,102 @@ def load_translated_queries(path: Path, max_per_category: int = 12) -> pd.DataFr
     )
 
 
+def load_unified_evidence(path: Path, max_per_category: int = 24) -> pd.DataFrame:
+    """Adapt the standalone evidence pipeline into Model 1 source rows.
+
+    Only rows with an explicit service category are admitted.  Generic
+    ``health-functional-food`` evidence cannot safely be assigned to a
+    category and is therefore retained in the standalone review artifacts,
+    not mixed into a category-local model prompt.
+    """
+    if not path.exists():
+        return _empty_sources()
+    if path.suffix.casefold() == ".parquet":
+        frame = pd.read_parquet(path).fillna("")
+    else:
+        frame = pd.read_csv(path, dtype=str).fillna("")
+    if frame.empty:
+        return _empty_sources()
+    category = frame.get("service_category")
+    if category is None:
+        category = frame.get("category", pd.Series("", index=frame.index))
+    category = category.astype(str).str.strip()
+    # Evidence snapshots exist in both canonical taxonomy-key form and the
+    # older uppercase service-category form. Normalize both forms, while
+    # rejecting the generic root that cannot enter a category-local prompt.
+    canonical = category.str.lower().map(
+        lambda value: (
+            value
+            if value.startswith("health-functional-food:")
+            else (
+                f"health-functional-food:{value}"
+                if value not in {
+                    "",
+                    "health-functional-food",
+                    "expression-reference",
+                    "unmapped",
+                    "unknown",
+                    "none",
+                    "nan",
+                }
+                else ""
+            )
+        )
+    )
+    frame = frame[canonical.ne("")].copy()
+    if frame.empty:
+        return _empty_sources()
+    frame["category_key"] = canonical.loc[frame.index]
+    frame["category_name"] = frame["category_key"]
+    frame["source_product_id"] = frame.apply(
+        lambda row: "evidence:" + ":".join(
+            str(row.get(column, "")).strip()
+            for column in ("source", "document_id", "normalized_attribute", "normalized_value")
+        ),
+        axis=1,
+    )
+    frame["product_name"] = frame.get("product_ref", "")
+    frame["source_category"] = frame["source_type"]
+    frame["product_form"] = frame.apply(
+        lambda row: row.get("normalized_value", "")
+        if str(row.get("normalized_attribute", "")) == "product_form"
+        else "",
+        axis=1,
+    )
+    frame["functional_ingredients"] = frame.apply(
+        lambda row: row.get("normalized_value", "")
+        if str(row.get("normalized_attribute", "")) == "functional_ingredients"
+        else "",
+        axis=1,
+    )
+    frame["consumer_search_text"] = frame["evidence_term"]
+    frame["sampling_reason"] = "unified facet evidence"
+    frame["evidence_text"] = frame["text_raw"].where(
+        frame["text_raw"].astype(str).str.strip().ne(""), frame["evidence_term"]
+    )
+    evidence_source_types = "EVIDENCE_" + frame["source_type"].astype(str)
+    frame = frame.sort_values(["category_key", "source_type", "source_product_id"])
+    # Do not let the largest source (usually PRODUCT_FACT) starve reviews,
+    # seller listings, or search evidence. First take a deterministic quota
+    # from each source within a category, then fill any remaining slots.
+    balanced: list[pd.DataFrame] = []
+    for _, category_frame in frame.groupby("category_key", sort=True):
+        source_types = sorted(category_frame["source_type"].astype(str).unique())
+        quota = max(1, max_per_category // max(1, len(source_types)))
+        selected = category_frame.groupby("source_type", sort=True, group_keys=False).head(quota)
+        if len(selected) < max_per_category:
+            remaining = category_frame.loc[~category_frame.index.isin(selected.index)]
+            selected = pd.concat(
+                [selected, remaining.head(max_per_category - len(selected))],
+                ignore_index=False,
+            )
+        balanced.append(selected.head(max_per_category))
+    frame = pd.concat(balanced, ignore_index=False) if balanced else frame.head(0)
+    result = _as_source_rows(frame, "EVIDENCE_UNIFIED")
+    result["source_type"] = evidence_source_types.loc[frame.index].to_numpy()
+    return result
+
+
 def _call_sampled_loader(
     loader: Any, path: Path, max_per_category: int
 ) -> pd.DataFrame:
@@ -280,6 +377,7 @@ def build_multisource_input(
     max_products_per_category: int = 24,
     max_sellers_per_category: int = 24,
     max_queries_per_category: int = 12,
+    max_evidence_per_category: int = 24,
 ) -> pd.DataFrame:
     # Demand data describes request conditions, not product attributes. Keep it
     # in the demand-labeling pipeline instead of allowing it to create facets.
@@ -292,6 +390,11 @@ def build_multisource_input(
         ),
         _call_sampled_loader(
             load_translated_queries, paths["queries"], max_queries_per_category
+        ),
+        _call_sampled_loader(
+            load_unified_evidence,
+            paths.get("evidence", Path("__missing_model1_evidence__")),
+            max_evidence_per_category,
         ),
     ]
     data = pd.concat([frame for frame in frames if not frame.empty], ignore_index=True)
@@ -598,15 +701,22 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--evidence",
+        type=Path,
+        default=Path("data/interim/facet_evidence_v3/facet_evidence_unified.parquet"),
+        help="optional unified evidence output from the Facet evidence pipeline",
+    )
+    parser.add_argument(
         "--output-dir", type=Path, default=Path("data/processed/model1_multisource_v1")
     )
     parser.add_argument(
         "--models",
-        default="qwen3:4b,gemma3:4b,llama3.2:3b,exaone3.5:2.4b-instruct-q4_K_M,phi4-mini",
+        default="kakaocorp/kanana-nano-2.1b-instruct",
+        help="selected Model 1 assist model; use --models for offline comparisons",
     )
     parser.add_argument(
         "--provider",
-        default="ollama",
+        default="transformers",
         choices=[
             "ollama",
             "transformers",
@@ -620,6 +730,11 @@ def main() -> None:
     parser.add_argument("--endpoint", default="")
     parser.add_argument("--api-key-env", default="")
     parser.add_argument("--smoke-only", action="store_true")
+    parser.add_argument(
+        "--prepare-only",
+        action="store_true",
+        help="write the deterministic multisource input and skip model calls",
+    )
     parser.add_argument("--retries", type=int, default=0)
     parser.add_argument("--max-products-per-category", type=int, default=24)
     parser.add_argument("--max-sellers-per-category", type=int, default=24)
@@ -640,6 +755,7 @@ def main() -> None:
             "demands": args.demands,
             "boards": args.boards,
             "queries": args.queries,
+            "evidence": args.evidence,
         },
         max_products_per_category=args.max_products_per_category,
         max_sellers_per_category=args.max_sellers_per_category,
@@ -652,6 +768,22 @@ def main() -> None:
         lines=True,
         force_ascii=False,
     )
+    if args.prepare_only:
+        print(
+            json.dumps(
+                {
+                    "status": "INPUT_PREPARED",
+                    "rows": len(data),
+                    "categories": int(data["category_key"].nunique()) if not data.empty else 0,
+                    "source_types": data["source_type"].value_counts().to_dict()
+                    if not data.empty
+                    else {},
+                    "output": str(args.output_dir / "multisource_model_input_v1.jsonl"),
+                },
+                ensure_ascii=False,
+            )
+        )
+        return
     categories = (
         SMOKE_CATEGORY_KEYS.intersection(set(data["category_key"].unique()))
         if args.smoke_only

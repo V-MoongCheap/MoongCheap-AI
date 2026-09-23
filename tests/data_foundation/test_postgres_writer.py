@@ -61,6 +61,8 @@ def test_writer_updates_only_completed_rows_and_commits() -> None:
     query, params = connection.executed[0]
     assert query == UPDATE_LABEL_SQL
     assert params == {"demand_id": "1", "label": "1-2", "processed_at": "2026-09-14T00:00:00+00:00"}
+    assert "status = 'UNASSIGNED'" in query
+    assert "processed_at IS NULL" in query
 
 
 def test_writer_rolls_back_when_a_write_fails() -> None:

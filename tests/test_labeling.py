@@ -156,6 +156,22 @@ def test_llm_result_is_limited_to_taxonomy_codes() -> None:
     assert warnings
 
 
+def test_llm_result_cannot_reintroduce_deprecated_taxonomy_value() -> None:
+    loader = TaxonomyLoader({"categories": [{"category_id": "C1", "facets": [
+        {"name": "form", "order": 1, "values": [
+            {"code": 0, "value": "ALL"},
+            {"code": 1, "value": "정제"},
+            {"code": 2, "value": "옛정제", "status": "DEPRECATED", "canonical_code": 1},
+        ]},
+    ]}]})
+    row = pd.Series({"category_id": "C1"})
+
+    values, warnings = _apply_model_result(row, {"form": 2}, loader)
+
+    assert values["form"]["code"] == 0
+    assert warnings
+
+
 def test_llm_numeric_facet_key_is_resolved_by_position() -> None:
     loader = TaxonomyLoader({"categories": [{"category_id": "C1", "facets": [
         {"name": "form", "order": 1, "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "정제"}]},

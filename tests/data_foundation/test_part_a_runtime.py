@@ -3,6 +3,7 @@ import json
 import pandas as pd
 
 from moongcheap_ai.data_foundation.part_a_runtime import run_part_a_batch
+from moongcheap_ai.data_foundation.runtime_job import run_batch
 from moongcheap_ai.demand_constraints.service import DemandConstraintParser
 
 
@@ -29,12 +30,13 @@ def test_part_a_returns_backend_contract_without_clustering(tmp_path):
     taxonomy, rules, aliases = _fixtures(tmp_path)
     demands = pd.DataFrame([
         {"demand_id": "1", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "\uac00\ub2a5\ud558\uba74 \ucea1\uc290\uc778 \uc81c\ud488\uc73c\ub85c \ubd80\ud0c1\ud574\uc694.", "is_substitutable": "true"},
-        {"demand_id": "2", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "", "is_substitutable": "false"},
+        {"demand_id": "2", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "분말", "is_substitutable": "false"},
         {"demand_id": "3", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "\ub538\uae30\ub9db \uc81c\ud488\uc774\uba74 \uc88b\uaca0\uc5b4\uc694.", "is_substitutable": "true"},
         {"demand_id": "4", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "\ubd84\ub9d0 \ub610\ub294 \ucea1\uc290\ub3c4 \uad1c\ucc2e\uc544\uc694.", "is_substitutable": "true"},
     ])
     result, summary = run_part_a_batch(demands, taxonomy, rules, aliases)
-    assert list(result["status"]) == ["PARSED", "NOT_APPLICABLE", "PASSTHROUGH", "PARSED"]
+    assert list(result["status"]) == ["PARSED", "PARSED", "PASSTHROUGH", "PARSED"]
+    assert json.loads(result.loc[1, "constraints"])[0]["valueCode"] == 2
     constraints = json.loads(result.loc[0, "constraints"])
     assert constraints[0]["facetKey"] == "product_form"
     assert constraints[0]["valueCode"] == 1
@@ -171,3 +173,91 @@ def test_v22_category_local_alias_maps_powder_to_korean_value():
     assert result.constraints[0].facet_name == "product_form"
     assert result.constraints[0].value == "분말"
     assert result.constraints[0].value_code == 1
+
+
+def test_part_a_runtime_uses_compatibility_aliases_for_explicit_requirement() -> None:
+    root = __import__("pathlib").Path(".")
+    demands = pd.DataFrame([{
+        "demand_id": "omega", "catalog_id": "catalog-1",
+        "category_id": "health-functional-food:omega_fatty_acid",
+        "extra_requirement": "오메가3 함유 제품을 원해요.",
+        "is_substitutable": "true",
+    }])
+
+    result, _ = run_part_a_batch(
+        demands,
+        root / "config/facet_taxonomy_v2_2.json",
+        root / "config/demand_constraint_rules.json",
+        root / "config/model1_aliases_reviewed_v2.json",
+        compatibility_alias_registry_path=root / "config/demand_constraint_aliases.json",
+    )
+
+    assert result.loc[0, "status"] == "PARSED"
+    assert result.loc[0, "label"] == "0-2-0"
+    constraint = json.loads(result.loc[0, "constraints"])[0]
+    assert constraint["constraintType"] == "MUST"
+
+
+def test_runtime_job_uses_qwen_only_for_unresolved_rows(tmp_path, monkeypatch):
+    taxonomy, rules, aliases = _fixtures(tmp_path)
+    calls = []
+
+    class FakeQwen:
+        call_count = 0
+
+        def __init__(self, model, *, endpoint, timeout):
+            assert model == "qwen-test"
+            assert endpoint == "http://ollama.test"
+            assert timeout == 7
+
+        def classify(self, rows, loader):
+            calls.append(rows)
+            self.call_count += 1
+            return {rows[0]["demand_id"]: {"product_form": {"code": 1}}}
+
+    monkeypatch.setattr("moongcheap_ai.data_foundation.runtime_job.OllamaDemandLabeler", FakeQwen)
+    demands = pd.DataFrame([
+        {"demand_id": "parsed", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "캡슐", "is_substitutable": "true"},
+        {"demand_id": "fallback", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "딸기맛", "is_substitutable": "true"},
+    ])
+
+    result, _ = run_batch(
+        demands, taxonomy, alias_registry_path=aliases, rules_path=rules,
+        model2_fallback_enabled=True, model2_fallback_model="qwen-test",
+        model2_fallback_endpoint="http://ollama.test", model2_fallback_timeout=7,
+    )
+
+    assert len(calls) == 1
+    assert calls[0][0]["demand_id"] == "fallback"
+    assert result.set_index("demand_id").loc["parsed", "interpretation_method"] != "RULE_FIRST_QWEN_FALLBACK"
+    assert result.set_index("demand_id").loc["fallback", "status"] == "PARSED"
+    assert result.set_index("demand_id").loc["fallback", "label"] == "1"
+    assert result.set_index("demand_id").loc["fallback", "fallback_status"] == "ACCEPTED"
+
+
+def test_runtime_job_keeps_unavailable_qwen_rows_in_review(tmp_path, monkeypatch):
+    taxonomy, rules, aliases = _fixtures(tmp_path)
+
+    class UnavailableQwen:
+        call_count = 0
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def classify(self, rows, loader):
+            from moongcheap_ai.data_foundation.demand_label_comparison import LLMLabelingError
+            raise LLMLabelingError("ollama unavailable")
+
+    monkeypatch.setattr("moongcheap_ai.data_foundation.runtime_job.OllamaDemandLabeler", UnavailableQwen)
+    demands = pd.DataFrame([{
+        "demand_id": "fallback", "catalog_id": "p1", "category_id": "c1",
+        "extra_requirement": "딸기맛", "is_substitutable": "true",
+    }])
+    result, payload = run_batch(
+        demands, taxonomy, alias_registry_path=aliases, rules_path=rules,
+        model2_fallback_enabled=True,
+    )
+    assert result.loc[0, "status"] == "REVIEW"
+    assert result.loc[0, "label_status"] == "REVIEW"
+    assert result.loc[0, "fallback_status"] == "UNAVAILABLE"
+    assert payload["results"] == []

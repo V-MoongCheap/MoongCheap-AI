@@ -5,12 +5,19 @@ kind: Kustomization
 resources:
   - ../../base/demand-clustering-job
 
-# Matches Cloud develop's ApplicationSet; infrastructure provisions Secrets/PVCs.
+# Matches Cloud develop's ApplicationSet; infrastructure provisions Secrets.
 namespace: moongcheap-develop
+
+# Backend Service in the same namespace: port 80 -> Pod port 8080.
+configMapGenerator:
+  - name: demand-clustering-config
+    behavior: merge
+    literals:
+      - BACKEND_BASE_URL=http://backend
 
 labels:
   - pairs:
       app.kubernetes.io/instance: demand-clustering-develop
     includeSelectors: false
 
-# Keep placeholders and suspend=true until the deployment dependencies are ready.
+# Keep the image placeholder and suspend=true until backend integration is ready.

@@ -100,12 +100,13 @@ Part B가 별도 ID를 만들지 않는다. 현재 Part A 산출물로 profile�
 로컬과 컨테이너의 운영 진입점은 `demand-clustering-batch`이다. 실행 시 최초
 PostgreSQL 조회, API 1 호출, PostgreSQL 재조회, 대체상품 계획, API 2 호출 순서를
 한 번 수행하고 요약 JSON을 표준 출력에 남긴 뒤 종료한다. DB 연결에는
-`default_transaction_read_only=on`과 autocommit을 함께 적용한다. DB role 자체의
-SELECT 전용 권한도 별도로 유지해야 한다.
+`default_transaction_read_only=on`과 autocommit을 함께 적용한다. 기본 K8s 설정은
+Backend DB 계정을 공유하며, 이 세션 설정이 DB role의 권한을 변경하지는 않는다.
 
 필수 운영 설정은 다음과 같다.
 
-- 비밀 설정: `SHARED_DATABASE_URL`, `BACKEND_INTERNAL_KEY`
+- 비밀 설정: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `BACKEND_INTERNAL_KEY`
+- 기존 직접 DSN 입력: `SHARED_DATABASE_URL` (비어 있지 않으면 DB 세 변수보다 우선)
 - 일반 설정: `BACKEND_BASE_URL`, `MFDS_CATALOG_PROFILES_PATH`,
   `DEMAND_TAXONOMY_PATH`, `DEMAND_CONSTRAINT_RULES_PATH`,
   `DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH` (B 기본 별칭), `E5_MODEL_PATH`
@@ -114,8 +115,13 @@ SELECT 전용 권한도 별도로 유지해야 한다.
   `E5_BATCH_SIZE`, `BACKEND_HTTP_TIMEOUT_SECONDS`,
   `POSTGRES_CONNECT_TIMEOUT_SECONDS`
 
-`SHARED_DATABASE_URL`은 Python PostgreSQL driver가 읽을 수 있는 DSN이어야 하며
-Spring의 `jdbc:postgresql://...` 형식을 사용하지 않는다. `BACKEND_BASE_URL`에는
+기본 K8s 설정은 `backend-env`의 DB 세 항목을 같은 이름으로 받고,
+`MOONGCHEAP_INTERNAL_API_KEY`를 `BACKEND_INTERNAL_KEY`로 매핑한다. 내부 키 항목은
+Cloud에서 추가 공급해야 하며, 참조를 바꾸는 것만으로 생성되지 않는다.
+`DB_URL`의 `jdbc:` 접두사를 제거하고 URL 인코딩한 계정·비밀번호를 넣어 PostgreSQL
+DSN을 만든다. IPv6 주소와 libpq 호환 query를 보존하며, JDBC 전용 query는 지원하지 않는다.
+기존 `SHARED_DATABASE_URL` 직접 입력은 PostgreSQL DSN이어야 하며 JDBC 형식을
+사용하지 않는다. `BACKEND_BASE_URL`에는
 경로가 아닌 Backend 서비스의 HTTP(S) base URL을 넣는다. artifact와 모델 경로가
 존재하지 않거나 PostgreSQL 입력의 catalog ID가 profile에 없으면 Backend mutation
 전에 실패한다.

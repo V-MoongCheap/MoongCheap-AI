@@ -18,6 +18,7 @@
 - 키는 환경변수 `BACKEND_INTERNAL_API_KEY` 로만 받는다 (명령줄에 남기지 않는다)
 - 필수 판정 필드가 빠진 board 는 판정하지 않고 보고서 `skipped` 에 계약 오류로 남는다 (명세 10-1.4절)
 - 종료 코드: 0 정상 · 1 실행 실패 · 2 키 없음 · 3 조회는 됐는데 한 건도 판정하지 못함
+  · 4 전송은 됐는데 Backend 가 반영하지 않은 board 가 있음 (stale — 묶음 롤백일 수 있다)
 - 배송비 단위 · 가격 상한 기준은 PM 결정 전이다. 명령줄 값은 시험용이며 보고서 `policy` 에 남는다
 """
 
@@ -27,13 +28,14 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from moongcheap_ai.seller_matching.awarding_batch import (
+    KST,
     fetch_pending,
     post_result,
     run_once,
@@ -44,7 +46,6 @@ from moongcheap_ai.seller_matching.offer_ranking import (
     RankingPolicy,
 )
 
-KST = timezone(timedelta(hours=9))
 KEY_ENV = "BACKEND_INTERNAL_API_KEY"
 
 
@@ -83,6 +84,9 @@ def _print_summary(report: dict) -> None:
     print(f"전송 요청 {len(report['requests'])}건 · 전송 {'함' if report['sent'] else '안 함 (dry run)'}")
     for response in report["responses"]:
         print(f"  응답: {response}")
+    reflection = report.get("reflection")
+    if reflection is not None:
+        print(f"  반영 {reflection['appliedCount']}건 · 미반영(stale) {reflection['staleRejectedCount']}건 / 보낸 board {reflection['submittedBoards']}건")
 
 
 def _write_report(path: Path | None, report: dict) -> None:
@@ -135,6 +139,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"판정한 board 가 없다 — 조회 {counts['fetched']}건이 모두 건너뛰어졌다", file=sys.stderr)
         _write_report(args.report, report)
         return 3
+    reflection = report.get("reflection")
+    if reflection is not None and reflection["staleRejectedCount"]:
+        # stale 은 이미 처리된 board 일 수도, 10개 묶음이 통째로 롤백된 것일 수도 있다. 응답으로는 구분되지 않는다.
+        # ⛔ 다시 보내지 않는다. Backend 조회·이력으로 확인한다.
+        print(
+            f"반영되지 않은 board 가 {reflection['staleRejectedCount']}건이다 "
+            f"(보낸 {reflection['submittedBoards']}건 중 반영 {reflection['appliedCount']}건) — Backend 이력을 확인한다",
+            file=sys.stderr,
+        )
+        _write_report(args.report, report)
+        return 4
     _write_report(args.report, report)
     return 0
 

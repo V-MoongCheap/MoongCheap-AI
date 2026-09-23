@@ -29,15 +29,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# src/moongcheap_ai/seller_analysis/evaluation/runner.py → 저장소 루트
-REPO_ROOT = Path(__file__).resolve().parents[4]
-
 from ..bid_guide import (
     METRICS_VERSION,
     ContractViolation,
     VersionMismatch,
     handle_bid_guide,
 )
+
+# src/moongcheap_ai/seller_analysis/evaluation/runner.py → 저장소 루트
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 DATASET_DIR = REPO_ROOT / "data" / "evaluation" / "seller_analysis"
 EVAL_CSV = DATASET_DIR / "seller_analysis_eval_v1.csv"
