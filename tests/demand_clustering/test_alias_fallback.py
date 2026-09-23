@@ -60,6 +60,37 @@ def test_b_only_expressions_remain_available_even_when_a_is_loaded(parsers, vari
     assert interpreted(parsers[variant], text) == ("PARSED", {expected})
 
 
+@pytest.mark.parametrize("variant", ["with_a", "b_only"])
+@pytest.mark.parametrize(("category", "text", "expected"), [
+    (
+        "health-functional-food:probiotics",
+        "프로바이오틱스 제품",
+        ("functional_ingredients", 1, "PREFER"),
+    ),
+    (
+        "health-functional-food:red_ginseng",
+        "홍삼제품",
+        ("functional_ingredients", 1, "PREFER"),
+    ),
+    (
+        "health-functional-food:vitamin_mineral",
+        "비타민D",
+        ("functional_ingredients", 2, "PREFER"),
+    ),
+])
+def test_deprecated_taxonomy_surfaces_resolve_to_canonical_values(
+    parsers,
+    variant,
+    category,
+    text,
+    expected,
+):
+    assert interpreted(parsers[variant], text, category) == (
+        "PARSED",
+        {expected},
+    )
+
+
 @pytest.mark.parametrize("text,expected", [
     ("가루면 좋겠어요.", {("product_form", 1, "PREFER")}),
     ("알약 제품이면 좋겠어요.", {("product_form", 2, "PREFER")}),

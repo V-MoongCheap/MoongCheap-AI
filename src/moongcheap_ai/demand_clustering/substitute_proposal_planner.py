@@ -12,6 +12,7 @@ from typing import Any, Mapping
 import pandas as pd
 
 from ..demand_constraints import DemandConstraintParser, DemandRequirementResult
+from ..taxonomy_contract import canonical_taxonomy_values
 from .claim_containment_index import IdentityClaimContainmentIndex
 from .profile_contract import SUBSTITUTION_EVIDENCE_READY_STATUSES
 from .postgres_reader import ClusteringInputBatch
@@ -87,12 +88,14 @@ def _taxonomy_value_indexes(
         indexes[category_id] = {}
         for facet in category.get("facets", ()):
             values: dict[str, int] = {}
-            for value in facet.get("values", ()):
-                code = int(value["code"])
-                if code == 0:
-                    continue
-                normalized = _normalized_text(value["value"])
-                values[normalized] = min(code, values.get(normalized, code))
+            for value in canonical_taxonomy_values(facet.get("values", ())):
+                for surface in (value.value, *value.aliases):
+                    normalized = _normalized_text(surface)
+                    if normalized:
+                        values[normalized] = min(
+                            value.code,
+                            values.get(normalized, value.code),
+                        )
             indexes[category_id][str(facet["name"])] = values
     return indexes
 

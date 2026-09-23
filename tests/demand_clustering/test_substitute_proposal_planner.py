@@ -14,9 +14,11 @@ from moongcheap_ai.demand_clustering.input_models import (
     DemandBoardInput,
     DemandInput,
 )
+from moongcheap_ai.demand_clustering.part_a_integration import build_part_b_parser
 from moongcheap_ai.demand_clustering.postgres_reader import ClusteringInputBatch
 from moongcheap_ai.demand_clustering.substitute_proposal_planner import (
     ClaimIndexedSubstituteProposalPlanner,
+    build_runtime_catalog_profiles,
 )
 from moongcheap_ai.demand_constraints import DemandConstraintParser
 
@@ -144,6 +146,95 @@ def test_claim_gate_runs_before_structured_preference_ranking() -> None:
     assert {item.demand_board_id for item in result.decisions[0].rejected_boards} == {
         33
     }
+
+
+def test_runtime_profiles_map_deprecated_ingredient_surfaces_to_canonical_codes() -> None:
+    taxonomy = json.loads(
+        (ROOT / "config/facet_taxonomy_v2_2.json").read_text(encoding="utf-8")
+    )
+    cases = (
+        (101, "health-functional-food:probiotics", "프로바이오틱스 제품", 1),
+        (102, "health-functional-food:red_ginseng", "홍삼제품", 1),
+        (103, "health-functional-food:vitamin_mineral", "비타민D", 2),
+    )
+    profiles = pd.DataFrame([
+        {
+            "catalog_id": str(catalog_id),
+            "product_name": ingredient,
+            "service_category_id": category_id,
+            "taxonomy_version": "v2.2",
+            "product_form": "",
+            "functional_ingredients_json": json.dumps([ingredient]),
+            "main_functionality_claim_ids_json": "[]",
+            "main_functionality_claim_texts_json": "[]",
+            "intake_method_text": "",
+            "profile_status": "EVIDENCE_READY",
+        }
+        for catalog_id, category_id, ingredient, _ in cases
+    ])
+
+    result = build_runtime_catalog_profiles(profiles, taxonomy)
+
+    for catalog_id, _, _, expected_code in cases:
+        assert result[catalog_id].facet_values["functional_ingredients"] == (
+            expected_code
+        )
+
+
+def test_deprecated_requirement_prefers_a_canonically_equivalent_profile() -> None:
+    taxonomy = json.loads(
+        (ROOT / "config/facet_taxonomy_v2_2.json").read_text(encoding="utf-8")
+    )
+    parser, _ = build_part_b_parser(
+        taxonomy,
+        rules_path=ROOT / "config/demand_constraint_rules.json",
+        aliases_path=ROOT / "config/model1_aliases_reviewed_v2.json",
+        compatibility_aliases_path=ROOT / "config/demand_constraint_aliases.json",
+    )
+
+    def red_ginseng_profile(
+        catalog_id: int,
+        ingredient: str,
+        claims: list[str],
+    ) -> dict[str, object]:
+        return {
+            "catalog_id": str(catalog_id),
+            "product_name": ingredient,
+            "service_category_id": "health-functional-food:red_ginseng",
+            "taxonomy_version": "v2.2",
+            "product_form": "액상",
+            "functional_ingredients_json": json.dumps([ingredient]),
+            "main_functionality_claim_ids_json": json.dumps(claims),
+            "main_functionality_claim_texts_json": json.dumps(claims),
+            "intake_method_text": "1일 1회 섭취",
+            "profile_status": "EVIDENCE_READY",
+        }
+
+    profiles = pd.DataFrame([
+        red_ginseng_profile(101, "홍삼", ["immune"]),
+        red_ginseng_profile(201, "홍삼제품", ["immune", "fatigue"]),
+        red_ginseng_profile(202, "인삼", ["immune", "fatigue"]),
+    ])
+    result = ClaimIndexedSubstituteProposalPlanner(
+        profiles,
+        taxonomy,
+        parser,
+        text_similarity_scorer=lambda _query, _passage: 0.0,
+    ).plan(
+        ClusteringInputBatch(
+            demands=(demand(1, 101, "홍삼제품"),),
+            boards=(
+                board(31, 201),
+                board(32, 202, participant_count=100),
+            ),
+        ),
+        as_of=NOW,
+    )
+
+    assert result.proposals[0]["demandBoardId"] == 31
+    assert result.proposals[0]["effectiveRequirementMode"] == "STRUCTURED"
+    assert result.decisions[0].selected_board is not None
+    assert result.decisions[0].selected_board.structured_preference_score == 1.0
 
 
 def test_passthrough_uses_injected_semantic_scorer_after_claim_gate() -> None:

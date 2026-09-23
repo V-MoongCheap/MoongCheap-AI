@@ -7,6 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Mapping
 
+from ..taxonomy_contract import canonical_taxonomy_values
 from .classifier import normalize
 from .facet_matcher import FacetMatchResult, FacetOccurrence, KiwiFacetMatcher, MatchedFacet
 
@@ -92,27 +93,12 @@ class TaxonomyFacetMatcher(KiwiFacetMatcher):
             if not facet_name:
                 continue
             values = facet.get("values", [])
-            if not isinstance(values, list):
-                continue
-            for value in values:
-                if not isinstance(value, Mapping):
-                    continue
-                try:
-                    value_code = int(value["code"])
-                except (KeyError, TypeError, ValueError):
-                    continue
-                canonical_value = str(value.get("value", "")).strip()
-                if value_code == 0 or not canonical_value:
-                    continue
-                candidate = MatchedFacet(facet_name, value_code, canonical_value)
+            for value in canonical_taxonomy_values(values):
+                candidate = MatchedFacet(facet_name, value.code, value.value)
                 self.values[category_id][facet_name].append(candidate)
-                raw_aliases = value.get("aliases", [])
-                if isinstance(raw_aliases, str):
-                    raw_aliases = [item.strip() for item in raw_aliases.split("|")]
-                if isinstance(raw_aliases, list):
-                    self.aliases[(category_id, facet_name, value_code)].extend(
-                        str(item).strip() for item in raw_aliases if str(item).strip()
-                    )
+                self.aliases[(category_id, facet_name, value.code)].extend(
+                    value.aliases
+                )
 
     def _category_key(self, category_id: str) -> str:
         key = str(category_id or "").strip()
