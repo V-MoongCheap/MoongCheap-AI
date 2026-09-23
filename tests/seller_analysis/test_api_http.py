@@ -397,3 +397,52 @@ class TransportLayerBoundaryTest(unittest.TestCase):
         self.assertIn("from fastapi import", api_source)
         # 모듈을 불러오는 것만으로 FastAPI 를 요구하지 않는다. create_app 안에서만 import 한다.
         self.assertNotIn("\nfrom fastapi", "\n" + api_source.split("def create_app")[0])
+
+
+@unittest.skipUnless(FASTAPI_AVAILABLE, "fastapi 가 없어 건너뛴다 — requirements-api.txt 참고")
+class MetricsEndpointTest(unittest.TestCase):
+    """KEDA/Prometheus 가 긁어갈 요청 수 노출.
+
+    인프라 요청(2026-09-22) — 상시 서비스 Pod 가 RPS 를 낼 수 있어야 KEDA 로 늘릴 수 있다.
+    """
+
+    def client(self):
+        return TestClient(create_app(TEST_KEY))
+
+    def test_metrics_is_scrapable_without_the_internal_key(self):
+        """Prometheus 는 내부 키를 모른다. 키 없이 긁혀야 한다."""
+        response = self.client().get("/metrics")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/plain", response.headers["content-type"])
+        self.assertIn("# TYPE http_requests_total counter", response.text)
+
+    def test_requests_are_counted_per_route(self):
+        client = self.client()
+        client.get("/health")
+        client.get("/health")
+
+        body = client.get("/metrics").text
+
+        self.assertIn('http_requests_total{method="GET",path="/health",status="200"} 2', body)
+
+    def test_unknown_paths_are_bucketed_so_labels_do_not_grow(self):
+        """없는 경로마다 라벨이 생기면 Prometheus 카디널리티가 터진다."""
+        client = self.client()
+        client.get("/no-such-one")
+        client.get("/no-such-two")
+
+        body = client.get("/metrics").text
+
+        self.assertEqual(body.count('path="<other>"'), 1)
+        self.assertNotIn("no-such", body)
+
+    def test_metrics_carries_no_secret_or_payload(self):
+        client = self.client()
+        client.post(BID_GUIDE_PATH, json=valid_payload(), headers={INTERNAL_KEY_HEADER: TEST_KEY})
+
+        body = client.get("/metrics").text
+
+        self.assertNotIn(TEST_KEY, body)
+        self.assertNotIn("http-001", body)
+        self.assertIn(f'path="{BID_GUIDE_PATH}"', body)
