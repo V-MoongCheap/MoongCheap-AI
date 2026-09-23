@@ -79,7 +79,7 @@ B 전용 overlay는 Cloud와 같은 `moongcheap-develop`을 사용한다. 기존
 | `DB_URL` | `backend-env` | `DB_URL` | Backend JDBC URL; 앱에서 `jdbc:` 제거 |
 | `DB_USERNAME` | `backend-env` | `DB_USERNAME` | Backend와 같은 DB 계정 |
 | `DB_PASSWORD` | `backend-env` | `DB_PASSWORD` | 해당 DB 계정 비밀번호 |
-| `BACKEND_INTERNAL_KEY` | `backend-env` | `MOONGCHEAP_INTERNAL_API_KEY` | Backend와 공유하는 `X-Internal-Key` 값; Cloud 공급 추가 필요 |
+| `BACKEND_INTERNAL_KEY` | `backend-env` | `MOONGCHEAP_INTERNAL_API_KEY` | Backend와 공유하는 `X-Internal-Api-Key` 값; Cloud 템플릿 매핑 완료, 실제 동기화 확인 필요 |
 
 앱은 DB 세 값을 읽어 PostgreSQL DSN을 조합한다. 계정·비밀번호는 공백을 보존하고
 URL 인코딩하며, IPv6 주소와 libpq 호환 query(`sslmode` 등)는 유지한다. `DB_URL`에
@@ -98,17 +98,17 @@ AI DB 계정에는 `demand`, `demand_board`, `reject_history`의 SELECT 권한�
 제외한다. 테이블 누락이나 권한 오류로 이력을 조회하지 못하면 배치가 실패한다.
 
 Backend와 합의한 내부 키의 원본은 **AWS Parameter Store `SecureString`**이며,
-HTTP 헤더 이름은 **`X-Internal-Key`**다. Cloud의 일반 Secrets Manager 정책이나
+HTTP 헤더 이름은 Backend `InternalApiKeyFilter`와 같은 **`X-Internal-Api-Key`**다. Cloud의 일반 Secrets Manager 정책이나
 RDS 계정 저장 방식을 이 내부 키의 별도 합의에 그대로 적용하지 않는다.
 
 앱의 입력 계약은 `BACKEND_INTERNAL_KEY` 환경 변수다. 배포 환경이 Parameter Store를
 조회해 `backend-env`의 `MOONGCHEAP_INTERNAL_API_KEY` 항목을 공급해야 한다.
-2026-09-21 확인한 Cloud `develop` (`57cd52e`)의 ExternalSecret 템플릿에는
-DB 세 항목은 있지만 내부 인증 키 항목은 없다. 따라서 이 참조 변경만으로 배포 준비가
-끝나지는 않는다. Parameter 경로·조회 권한·동기화 구성과 해당 key의 공급을 Cloud에서
-완료하기 전까지 `suspend: true`를 유지한다. 앱은 SSM을 직접 호출하지 않으며,
+2026-09-23 확인한 Cloud `develop` (`8fd7e20`)의 ExternalSecret 템플릿에는
+DB 세 항목과 내부 인증 키 항목이 모두 매핑돼 있다. 다만 실제 AWS 원본 값, 조회 권한과
+클러스터의 ExternalSecret 동기화 성공 여부는 별도 확인이 필요하다. 실제 DB·Backend
+연동 검증을 완료하기 전까지 `suspend: true`를 유지한다. 앱은 SSM을 직접 호출하지 않으며,
 `secretKeyRef` 자체가 SSM을 조회하지도 않는다.
-([Cloud ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
+([Cloud ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/8fd7e20/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
 
 Secret 공급 주체의 AWS 권한과 ECR 이미지 pull 권한은 별도의 인프라 설정이다.
 실제 비밀 값과 `.env`는 Git·이미지·로그에 넣지 않는다. 키 교체 시 Backend와 AI의
@@ -226,8 +226,7 @@ B에 연결할 때는 저장소 루트를 build context로 유지하고 이 값�
 [빌드 에이전트](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/platform/jenkins/values.yaml))
 
 Backend `develop` (`89a4935`)에는 합의한 두 internal API와 `reject_history` migration이
-있다. 단, 인증 필터는 아직 `X-Internal-Api-Key`를 읽는다. AI의 합의된 `X-Internal-Key`를
-바꾸지 않고 Backend에서 정합성을 맞춘 뒤 연동한다. AI의 `BACKEND_INTERNAL_KEY`와
+있다. AI도 Backend 인증 필터와 같은 `X-Internal-Api-Key`를 보내도록 맞췄다. AI의 `BACKEND_INTERNAL_KEY`와
 Backend의 `MOONGCHEAP_INTERNAL_API_KEY`에는 같은 키 값을 각각 주입해야 한다.
 ([Backend 인증 필터](https://github.com/V-MoongCheap/MoongCheap-Backend/blob/89a4935/src/main/java/com/moongcheap_backend/auth/infrastructure/InternalApiKeyFilter.java))
 

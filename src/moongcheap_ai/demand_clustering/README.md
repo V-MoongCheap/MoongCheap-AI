@@ -66,7 +66,7 @@ import하지 않는다. 공통 profile 상태와 relation fingerprint 계약은 
 구현되어 있으며, 이미지 배포와 시간별 스케줄 등록은 인프라 측 작업이다.
 빌드·실행 방법은 [컨테이너 안내](../../../docs/DEMAND_CLUSTERING_CONTAINER.md)를 참고한다.
 
-Backend 호출 인증은 `X-Internal-Key: {internal-key}`를 사용한다. 공유 키는
+Backend 호출 인증은 `X-Internal-Api-Key: {internal-key}`를 사용한다. 공유 키는
 AWS Parameter Store의 `SecureString`으로 관리하고 배포 환경에서
 `BACKEND_INTERNAL_KEY` 환경 변수로 주입한다. 애플리케이션이 요청마다 AWS에
 조회하지 않으며 AWS 자격 증명을 직접 요구하지 않는다. 키 조회 권한, 주입과
