@@ -232,7 +232,7 @@ def test_fetch_sends_internal_api_key_and_size():
     fetch_pending("http://backend/", "secret", size=50, timeout_seconds=5, http_get=http_get)
 
     url, kwargs = calls[0]
-    assert url == "http://backend/api/awarding/pending"
+    assert url == "http://backend/api/awarding/internal/pending"
     assert kwargs["params"] == {"size": 50}
     assert kwargs["headers"][HEADER_NAME] == "secret"
     assert HEADER_NAME == "X-Internal-Api-Key"

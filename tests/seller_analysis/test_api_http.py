@@ -400,6 +400,20 @@ class TransportLayerBoundaryTest(unittest.TestCase):
 
 
 @unittest.skipUnless(FASTAPI_AVAILABLE, "fastapi 가 없어 건너뛴다 — requirements-api.txt 참고")
+class InternalKeyHeaderNameTest(unittest.TestCase):
+    """Backend 와 헤더 이름이 갈리면 연동이 401/403 으로 막힌다. 이름 자체를 고정한다."""
+
+    def test_reads_the_header_backend_sends(self):
+        client = TestClient(create_app(TEST_KEY))
+
+        ok = client.post(BID_GUIDE_PATH, json=valid_payload(), headers={"X-Internal-Api-Key": TEST_KEY})
+        old = client.post(BID_GUIDE_PATH, json=valid_payload(), headers={"X-Internal-Key": TEST_KEY})
+
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(old.status_code, 403)
+
+
+@unittest.skipUnless(FASTAPI_AVAILABLE, "fastapi 가 없어 건너뛴다 — requirements-api.txt 참고")
 class MetricsEndpointTest(unittest.TestCase):
     """KEDA/Prometheus 가 긁어갈 요청 수 노출.
 

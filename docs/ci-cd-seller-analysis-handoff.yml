@@ -62,7 +62,7 @@ environment_variables:
 
 secret_variables:
   - name: SELLER_ANALYSIS_INTERNAL_KEY
-    purpose: "Backend → AI 내부 호출 인증 키. 요청 헤더 X-Internal-Key 와 비교"
+    purpose: "Backend → AI 내부 호출 인증 키. 요청 헤더 X-Internal-Api-Key 와 비교"
     source:
       provider: aws-ssm-parameter-store
       type: SecureString
@@ -71,7 +71,7 @@ secret_variables:
     secret_key: internal-key  # B 인계서 선례와 같게 제안
     open_questions:
       - "B 배치(AI → Backend)의 ai-backend-internal-key 와 같은 키를 쓸지, 방향별로 나눌지 미정"
-      - "Backend → AI 호출 클라이언트를 Backend 저장소에서 찾지 못해, Backend 가 보낼 헤더 이름은 미확인이다. 이 API 는 합의대로 X-Internal-Key 만 읽는다 (다른 이름으로 오면 403 확인, 2026-09-17). Backend develop 의 InternalApiKeyFilter(X-Internal-Api-Key)는 Backend 가 받는 요청용이라 이 API 호출과 방향이 다르다"
+      - "헤더 이름은 2026-09-22 Backend 요청으로 양방향 X-Internal-Api-Key 로 통일했다. 이름만 같고 값은 방향마다 다른 별개의 비밀이다"
 
 resources:
   requests:
