@@ -6,7 +6,7 @@
 최종 Taxonomy나 Label의 자동 승인 근거로 사용하지 않는다.
 
 - Model 1: `kakaocorp/kanana-nano-2.1b-instruct`를 오프라인 후보 생성기로 사용한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다.
-- Model 2: `Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 명확한 행은 Rule/Alias가 처리하고, `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 별도 LLM Worker의 Qwen 모델로 보조한다.
+- Model 2: `Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 명확한 행은 Rule/Alias가 처리하고, `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 Qwen 모델 런타임으로 보조한다. 런타임 배치 위치는 미정이다.
 - LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
 ### 현재 로컬 후보의 범위
@@ -92,8 +92,8 @@ Rule-first Hybrid가 Rule-only보다 유의미하게 개선되지 않으면 Mode
 ### 서버 배포 제약을 반영한 추가 모델 평가
 
 현재 A labeling CronJob은 CPU 1 / Memory 2Gi request, CPU 2 / Memory 3Gi limit이며,
-Docker 이미지에 Ollama와 모델 가중치를 포함하지 않는다. 모델은 별도 Worker Pod에서
-제공한다. 따라서 로컬 GPU에서
+현재 Docker 이미지에는 Ollama와 모델 가중치를 포함하지 않는다. 모델을 A Pod 내부,
+sidecar 또는 별도 Worker Pod 중 어디에 배치할지는 아직 확정되지 않았다. 따라서 로컬 GPU에서
 정상 실행되는 것만으로는 서버 후보로 승격하지 않는다.
 
 | 후보 | 양자화/크기 | 동일 Gold 및 샘플 측정 | 결론 |
@@ -110,12 +110,11 @@ Qwen 3 4B의 200건 결과는 Mac GPU 실행이라 Kubernetes CPU 처리량을 �
 따라서 최종 Model 2 운영 방식은 다음과 같다.
 
 1. Rule/Alias 기반 Labeling을 기본 서버 경로로 사용한다.
-2. `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 별도 LLM Worker로 보낸다.
+2. `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 모델 런타임으로 보낸다.
 3. LLM 결과는 Taxonomy 검증과 Evidence Gate를 통과한 경우에만 적용한다.
 4. 부정 조건은 Rule Parser가 최종 판정하며, LLM은 부정 조건을 덮어쓰지 않는다.
-5. 별도 LLM Worker는 Qwen 2.5 7B Q4를 현재 운영 후보로 사용하며 A Pod에 모델
-   가중치를 넣지 않는다. 실제 Worker Service endpoint와 리소스는 Cloud 배포 설정에서
-   주입한다.
+5. Qwen 2.5 7B Q4를 현재 모델 후보로 유지한다. 실제 모델 실행 위치,
+   Service endpoint, 리소스 및 프로토콜은 Cloud 배포 방식 확정 후 반영한다.
 
 ## 다음 실행 순서
 
@@ -138,8 +137,9 @@ PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
 ```
 
 오프라인 5천 건 생성기의 LLM fallback은 `LABELING_LLM_FALLBACK_ENABLED=false`가
-기본값이다. 서버 런타임은 별도 Worker가 배포된 뒤 `A_LLM_ENABLED=true`, `A_LLM_ENDPOINT`,
-`A_LLM_MODEL=qwen2.5:7b-instruct`를 별도 Worker와 함께 주입할 때만 활성화한다.
+기본값이다. 서버 런타임은 모델 실행 방식이 확정된 뒤 `A_LLM_ENABLED=true`와
+`A_LLM_MODEL=qwen2.5:7b-instruct`를 주입한다. 원격 Worker 방식을 선택한 경우에만
+`A_LLM_ENDPOINT`도 함께 주입한다.
 오프라인 실험에서는 `--enable-llm-fallback`을 명시한다.
 
 실제 모델 가중치·Ollama/Hugging Face/API 환경이 없는 경우에는 모델을 실행한 것처럼 처리하지 않고, 해당 후보를 `NOT_RUN`으로 기록한다.

@@ -11,5 +11,5 @@ configMapGenerator:
       - A_ALIAS_REGISTRY_PATH=/app/config/model1_aliases_reviewed_v2.json
       - A_RULES_PATH=/app/config/demand_constraint_rules.json
       - A_BACKEND_HTTP_TIMEOUT_SECONDS=15
-      # Cloud overlay must set the Worker endpoint and enable the mandatory
-      # model path after the separate Model 2 Worker is deployed.
+      # Cloud overlay must enable the model path after its placement and
+      # protocol (in-process, sidecar, or remote Worker) are finalized.

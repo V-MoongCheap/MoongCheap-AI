@@ -34,12 +34,13 @@ python -m moongcheap_ai.data_foundation.runtime_job `
   Backend API 제출 경로를 별도로 사용할 때만 필요한 선택 설정이다. 현재 A
   CronJob의 기본 저장 경로는 PostgreSQL 직접 UPDATE다.
 - `A_BACKEND_HTTP_TIMEOUT_SECONDS`: 기본 15초
-- `A_LLM_ENABLED`: 배포에서는 `true`가 필수다. `false`는 외부 Worker 없이
+- `A_LLM_ENABLED`: 배포에서는 `true`가 필수다. `false`는 모델 런타임 없이
   로컬 Rule 회귀 테스트를 할 때만 허용한다.
-- `A_LLM_MODEL`: 별도 LLM Worker의 모델 이름. 현재 운영 후보는
+- `A_LLM_MODEL`: 사용할 LLM 모델 이름. 현재 후보는
   `qwen2.5:7b-instruct` Q4다.
-- `A_LLM_ENDPOINT`: 별도 LLM Worker의 Ollama-compatible endpoint. 실제 Service
-  이름과 포트는 Cloud가 주입하며, A Pod 안에 Ollama를 실행하지 않는다.
+- `A_LLM_ENDPOINT`: 원격 LLM Worker 방식을 선택할 때 사용하는
+  Ollama-compatible endpoint. A Pod 내부 실행 또는 sidecar 방식을 선택하면
+  이 값의 사용 여부가 달라진다.
 - Cloud develop의 기존 `A_MODEL2_FALLBACK_*`, `A_MODEL2_OLLAMA_BASE_URL` 이름도
   과도기 호환용으로 읽지만, 새 설정의 표준 이름은 `A_LLM_*`다.
 - `A_LLM_TIMEOUT_SECONDS`: LLM 요청 timeout. 기본 300초
@@ -66,8 +67,9 @@ Backend API를 거치지 않고 직접 DB에 반영한다.
 - DB URL은 Secret으로 주입한다. Backend API 경로를 사용할 때만 Internal Key도
   추가로 주입한다.
 - API 호출 실패 시 임의 재시도하지 않고 다음 배치에서 미처리 수요를 재조회한다.
-- 모델은 필수지만 A 이미지에 모델 가중치나 Ollama를 넣지 않는다. 별도 LLM Worker
-  Pod를 통해 호출하며, Worker의 Service endpoint는 Cloud 배포 설정으로 주입한다.
+- 모델 사용은 필수지만, A Pod 내부 실행·sidecar·별도 LLM Worker 중 배치 방식은
+  아직 미정이다. 현재 A 이미지에는 모델 가중치나 Ollama가 포함되어 있지 않으므로,
+  A 이미지에 포함하는 방식을 선택하면 Dockerfile과 리소스 계약을 추가로 갱신해야 한다.
 - Rule이 이미 처리한 행은 LLM으로 덮어쓰지 않는다. `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 LLM 후보로 보낸다.
 - LLM 결과는 Taxonomy에 존재하는 Facet/Value를 모두 반환하고, 비어 있지 않은 요구사항을 `ALL`로 만들지 않을 때만 적용한다.
 - 부정 표현은 Rule Parser가 담당하며 LLM은 부정 조건을 최종 확정하지 않는다.

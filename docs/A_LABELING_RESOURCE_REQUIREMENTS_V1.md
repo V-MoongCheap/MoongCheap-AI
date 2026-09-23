@@ -7,23 +7,24 @@ validation policy, not a model-free deployment: the model handles the demand
 rows that the deterministic parser cannot resolve, and the parser remains the
 owner of polarity and `MUST`/`PREFER`/`EXCLUDE` semantics.
 
-The current deployment target is an A labeling CronJob plus a separate model
-Worker Pod. The A image does not contain Ollama or model weights; the Worker
-endpoint and its resources are supplied by Cloud. A local/in-process model is
-only a fallback experiment and is not the current container contract.
+The deployment target is an A labeling CronJob with a model runtime, but the
+placement is not finalized. The model may run in the A Pod, a sidecar, or a
+separate Worker Pod. The current A image does not contain Ollama or model
+weights, so the resource and image contract must be updated after placement is
+decided.
 
 ## Resource Plan
 
 | Component | Requests | Limits | Notes |
 | --- | --- | --- | --- |
-| A labeling CronJob | CPU 1 / memory 2Gi | CPU 2 / memory 3Gi | PostgreSQL, taxonomy, external model Worker |
+| A labeling CronJob baseline | CPU 1 / memory 2Gi | CPU 2 / memory 3Gi | PostgreSQL, taxonomy; model runtime excluded until placement is decided |
 | B clustering, supplied baseline | CPU 1 / memory 3Gi | CPU 2 / memory 4Gi | Includes the current E5 CPU inference path |
 | A + B sequential in one CronJob, no local LLM | CPU 2 / memory 5Gi | CPU 4 / memory 8Gi | Recommended combined-job starting point |
 | A + B with external LLM API | CPU 2 / memory 5Gi | CPU 4 / memory 8Gi | Adds network timeout/retry requirements, not model memory |
 
-If A and B remain separate CronJobs, reserve their requests independently. The
-model Worker resource budget is separate and must be supplied by Cloud after the
-Worker image/model and protocol are fixed.
+If A and B remain separate CronJobs, reserve their requests independently. Any
+additional model resource budget must be calculated after the model placement
+and protocol are fixed.
 
 ## Local Model Evaluation
 
