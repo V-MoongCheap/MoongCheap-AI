@@ -190,7 +190,7 @@ def test_handoff_uses_part_b_paths_and_agreed_parameter_store_source():
     assert key["source"] == {
         "provider": "aws-ssm-parameter-store", "type": "SecureString",
     }
-    assert "X-Internal-Key" in key["purpose"]
+    assert "X-Internal-Api-Key" in key["purpose"]
     assert key["secret_name"] == "backend-env"
     assert key["secret_key"] == "MOONGCHEAP_INTERNAL_API_KEY"
     for name in ("DB_URL", "DB_USERNAME", "DB_PASSWORD"):
