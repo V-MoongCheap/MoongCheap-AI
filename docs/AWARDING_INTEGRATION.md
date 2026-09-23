@@ -6,7 +6,7 @@ AI 가 Backend 의 판정 대기 board 를 조회해 낙찰을 판정하고 결�
 ```
 Backend  모집 종료 배치 → board GB_AWARDING · product AWARDING
    ↓
-AI       GET  /api/awarding/pending?size=N      (조회)
+AI       GET  /api/awarding/internal/pending?size=N   (조회)
    ↓
 AI       조건 검사 → 총액 최저 1건 낙찰, 없으면 유찰
    ↓

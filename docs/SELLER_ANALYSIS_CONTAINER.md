@@ -50,7 +50,7 @@ docker run --rm -p 8081:8081 \
 |---|---|
 | 포트 | 8081 (컨테이너 내부·노출 동일). 실행 명령에 고정하며 환경 변수로 바꾸지 않는다 |
 | 헬스체크 | `GET /health` — `{"status":"ok","metrics_version":...,"internal_key_required":true}` |
-| 인증 | 요청 헤더 `X-Internal-Key`. 값이 없거나 다르면 `403 UNAUTHORIZED` |
+| 인증 | 요청 헤더 `X-Internal-Api-Key`. 값이 없거나 다르면 `403 UNAUTHORIZED` |
 | 실행 사용자 | 65534 (비루트) |
 | 쓰기 필요 경로 | 없음 — 읽기 전용 루트 파일시스템으로 띄울 수 있다 |
 
@@ -105,7 +105,7 @@ docker run --rm -p 8081:8081 \
 |---|---|
 | `GET /health` | `200` · `internal_key_required: true` |
 | 인증 헤더 없음 / 잘못된 키 | 둘 다 `403` |
-| 올바른 키를 `X-Internal-Api-Key` 헤더로 보냄 | `403` — 이 API 는 `X-Internal-Key` 만 읽는다 |
+| 올바른 키를 `X-Internal-Key`(옛 이름) 헤더로 보냄 | `403` — 이 API 는 `X-Internal-Api-Key` 만 읽는다 |
 | 정상 요청 | `200` · 지표·근거 문장 정상 |
 | 개인정보 필드(`user_id`) 포함 요청 | `400` |
 | `GET /openapi.json` | `200` — 이미지에 담은 계약 파일로 생성 |
@@ -120,7 +120,7 @@ docker run --rm -p 8081:8081 \
 | 항목 | |
 |---|---|
 | Cloud `containerPort` | Cloud values 는 8000, 이 이미지는 8081. 인프라 설계서의 `[AI API Port 확정 필요]` 에 8081 을 제안했다 |
-| 인증 헤더 이름 | 이 API 는 합의대로 `X-Internal-Key` 만 읽는다. Backend → AI 호출 클라이언트는 Backend 저장소에서 찾지 못해 **Backend 가 보낼 헤더 이름은 미확인**이다. Backend develop 의 `InternalApiKeyFilter`(`X-Internal-Api-Key`)는 Backend 가 **받는** 요청용이라 이 API 와 방향이 다르다 |
+| 인증 헤더 이름 | **해결됨 (2026-09-22 Backend 요청).** 양방향을 `X-Internal-Api-Key` 로 통일했다. 이름만 같고 값은 방향마다 다른 별개의 비밀이다 |
 | 내부 키 공유 | B 배치(AI → Backend)의 키와 같은 값을 쓸지 방향별로 나눌지 미정. Secret 이름도 인프라 확정 |
 | ECR 리포지토리 | 네이밍 규약은 `moongcheap/{service}` 다. AI 파트는 배치와 API 두 이미지를 내므로 리포지토리를 나눌지 태그로 구분할지 확인 필요 |
 | Kaniko 빌드 · 차트 보안 설정 | 미검증 · 미지원 (위 「빌드」 · 「Kubernetes 배포」) |

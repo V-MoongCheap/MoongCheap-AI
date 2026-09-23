@@ -39,11 +39,11 @@ from .bid_guide import (
 
 BID_GUIDE_PATH = "/internal/v1/seller/bid-guide"
 
-# 내부 인증 — 「AI-Backend 수요 보드 생성 관련 답변」 2.2절 「서비스 간 인증 방식」.
-# 시크릿은 AWS Parameter Store 에서 주입받고 받는 쪽이 헤더 값과 일치하는지 검증한다.
-# ⚠️ 그 회신은 AI → Backend 방향에 대한 것이다. 본 API(Backend → AI)에도 같은 방식을
-# 적용하는지는 확인 요청 중이다(명세서 8-1). 방향이 뒤집혀도 검증 위치만 바뀐다.
-INTERNAL_KEY_HEADER = "X-Internal-Key"
+# 내부 인증 — 헤더 이름은 Backend 와 **양방향 동일**하게 맞춘다 (2026-09-22 Backend 요청).
+# Backend 의 `InternalApiKeyFilter` 가 받는 이름과 같고, AI 가 Backend 를 호출할 때도 같은 이름을 쓴다.
+# ⛔ 값은 방향마다 다른 별개의 비밀이다. 이름만 같고 키는 따로 주입받는다.
+# 이전 이름(`X-Internal-Key`)은 「AI-Backend 수요 보드 생성 관련 답변」 2.2절 표기였다.
+INTERNAL_KEY_HEADER = "X-Internal-Api-Key"
 INTERNAL_KEY_ENV = "SELLER_ANALYSIS_INTERNAL_KEY"
 ALLOW_UNAUTHENTICATED_ENV = "SELLER_ANALYSIS_ALLOW_UNAUTHENTICATED"
 
