@@ -62,10 +62,10 @@ environment_variables:
   - name: BACKEND_BASE_URL
     purpose: "Backend HTTP(S) base URL"
     develop_value: http://backend  # 같은 moongcheap-develop의 Service 80 -> Pod 8080
-  - name: MFDS_CATALOG_PROFILES_PATH
-    purpose: "Part A 상품도감 ID 기준의 MFDS profile CSV; DB 입력도 같은 ID 사용"
+  - name: DEMAND_CATALOG_SEED_PATH
+    purpose: "Backend와 같은 도매꾹 v5 상품 시드; UNIQUE 상품명으로 DB의 숫자 ID에 런타임 결합"
   - name: DEMAND_TAXONOMY_PATH
-    purpose: "배포 profile과 일치하는 taxonomy JSON"
+    purpose: "v5 category facet과 호환되는 문장 구조화·상품명 facet용 taxonomy JSON"
   - name: DEMAND_CONSTRAINT_RULES_PATH
     purpose: "자연어 조건 규칙 JSON"
   - name: DEMAND_CONSTRAINT_ALIASES_PATH
@@ -131,14 +131,15 @@ runtime_filesystem:
   writable_tmp: "/tmp (emptyDir, 초기 sizeLimit 256Mi)"
   read_only_mounts: []  # 외부 볼륨 없이 이미지 내부 파일 사용
   bundled_paths:
-    - /artifacts/catalog_profiles.csv
+    - /artifacts/product_catalog_seed_v5.csv
+    - /artifacts/category_seed_v5.csv
     - /artifacts/taxonomy.json
     - /models/multilingual-e5-small
 
 artifact_migration:
   required_before_v2_2_deploy: false
-  reason: "검증된 V2.2 profile·taxonomy와 E5를 이미지에 포함; 외부 artifact 이관 없음"
-  required_files: [catalog_profiles.csv, taxonomy.json]
+  reason: "검증된 Backend v5 시드·taxonomy와 E5를 이미지에 포함; 외부 artifact 이관 없음"
+  required_files: [product_catalog_seed_v5.csv, category_seed_v5.csv, taxonomy.json]
   rollout: "B 담당자가 runtime-assets를 함께 갱신·검증하고 새 이미지 태그로 배포"
   image_only_rollout_supported: true
 
@@ -163,7 +164,7 @@ notes: >-
   Pod는 restartPolicy=Never로 설정해 실패한 배치를 즉시 재실행하지 않는다.
   과거 슬롯을 전달하는 --planned-at/--batch-id 옵션과 checkpoint 볼륨은 사용하지 않는다.
   모델은 이미지 빌드 시 고정 revision을 다운로드하고 파일별 SHA256을 검증한다.
-  상품 profile·taxonomy는 저장소의 runtime-assets에서 가져와 이미지에 함께 넣는다.
+  Backend v5 상품/카테고리 시드·taxonomy는 저장소의 runtime-assets에서 가져와 이미지에 함께 넣는다.
   실행 시 외부 모델·데이터 다운로드나 PVC 공급이 필요하지 않다.
   workload=backend-ai 라벨은 인프라가 실제 노드에 제공해야 한다.
   Cloud develop 57cd52e의 be-ai NodePool은 workload=backend-ai, Linux amd64이며 taint가 없다.

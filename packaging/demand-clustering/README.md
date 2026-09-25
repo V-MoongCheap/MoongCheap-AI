@@ -46,7 +46,7 @@ Dockerfile은 이 프로젝트의 lockfile로 의존성을 설치하고 non-edit
 docker build -f docker/Dockerfile.demand-clustering -t demand-clustering-job:local .
 ```
 
-모델·상품 profile·taxonomy는 빌드 시 이미지에 포함한다. `runtime-assets/`의 확정된
+모델·Backend v5 상품/카테고리 시드·taxonomy는 빌드 시 이미지에 포함한다. `runtime-assets/`의 확정된
 상품 자료와 파일별 SHA256을 사용하며, E5는 고정 revision을 Hugging Face에서 다운로드한다.
 빌드 환경에는 패키지·모델 다운로드를 위한 네트워크가 필요하지만, 실행 환경에서는
 PVC나 모델·데이터 마운트, 모델 다운로드가 필요하지 않다. 자료를 바꾸면 이미지를 재빌드한다.

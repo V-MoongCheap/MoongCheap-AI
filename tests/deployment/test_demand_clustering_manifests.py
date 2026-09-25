@@ -10,7 +10,6 @@ from pathlib import Path, PurePosixPath
 import pytest
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -122,11 +121,11 @@ def test_generated_config_reference_and_runtime_settings(resources):
     assert config["HF_HOME"] == "/tmp/huggingface"
     assert config["DEMAND_CONSTRAINT_ALIASES_PATH"] == "/app/config/model1_aliases_reviewed_v2.json"
     assert config["DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH"] == "/app/config/demand_constraint_aliases.json"
-    profiles = PurePosixPath(config["MFDS_CATALOG_PROFILES_PATH"])
+    catalog_seed = PurePosixPath(config["DEMAND_CATALOG_SEED_PATH"])
     taxonomy = PurePosixPath(config["DEMAND_TAXONOMY_PATH"])
-    assert profiles.parent == taxonomy.parent
-    assert str(profiles.parent) == "/artifacts"
-    assert profiles.name == "catalog_profiles.csv"
+    assert catalog_seed.parent == taxonomy.parent
+    assert str(catalog_seed.parent) == "/artifacts"
+    assert catalog_seed.name == "product_catalog_seed_v5.csv"
     assert taxonomy.name == "taxonomy.json"
 
 
@@ -190,7 +189,7 @@ def test_handoff_uses_part_b_paths_and_agreed_parameter_store_source():
     assert key["source"] == {
         "provider": "aws-ssm-parameter-store", "type": "SecureString",
     }
-    assert "X-Internal-Key" in key["purpose"]
+    assert "X-Internal-Api-Key" in key["purpose"]
     assert key["secret_name"] == "backend-env"
     assert key["secret_key"] == "MOONGCHEAP_INTERNAL_API_KEY"
     for name in ("DB_URL", "DB_USERNAME", "DB_PASSWORD"):

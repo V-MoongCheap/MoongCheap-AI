@@ -9,47 +9,50 @@ from typing import Any, Protocol
 
 from .input_models import DemandBoardInput, DemandInput
 
-
 CLUSTERING_DEMANDS_SQL = """
 SELECT
-    "id",
-    "demand_board_id",
-    "catalog_id",
-    "desired_price_min",
-    "desired_price_max",
-    "quantity",
-    "extra_requirement",
-    "is_substitutable",
-    "status",
-    "label",
-    "desire_end_at",
-    "processed_at",
-    "created_at",
-    "updated_at"
-FROM "demand"
-WHERE "status" = %(status)s
-  AND "demand_board_id" IS NULL
-  AND "pay_method_id" IS NOT NULL
-  AND "created_at" > %(as_of)s - INTERVAL '2 days'
-  AND "desire_end_at" > %(as_of)s
-ORDER BY "catalog_id", "id"
+    d."id",
+    d."demand_board_id",
+    d."catalog_id",
+    pc."name" AS "catalog_name",
+    d."desired_price_min",
+    d."desired_price_max",
+    d."quantity",
+    d."extra_requirement",
+    d."is_substitutable",
+    d."status",
+    d."label",
+    d."desire_end_at",
+    d."processed_at",
+    d."created_at",
+    d."updated_at"
+FROM "demand" AS d
+JOIN "product_catalog" AS pc ON pc."id" = d."catalog_id"
+WHERE d."status" = %(status)s
+  AND d."demand_board_id" IS NULL
+  AND d."pay_method_id" IS NOT NULL
+  AND d."created_at" > %(as_of)s - INTERVAL '2 days'
+  AND d."desire_end_at" > %(as_of)s
+ORDER BY d."catalog_id", d."id"
 """.strip()
 
 
 CLUSTERING_BOARDS_SQL = """
 SELECT
-    "id",
-    "catalog_id",
-    "participant_count",
-    "price_min",
-    "price_max",
-    "status",
-    "sale_end_at",
-    "created_at"
-FROM "demand_board"
-WHERE "status" = %(status)s
-  AND "sale_end_at" > %(as_of)s
-ORDER BY "catalog_id", "created_at", "id"
+    db."id",
+    db."catalog_id",
+    pc."name" AS "catalog_name",
+    db."participant_count",
+    db."price_min",
+    db."price_max",
+    db."status",
+    db."sale_end_at",
+    db."created_at"
+FROM "demand_board" AS db
+JOIN "product_catalog" AS pc ON pc."id" = db."catalog_id"
+WHERE db."status" = %(status)s
+  AND db."sale_end_at" > %(as_of)s
+ORDER BY db."catalog_id", db."created_at", db."id"
 """.strip()
 
 

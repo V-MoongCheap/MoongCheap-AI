@@ -114,17 +114,18 @@ Secret 공급 주체의 AWS 권한과 ECR 이미지 pull 권한은 별도의 인
 실제 비밀 값과 `.env`는 Git·이미지·로그에 넣지 않는다. 키 교체 시 Backend와 AI의
 반영 시점을 맞추고, 이미 실행 중인 프로세스의 환경 변수가 자동 교체된다고 가정하지 않는다.
 
-## 모델과 상품 profile은 이미지에 포함
+## 모델과 v5 상품 시드는 이미지에 포함
 
-B 담당자가 확정한 상품 profile·taxonomy와 E5 모델을 Dockerfile이 이미지에 넣는다.
+B 담당자가 확정한 Backend v5 상품 시드·taxonomy와 E5 모델을 Dockerfile이 이미지에 넣는다.
 인프라는 이미지 빌드·배포를 수행하며 별도의 PVC 생성, 데이터 복사 Job이나 모델 선택이 필요 없다.
-`packaging/demand-clustering/runtime-assets/`에 상품 압축본·분류표와 검증 manifest가 있다.
+`packaging/demand-clustering/runtime-assets/`에 v5 시드 압축본·분류표와 검증 manifest가 있다.
 모델은 `model.json`의 고정 revision을 빌드 때 다운로드하고 파일별 SHA256을 검사한다.
 
 | 이미지 내부 경로 | 내용 |
 | --- | --- |
-| `/artifacts/catalog_profiles.csv` | 확정된 상품 profile |
-| `/artifacts/taxonomy.json` | profile과 함께 검증한 A V2.2 분류표 |
+| `/artifacts/product_catalog_seed_v5.csv` | Backend에 적재하는 도매꾹 v5 상품 시드 |
+| `/artifacts/category_seed_v5.csv` | Backend category 시드와 상품 FK 검증 기준 |
+| `/artifacts/taxonomy.json` | 문장 구조화와 상품명 facet 추출에 사용하는 V2.2 분류표 |
 | `/models/multilingual-e5-small` | E5 가중치·tokenizer·SentenceTransformer 설정 |
 
 ConfigMap은 위 경로를 그대로 지정한다. `/artifacts`와 `/models` 위에 볼륨을 마운트하면
@@ -132,7 +133,10 @@ ConfigMap은 위 경로를 그대로 지정한다. `/artifacts`와 `/models` 위
 파일은 non-root UID 65534가 읽을 수 있으며 실행 중 다운로드하지 않는다.
 자료 버전은 이미지 안의 `/artifacts/manifest.json`, 모델의 `image-model-manifest.json`에 기록된다.
 자료 갱신은 B 담당자가 [runtime-assets 갱신 절차](../packaging/demand-clustering/runtime-assets/README.md)에
-따라 커밋하고 이미지를 재빌드한다. 상품도감 ID와 DB 입력 ID의 일치 계약은 계속 적용한다.
+따라 커밋하고 이미지를 재빌드한다. DB가 생성한 `product_catalog.id`는
+이미지에 고정하지 않고, UNIQUE인 `product_catalog.name`을 v5 시드와 정확히
+일치시켜 런타임에 결합한다. 시드에 없는 사용자 추가 상품은 기본 보드
+처리는 계속하고 대체상품 제안만 건너뛴다.
 
 ## 공유 BE·AI Worker에 배치
 
@@ -263,7 +267,7 @@ Secret·노드·재시도·보안·이미지 내부 경로·PVC 미사용과 A �
 
 1. 실제 Namespace와 ECR 이미지 경로·Git SHA 태그.
 2. ConfigMap의 Backend Service 주소(개발 예시는 `http://backend` 반영 완료).
-   profile·taxonomy·모델 경로는 이미지 기본값을 유지한다.
+   v5 시드·taxonomy·모델 경로는 이미지 기본값을 유지한다.
 3. `backend-env`의 DB 세 항목과 Parameter Store 내부 키 항목 공급.
 4. BE·AI NodePool의 실제 라벨·taint 정책, 합산 CPU/메모리 여유와 DB·Backend 네트워크 연결.
 5. 테스트 데이터로 실제 연동 검증 후 스케줄·제한 시간을 확인하고 `suspend: false`로 전환.
