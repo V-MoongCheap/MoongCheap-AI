@@ -36,6 +36,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from moongcheap_ai.seller_matching.awarding_batch import (
     KST,
+    BatchSendError,
     fetch_pending,
     post_result,
     run_once,
@@ -128,6 +129,19 @@ def main(argv: list[str] | None = None) -> int:
             now=datetime.now(KST),
             send=send,
         )
+    except BatchSendError as error:
+        # 일부 요청은 이미 반영됐을 수 있다. 뒤 요청/재전송 없이 부분 보고서만 남긴다.
+        print(f"실행 실패: {error}", file=sys.stderr)
+        # --report 미지정/저장 실패여도 ID별 시도 구분은 stderr에 남긴다. 원시 예외는 출력하지 않는다.
+        print(json.dumps({
+            "sendProgress": error.report["sendProgress"],
+            "confirmedReflection": error.report["confirmedReflection"],
+        }, ensure_ascii=False), file=sys.stderr)
+        try:
+            _write_report(args.report, error.report)
+        except OSError:
+            print("부분 보고서 저장 실패 — 위 요청 기록과 Backend 이력을 확인한다. 재전송하지 않는다.", file=sys.stderr)
+        return 1
     except Exception as error:  # noqa: BLE001 — 네트워크 오류 포함. 한 줄로 알리고 끝낸다
         # ⛔ 전송 실패는 재시도하지 않는다. 반영되지 않은 board 는 다음 조회에 다시 나온다.
         print(f"실행 실패: {error}", file=sys.stderr)

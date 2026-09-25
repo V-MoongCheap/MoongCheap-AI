@@ -6,6 +6,7 @@ Docker --network none에서도 실행 가능하다. Mock은 묶음 롤백/DB 전
 from __future__ import annotations
 
 import contextlib
+import copy
 import io
 import json
 import os
@@ -135,6 +136,30 @@ def check():
             require("unconfirmed" in error, f"잘못된 200 을 거절하지 않았다: {error}")
             require(handler.posts == 1, f"POST 가 1회가 아니다: {handler.posts}")
             evidence["invalid_200"] = "exit 1 / unconfirmed / exactly one POST"
+
+        many = dict(sample, boards=[dict(copy.deepcopy(sample["boards"][0]), boardId=i) for i in range(1, 101)])
+        with local_server(many) as (backend, url, _):
+            apply = backend.apply
+            calls = []
+
+            def lose_second_response(body):
+                calls.append(body)
+                status, response = apply(body)
+                return (200, {}) if len(calls) == 2 else (status, response)
+
+            backend.apply = lose_second_response
+            invoke(["--backend-url", url, "--size", "100", *POLICY_ARGS, "--send", "--report", str(report)], 1)
+            partial = json.loads(report.read_text())
+            require(len(calls) == 2 and not backend.pending, "부분 응답 실패의 Mock 반영/호출 수가 다르다")
+            require(partial["reflection"] is None, "불명 요청이 있는데 전체 반영을 확정했다")
+            require(partial["confirmedReflection"] == {
+                "submittedBoards": 50, "appliedCount": 50, "staleRejectedCount": 0,
+            }, "확인된 응답 합계가 다르다")
+            require(partial["sendProgress"]["requests"] == [
+                {"requestIndex": 1, "boardIds": list(range(1, 51)), "status": "confirmed"},
+                {"requestIndex": 2, "boardIds": list(range(51, 101)), "status": "unconfirmed"},
+            ], "부분 보고서가 확인/불명 요청을 구분하지 못한다")
+            evidence["partial_send"] = "Mock applied100 / confirmed50+unconfirmed50 / exit1 / two POSTs only"
 
         with local_server(sample, stale_response=True) as (_, url, handler):
             error = invoke(["--backend-url", url, *POLICY_ARGS, "--send", "--report", str(report)], 4)

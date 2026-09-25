@@ -1,6 +1,7 @@
 """시험 운전 스크립트를 가짜 Backend 에 실제 HTTP 로 붙여 본다."""
 
 import ast
+import copy
 import importlib.util
 import json
 import threading
@@ -188,3 +189,136 @@ def test_a_single_unreflected_board_is_not_silent(backend, monkeypatch, tmp_path
     assert "반영되지 않은 board 가 1건" in capsys.readouterr().err
     assert json.loads(report.read_text(encoding="utf-8"))["reflection"] == {
         "submittedBoards": 3, "appliedCount": 2, "staleRejectedCount": 1}
+
+
+def test_hundred_boards_use_two_http_posts(backend, monkeypatch, tmp_path):
+    server, url = backend
+    seed = copy.deepcopy(server.backend.pending[1001])
+    server.backend.pending = {i: dict(copy.deepcopy(seed), boardId=i) for i in range(1, 101)}
+    calls = []
+    original = server.backend.apply
+
+    def apply(body):
+        calls.append(len(body["results"]))
+        return original(body)
+
+    server.backend.apply = apply
+    monkeypatch.setenv("BACKEND_INTERNAL_API_KEY", "test-key")
+    report_path = tmp_path / "report.json"
+    code = _load("run_awarding_test_drive").main([
+        "--backend-url", url, "--size", "100", *ARGS, "--send", "--report", str(report_path)])
+    assert code == 0
+    assert calls == [50, 50]
+    assert server.backend.pending == {}
+    assert json.loads(report_path.read_text())["reflection"] == {
+        "submittedBoards": 100, "appliedCount": 100, "staleRejectedCount": 0}
+
+
+@pytest.mark.parametrize("failure", ["timeout", "invalid_response", "http_500"])
+def test_partial_send_failure_saves_confirmed_and_unknown_requests(
+    backend, monkeypatch, tmp_path, capsys, failure,
+):
+    import requests
+
+    server, url = backend
+    seed = copy.deepcopy(server.backend.pending[1001])
+    server.backend.pending = {i: dict(copy.deepcopy(seed), boardId=i) for i in range(1, 101)}
+    monkeypatch.setenv("BACKEND_INTERNAL_API_KEY", "test-key")
+    calls = []
+    original_post = requests.post
+
+    def post(*args, **kwargs):
+        calls.append(kwargs["json"])
+        response = original_post(*args, **kwargs)
+        if len(calls) == 2:
+            # 서버가 실제 반영한 뒤 응답만 유실/변형: 실패를 미반영으로 단정하면 안 된다.
+            if failure == "timeout":
+                raise requests.Timeout("do-not-log-response-or-secret")
+            if failure == "invalid_response":
+                response._content = b'{"status": "do-not-log-response-or-secret"}'
+            else:
+                response.status_code = 500
+                response._content = b"do-not-log-response-or-secret"
+        return response
+
+    monkeypatch.setattr(requests, "post", post)
+    report_path = tmp_path / "partial.json"
+    code = _load("run_awarding_test_drive").main([
+        "--backend-url", url, "--size", "100", *ARGS, "--send", "--report", str(report_path)])
+
+    assert code == 1
+    assert len(calls) == 2
+    assert server.backend.pending == {}  # 오류여도 실제 반영은 100건이다.
+    assert report_path.exists(), "전송 도중 실패해도 부분 보고서가 필요하다"
+    report = json.loads(report_path.read_text())
+    assert report["sent"] is True  # 시도했다는 뜻이지 반영 완료라는 뜻이 아니다.
+    assert report["reflection"] is None
+    assert report["confirmedReflection"] == {
+        "submittedBoards": 50, "appliedCount": 50, "staleRejectedCount": 0}
+    assert report["sendProgress"] == {
+        "status": "unconfirmed",
+        "requests": [
+            {"requestIndex": 1, "boardIds": list(range(1, 51)), "status": "confirmed"},
+            {"requestIndex": 2, "boardIds": list(range(51, 101)), "status": "unconfirmed"},
+        ],
+    }
+    output = capsys.readouterr()
+    assert "Backend" in output.err
+    assert "do-not-log-response-or-secret" not in output.err + output.out + report_path.read_text()
+
+
+def test_mock_enforces_50_results_but_allows_over_50_evaluations():
+    mock = _load("mock_backend")
+    body = {
+        "schemaVersion": "awarding-result.v0.1", "ruleVersion": "test",
+        "plannedAt": "2026-09-23T16:00:00+09:00",
+        "results": [{"boardId": i, "judgedAt": "2026-09-23T16:00:00",
+                     "evaluations": [{"productId": 1, "score": 0.0, "isAwarded": False}]}
+                    for i in range(51)],
+    }
+    assert mock._invalid(body) == "results must have 1..50 items"
+    body["results"] = body["results"][:50]
+    assert mock._invalid(body) is None
+    body["results"][0]["evaluations"] = [
+        {"productId": i, "score": 0.0, "isAwarded": False} for i in range(51)]
+    assert mock._invalid(body) is None
+    body["results"][0]["evaluations"] = []
+    assert mock._invalid(body) is not None
+
+
+@pytest.mark.parametrize("report_mode", ["omitted", "unwritable"])
+def test_failed_send_still_logs_progress_without_a_writable_report(
+    backend, monkeypatch, tmp_path, capsys, report_mode,
+):
+    server, url = backend
+    monkeypatch.setenv("BACKEND_INTERNAL_API_KEY", "test-key")
+    calls = []
+
+    def apply(body):
+        calls.append(body)
+        return 200, {"status": "invalid"}
+
+    server.backend.apply = apply
+    # 디렉터리를 파일 경로로 지정하면 root 권한 여부와 관계없이 쓰기에 실패한다.
+    report_args = [] if report_mode == "omitted" else ["--report", str(tmp_path)]
+    code = _load("run_awarding_test_drive").main(["--backend-url", url, *ARGS, "--send", *report_args])
+    assert code == 1
+    assert len(calls) == 1
+    stderr = capsys.readouterr().err
+    progress = json.loads(stderr.splitlines()[1])
+    assert progress["sendProgress"]["requests"] == [
+        {"requestIndex": 1, "boardIds": [1001, 1002, 1003], "status": "unconfirmed"}]
+    assert progress["confirmedReflection"]["submittedBoards"] == 0
+    if report_mode == "unwritable":
+        assert "부분 보고서 저장 실패" in stderr
+
+
+def test_zero_demand_stays_unposted_until_policy_is_confirmed(backend, monkeypatch):
+    server, url = backend
+    seed = copy.deepcopy(server.backend.pending[1001])
+    seed["totalQuantity"] = 0
+    server.backend.pending = {1001: seed}
+    monkeypatch.setenv("BACKEND_INTERNAL_API_KEY", "test-key")
+    assert _load("run_awarding_test_drive").main(["--backend-url", url, *ARGS, "--send"]) == 3
+    assert server.backend.applied == {}
+    assert set(server.backend.pending) == {1001}

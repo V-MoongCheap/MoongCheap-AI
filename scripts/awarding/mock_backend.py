@@ -1,10 +1,12 @@
 """낙찰 연동 시험 운전용 가짜 Backend.
 
-Backend develop 의 낙찰 API 동작을 좁게 흉내 낸다 (2026-09-17 코드 열람 기준).
+Backend develop bf98fba의 낙찰 API를 좁게 흉내 낸다 (2026-09-23 코드 열람).
+results50/evaluations 상한 제거 변경 커밋은 7917278이다.
 
 - `/api/awarding/**` 는 `X-Internal-Api-Key` 가 맞지 않으면 401 `COMMON_401`
 - `GET /api/awarding/internal/pending?size=` — 1~100, 기본 50. 대기 board 를 순서대로 최대 size 개, `hasNext`
 - `POST /api/awarding/internal/result` — 형식 위반은 400. 그 밖에는 200 + `appliedCount` · `staleRejectedCount`
+  · results 최대 50개. evaluations 는 비어 있으면 안 되며 개수 상한은 없음
   · 이미 처리된 board → stale
   · evaluations 가 그 board 의 상품 전건과 다름 → stale
   · 반영된 board 는 대기 목록에서 빠진다
@@ -79,8 +81,8 @@ def _invalid(body: object) -> str | None:
     except ValueError:
         return "plannedAt must be ISO-8601"
     results = body.get("results")
-    if not isinstance(results, list) or not 1 <= len(results) <= 100:
-        return "results must have 1..100 items"
+    if not isinstance(results, list) or not 1 <= len(results) <= 50:
+        return "results must have 1..50 items"
     if len({r.get("boardId") for r in results}) != len(results):
         return "results의 boardId는 중복될 수 없습니다"
     for result in results:
@@ -90,8 +92,8 @@ def _invalid(body: object) -> str | None:
         except (KeyError, TypeError, ValueError):
             return "judgedAt is required"
         evaluations = result.get("evaluations")
-        if not isinstance(evaluations, list) or not 1 <= len(evaluations) <= 50:
-            return "evaluations must have 1..50 items"
+        if not isinstance(evaluations, list) or not evaluations:
+            return "evaluations must not be empty"
         if len({e.get("productId") for e in evaluations}) != len(evaluations):
             return "evaluations의 productId는 중복될 수 없습니다"
         if sum(e.get("isAwarded") is True for e in evaluations) > 1:
