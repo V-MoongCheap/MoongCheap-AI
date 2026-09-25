@@ -124,6 +124,8 @@ BACKEND_INTERNAL_API_KEY=local-test-key python scripts/awarding/run_awarding_tes
 | 인증 헤더 | `X-Internal-Api-Key` | Backend `InternalApiKeyFilter` 기준. 실패 시 401 |
 | 키 전달 | 환경변수 `BACKEND_INTERNAL_API_KEY` | 명령줄에 남기지 않는다. 오류 메시지에서 가린다 |
 | 조회 `size` | 1~100, 기본 50 | |
+| 전송 `results` | 요청당 최대 50 | Backend 변경7917278, develop 스냅샷bf98fba (2026-09-23). 조회100건이면 전송 요청2개 |
+| 각 board의 `evaluations` | 1개 이상, 개수 상한 없음 | 같은 Backend DTO 기준. 상품 평가를 생략하거나 다른 board로 쪼개지 않음 |
 | 배송비 부과 단위 | `PER_BOARD` / `PER_PARTICIPANT` | **미확정 정책** — 실행할 때 지정한다 |
 | 가격 상한 비교 금액 | `UNIT_PRICE` / `TOTAL_WITH_SHIPPING` | **미확정 정책** — 실행할 때 지정한다 |
 
@@ -140,6 +142,27 @@ BACKEND_INTERNAL_API_KEY=local-test-key python scripts/awarding/run_awarding_tes
 통째로 롤백한 경우(`DemandBoardService.applyAwardingResult` 의 예외 처리)도 같은 건수에 합산된다.
 응답만으로는 구분되지 않으므로 이 값이 0 이 아니면 종료 코드 4 와 경고로 알리고 보고서 `reflection` 에 남긴다.
 **다시 보내지 않는다.** 반영 여부는 Backend 조회·이력으로 확인한다.
+
+### 전송 중간 실패 보고서
+
+전송 실패도 종료1이며 후속 요청과 재전송을 중단한다. `--report`를 지정하면 부분 보고서를 저장하고,
+지정하지 않았거나 파일 저장에 실패하면 stderr에 요청별 진행 상태와 확인된 건수만 남긴다.
+원시 전송 예외/실패 응답 본문은 출력하지 않는다.
+
+- `sendProgress.status=unconfirmed`: 전체 전송의 반영 여부가 확정되지 않았다.
+- `sendProgress.requests`: 1부터 시작하는 `requestIndex`, `boardIds`, 상태를 기록한다.
+  `confirmed`는 유효한 업무 응답 확인, `unconfirmed`는 호출 시도 후 반영 여부 불명,
+  `not_attempted`는 중단으로 호출하지 않은 요청이다. **confirmed여도 stale을 포함할 수 있다.**
+- `confirmedReflection`: 확인된 응답만의 제출/applied/stale 합계다. 전체 제출/반영 합계가 아니다.
+  건수 응답만으로 어느 ID가 stale인지 알 수 없으므로 개별 ID의 반영 상태는 추정하지 않는다.
+- 실패 보고서의 `reflection`은 `null`이다. `sent=true`는 호출 시도를 뜻하며 실제 반영 완료가 아니다.
+- 직접 `run_once`를 호출하는 코드는 전송/응답 검증 실패를 `BatchSendError`로 받는다.
+  `.report`에 부분 결과, `.__cause__`에 원래 예외가 있다. 원래 예외를 외부 로그에 노출하지 않는다.
+
+이 기능은 예외를 처리한 뒤 남기는 진단 기록이지 영속 실행 원장이 아니다.
+강제 종료/프로세스 크래시/디스크 오류에는 파일이 없거나 불완전할 수 있다.
+**보고서 부재를 전송0건으로 해석하거나, 이 파일로 자동 재전송하지 않는다.**
+보고서에는 업무 ID·가격·판정 내용이 있으므로 승인된 접근 제한 위치에 보관한다.
 
 ## 연동 전에 필요한 것
 

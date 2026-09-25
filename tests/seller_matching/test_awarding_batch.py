@@ -2,7 +2,7 @@
 
 기준
 - Backend develop `AwardingPendingResponseDto` · `AwardingResultRequestDto` · `InternalApiKeyFilter`
-- 「AI-Backend 낙찰 판정 연동 API 기능 요구 명세서」 · 「… 응답」 1절 (`size` 1~100, `results` 최대 100)
+- Backend 7917278 (2026-09-23): 조회 size 1~100, results 최대 50
 """
 
 import json
@@ -13,6 +13,7 @@ import pytest
 from moongcheap_ai.seller_matching.awarding_batch import (
     HEADER_NAME,
     RESULT_SCHEMA_VERSION,
+    BatchSendError,
     ContractError,
     build_result_requests,
     fetch_pending,
@@ -182,16 +183,31 @@ def test_result_request_matches_backend_dto():
     json.dumps(request)  # 직렬화 가능
 
 
-def test_results_are_split_into_requests_of_at_most_100_boards():
-    boards = [_board(boardId=i, products=[_product(productId=i)]) for i in range(1, 206)]
+@pytest.mark.parametrize("count, sizes", [(0, []), (50, [50]), (51, [50, 1]), (100, [50, 50]), (205, [50, 50, 50, 50, 5])])
+def test_results_are_split_into_requests_of_at_most_50_boards(count, sizes):
+    boards = [_board(boardId=i, products=[_product(productId=i)]) for i in range(1, count + 1)]
 
     requests = build_result_requests(_decisions(*boards), planned_at=NOW, judged_at=NOW)
 
-    assert [len(r["results"]) for r in requests] == [100, 100, 5]
+    assert [len(r["results"]) for r in requests] == sizes
+    assert [r["boardId"] for request in requests for r in request["results"]] == list(range(1, count + 1))
 
 
 def test_no_decisions_produce_no_requests():
     assert build_result_requests([], planned_at=NOW, judged_at=NOW) == []
+
+
+def test_result_limit_does_not_split_or_drop_a_boards_evaluations():
+    products = [_product(productId=i) for i in range(1, 52)]
+    decisions = _decisions(_board(boardId=1, products=products))
+
+    requests = build_result_requests(decisions, planned_at=NOW, judged_at=NOW)
+
+    assert len(requests) == 1
+    assert len(requests[0]["results"]) == 1
+    result = requests[0]["results"][0]
+    assert result["boardId"] == 1
+    assert sorted(item["productId"] for item in result["evaluations"]) == list(range(1, 52))
 
 
 def test_naive_times_are_rejected():
@@ -300,8 +316,9 @@ def test_valid_post_counts_include_stale_without_claiming_applied(applied, stale
 
 
 def test_custom_sender_cannot_bypass_response_validation():
-    with pytest.raises(ContractError, match="unconfirmed"):
+    with pytest.raises(BatchSendError, match="unconfirmed") as error:
         run_once(_page(_board()), POLICY, now=NOW, send=lambda req: {})
+    assert isinstance(error.value.__cause__, ContractError)
 
 
 def test_invalid_json_response_is_unconfirmed_without_exposing_body():
@@ -390,7 +407,7 @@ def test_report_lists_skipped_boards():
 
 
 def test_reflection_sums_every_request_not_just_the_first():
-    """board 가 100개를 넘으면 요청이 나뉜다. 앞 요청만 세면 반영 건수가 줄어 보인다."""
+    """board 가 50개를 넘으면 요청이 나뉜다. 앞 요청만 세면 반영 건수가 줄어 보인다."""
     # 첫 요청의 값과 합계가 모두 달라야 「첫 요청만 센다」 는 실수를 잡는다.
     requests = [{"results": [{}, {}]}, {"results": [{}, {}, {}]}]
     responses = [
@@ -400,3 +417,74 @@ def test_reflection_sums_every_request_not_just_the_first():
 
     assert summarize_reflection(requests, responses) == {
         "submittedBoards": 5, "appliedCount": 2, "staleRejectedCount": 3}
+
+
+def test_failure_on_second_batch_stops_without_retry_or_third_post():
+    calls = []
+
+    def send(request):
+        calls.append([result["boardId"] for result in request["results"]])
+        if len(calls) == 2:
+            raise TimeoutError("synthetic response loss")
+        return {"status": "APPLIED", "appliedCount": len(request["results"]), "staleRejectedCount": 0}
+
+    payload = _page(*[_board(boardId=i) for i in range(1, 102)])
+    with pytest.raises(BatchSendError, match="unconfirmed") as error:
+        run_once(payload, POLICY, now=NOW, send=send)
+    assert calls == [list(range(1, 51)), list(range(51, 101))]
+    assert isinstance(error.value.__cause__, TimeoutError)
+    report = error.value.report
+    assert report["reflection"] is None
+    assert report["confirmedReflection"] == {"submittedBoards": 50, "appliedCount": 50, "staleRejectedCount": 0}
+    assert report["sendProgress"]["requests"] == [
+        {"requestIndex": 1, "boardIds": list(range(1, 51)), "status": "confirmed"},
+        {"requestIndex": 2, "boardIds": list(range(51, 101)), "status": "unconfirmed"},
+        {"requestIndex": 3, "boardIds": [101], "status": "not_attempted"},
+    ]
+
+
+def test_first_send_failure_preserves_zero_confirmed_and_does_not_leak_exception():
+    calls = []
+
+    def send(request):
+        calls.append(request)
+        raise TimeoutError("do-not-log-secret")
+
+    with pytest.raises(BatchSendError) as error:
+        run_once(_page(*[_board(boardId=i) for i in range(1, 52)]), POLICY, now=NOW, send=send)
+    report = error.value.report
+    assert len(calls) == 1
+    assert report["responses"] == []
+    assert report["confirmedReflection"] == {"submittedBoards": 0, "appliedCount": 0, "staleRejectedCount": 0}
+    assert [item["status"] for item in report["sendProgress"]["requests"]] == ["unconfirmed", "not_attempted"]
+    assert "do-not-log-secret" not in str(error.value) + json.dumps(report)
+
+
+def test_partial_report_keeps_confirmed_stale_counts_without_claiming_applied_ids():
+    calls = []
+
+    def send(request):
+        calls.append(request)
+        if len(calls) == 2:
+            return {}  # 업무 응답 계약 오류
+        return {"status": "APPLIED", "appliedCount": 49, "staleRejectedCount": 1, "extra": "do-not-log-secret"}
+
+    with pytest.raises(BatchSendError) as error:
+        run_once(_page(*[_board(boardId=i) for i in range(1, 52)]), POLICY, now=NOW, send=send)
+    report = error.value.report
+    assert report["confirmedReflection"] == {"submittedBoards": 50, "appliedCount": 49, "staleRejectedCount": 1}
+    assert report["reflection"] is None
+    assert report["responses"] == [{"status": "APPLIED", "appliedCount": 49, "staleRejectedCount": 1}]
+    assert "do-not-log-secret" not in json.dumps(report)
+
+
+def test_multi_batch_reflection_keeps_applied_and_stale_separate():
+    calls = []
+
+    def send(request):
+        calls.append(request)
+        return {"status": "APPLIED", "appliedCount": len(request["results"]) - 1, "staleRejectedCount": 1}
+
+    report = run_once(_page(*[_board(boardId=i) for i in range(1, 52)]), POLICY, now=NOW, send=send)
+    assert [len(request["results"]) for request in calls] == [50, 1]
+    assert report["reflection"] == {"submittedBoards": 51, "appliedCount": 49, "staleRejectedCount": 2}

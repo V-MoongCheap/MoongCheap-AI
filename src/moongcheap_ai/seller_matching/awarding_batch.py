@@ -35,12 +35,20 @@ PENDING_PATH = "/api/awarding/internal/pending"
 RESULT_PATH = "/api/awarding/internal/result"
 PENDING_SCHEMA_VERSION = "awarding-pending.v0.1"
 RESULT_SCHEMA_VERSION = "awarding-result.v0.1"
-MAX_RESULTS_PER_REQUEST = 100  # 「… 명세서 응답」 1절 · Backend `@Size(max = 100)`
+MAX_RESULTS_PER_REQUEST = 50  # Backend 7917278 (2026-09-23), AwardingResultRequestDto @Size(max = 50)
 KST = timezone(timedelta(hours=9))
 
 
 class ContractError(ValueError):
     """조회/결과 응답 계약을 믿을 수 없을 때. 결과 반영 여부는 별도 확인한다."""
+
+
+class BatchSendError(RuntimeError):
+    """전송 중단. report는 응답 확인/불명/미시도를 구분하며 재전송 지시가 아니다."""
+
+    def __init__(self, report: dict[str, Any]) -> None:
+        super().__init__("awarding result unconfirmed: sending stopped; check Backend history before rerun")
+        self.report = report
 
 
 @dataclass
@@ -128,7 +136,7 @@ def parse_pending(payload: Any) -> PendingPage:
 
 
 def build_result_requests(decisions: Sequence[BoardDecision], *, planned_at: datetime, judged_at: datetime) -> list[dict[str, Any]]:
-    """판정 결과를 전송 본문으로 만든다. 한 요청에 board 최대 100개."""
+    """판정 결과를 전송 본문으로 만든다. 한 요청에 board 최대 50개."""
     if planned_at.utcoffset() is None or judged_at.utcoffset() is None:
         raise ValueError("planned_at and judged_at must carry a timezone")
     # Backend: plannedAt 은 OffsetDateTime, judgedAt 은 LocalDateTime(시간대 없음). judgedAt 은 KST 벽시계로 보낸다.
@@ -254,7 +262,7 @@ def run_once(
     now: datetime,
     send: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """조회 응답 한 페이지를 판정하고, `send` 가 있으면 전송한다. 결과는 사람이 읽을 보고서다."""
+    """한 페이지를 판정/전송한다. 전송 실패는 부분 보고서를 담은 BatchSendError로 알린다."""
     page = parse_pending(pending_payload)
     skipped = [{"boardId": board_id, "reason": reason} for board_id, reason in page.skipped]
 
@@ -288,11 +296,8 @@ def run_once(
         )
 
     requests = build_result_requests(decisions, planned_at=now, judged_at=now)
-    responses = [
-        validate_result_response(send(request), submitted_count=len(request["results"]))
-        for request in requests
-    ] if send is not None else []
-    return {
+    responses: list[dict[str, Any]] = []
+    report = {
         "fetchedAt": page.fetched_at,
         "hasNext": page.has_next,
         "policy": {"shippingFeeUnit": policy.shipping_fee_unit, "priceCapBasis": policy.price_cap_basis},
@@ -306,7 +311,35 @@ def run_once(
         "boards": boards,
         "skipped": skipped,
         "requests": requests,
-        "sent": send is not None and bool(requests),
+        "sent": False,
         "responses": responses,
-        "reflection": summarize_reflection(requests, responses) if send is not None and requests else None,
+        "reflection": None,
     }
+    if send is not None:
+        for index, request in enumerate(requests):
+            # 호출 시도만 뜻한다. HTTP 도달/DB 반영은 응답 유실 시 알 수 없다.
+            report["sent"] = True
+            try:
+                response = validate_result_response(send(request), submitted_count=len(request["results"]))
+            except Exception as error:  # 중단하되 앞선 요청의 확인 결과를 보존한다
+                report["confirmedReflection"] = summarize_reflection(requests[:index], responses)
+                report["sendProgress"] = {
+                    "status": "unconfirmed",
+                    "requests": [
+                        {
+                            "requestIndex": number + 1,
+                            "boardIds": [result["boardId"] for result in batch["results"]],
+                            # confirmed는 응답 계약 확인이며 모든 board가 반영됐다는 뜻이 아니다.
+                            "status": "confirmed" if number < index else (
+                                "unconfirmed" if number == index else "not_attempted"
+                            ),
+                        }
+                        for number, batch in enumerate(requests)
+                    ],
+                }
+                # 원시 응답/예외 문자열은 키나 서버 내부 정보를 포함할 수 있어 보고서에 넣지 않는다.
+                raise BatchSendError(report) from error
+            responses.append({name: response[name] for name in ("status", "appliedCount", "staleRejectedCount")})
+        if requests:
+            report["reflection"] = summarize_reflection(requests, responses)
+    return report
