@@ -30,7 +30,7 @@ Part B는 `constraints`의 `MUST`/`EXCLUDE`만 hard gate로 사용하고, `PREFE
 | 설정 | 자료와 역할 |
 | --- | --- |
 | `DEMAND_TAXONOMY_PATH` | A `config/facet_taxonomy_v2_2.json`을 복사한 배포용 `taxonomy.json` |
-| `MFDS_CATALOG_PROFILES_PATH` | 같은 분류표 기준으로 생성한 `catalog_profiles.csv` |
+| `DEMAND_CATALOG_SEED_PATH` | Backend와 같은 도매꾹 v5 `product_catalog_seed_v5.csv` |
 | `DEMAND_CONSTRAINT_RULES_PATH` | 이미지에 포함된 B `config/demand_constraint_rules.json` |
 | `DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH` | 이미지에 포함된 필수 B `config/demand_constraint_aliases.json` |
 | `DEMAND_CONSTRAINT_ALIASES_PATH` | 이미지에 포함된 선택 A `config/model1_aliases_reviewed_v2.json` |
@@ -48,61 +48,41 @@ Part B는 `constraints`의 `MUST`/`EXCLUDE`만 hard gate로 사용하고, `PREFE
 `aliasMode=A_AND_B/B_ONLY`, `primaryAliasLoadStatus=LOADED/NOT_CONFIGURED`로
 실제 사용한 조합을 확인한다. B 별칭은 B의 개발·검수 자료이며 A 승인 상태로 바꾸지 않는다.
 
-## 상품 profile 준비
+## v5 상품 시드 준비
 
-> **배포 전환 필수:** 기존 V2.1 profile을 그대로 둔 채 새 이미지만 배포하면 버전 검증에서
-> 기동이 중단된다. V2.2 `catalog_profiles.csv`와 그 생성에 사용한 `taxonomy.json`을 함께
-> 이미지에 넣어 배포한다. 현재 Dockerfile은 확정된 두 파일을 기본으로 포함한다.
+Backend가 적재하는 `product_catalog_seed_v5.csv`를 그대로 이미지 입력으로
+포장한다. 런타임에서 DB의 숫자 `product_catalog.id`를 시드 ID로 간주하지
+않는다. Backend에서 UNIQUE인 `product_catalog.name`과 v5 `name`을 정확히 일치시켜
+현재 DB ID에 결합한다.
 
-profile 갱신은 담당자가 원재료를 준비하고 생성·검증한 뒤 배포 버전을 확정하는 작업이다.
-확정한 profile과 분류표를 `packaging/demand-clustering/runtime-assets/`에 묶어 커밋하고
-코드와 함께 이미지를 빌드한다. 인프라에서 별도로 파일을 준비하거나 마운트하지 않는다.
+`extra_requirement`의 MUST/PREFER/EXCLUDE 구조화는 V2.2 taxonomy와 기존 B 파서를
+그대로 사용한다. 대체상품 후보는 같은 v5 말단 카테고리와 같은
+서비스 taxonomy 카테고리로 제한한다. 상품명에 원료가 명시된 경우에만
+같은 원료를 요구한다. MFDS claim ID와 기능 containment는 운영 경로에서
+사용하지 않는다.
 
-| 입력 | 기본 위치 |
-| --- | --- |
-| MFDS I0030 정제 상품 | `data/interim/facet_discovery/i0030_products_clean_dedup.csv` |
-| MFDS I2710 원료 근거 | `data/interim/facet_discovery/i2710_reference.csv` |
-| A 상품·카테고리 매핑 | `data/processed/category_v2_1/product_service_category_mapping_v2_1.csv` |
-| 기능성 문장 후보 | `data/reports/mfds_function_claim_candidates_v1.csv` |
-| A 분류표 | `config/facet_taxonomy_v2_2.json` |
+상품명이 v5에 없는 사용자 추가 상품과 `source_category_id`가 빈 99건은
+동일상품 보드 편입·신규 보드 생성을 계속하고 대체상품 제안만 건너뛴다.
+따라서 일부 상품 불일치가 전체 배치나 기본 보드 생성을 중단하지 않는다.
 
-I0030·I2710 정제 자료를 먼저 준비한다. A 매핑을 생성하고 기능성 문장 후보를 준비하는
-기존 스크립트는 다음과 같다. A가 제공한 매핑 파일이 있으면 profile 생성기에 그 경로를 지정한다.
+확정된 시드를 다음 명령으로 이미지 입력에 반영한다.
 
 ```bash
-PYTHONPATH=src python scripts/category/build_category_v2_1.py
-PYTHONPATH=src python scripts/evaluation/analyze_mfds_function_claims.py
-PYTHONPATH=src python scripts/evaluation/build_catalog_wide_mfds_profiles.py \
-  --category-mapping data/processed/category_v2_1/product_service_category_mapping_v2_1.csv \
+python scripts/deployment/prepare_demand_clustering_assets.py pack-seed \
+  --seed /path/to/product_catalog_seed_v5.csv \
+  --category-seed /path/to/category_seed_v5.csv \
   --taxonomy config/facet_taxonomy_v2_2.json \
-  --output-dir data/reports/b_profile_releases/v2_2_20260911
-```
-
-`--products`, `--references`, `--claims`로 입력 경로를 바꿀 수 있다. `--output-dir`은
-매 갱신마다 새로운 경로를 지정한다. 실행기는 기존 폴더를 덮어쓰지 않는다.
-
-생성기는 원재료를 결합하고 분류표 버전 및 카테고리 ID 존재 여부를 확인한 뒤
-`catalog_profiles.csv`, `catalog_mappings.csv`, `taxonomy.json`, `manifest.json`을 저장한다.
-분류표는 A 원본을 그대로 복사한다. manifest에 입력 경로, 생성 시각, 분류표 버전·해시,
-profile 내용의 fingerprint를 기록한다. 원재료와 중간 생성 파일은 로컬에 보관하며,
-검증한 배포본만 아래 방식으로 압축해 Git에 포함한다.
-
-현재 근거용 profile의 `catalog_id`는 MFDS `source_product_id`다. 실제 배포에는 Backend
-`product_catalog.id`와의 연결을 확인하고, 입력 수요·보드와 같은 상품 ID를 사용해야 한다.
-카테고리 ID 존재 검사는 상품 분류의 의미적 정확성까지 판정하지 않는다.
-
-완성된 release를 다음 명령으로 이미지 입력에 반영한다.
-
-```bash
-python scripts/deployment/prepare_demand_clustering_assets.py pack \
-  --release data/reports/b_profile_releases/v2_2_20260911 \
+  --release backend-v5-domeggook-YYYYMMDD \
   --assets packaging/demand-clustering/runtime-assets
 ```
 
-이는 갱신 예시이며 실제로는 검증을 마친 새 release 경로를 지정한다.
-Dockerfile이 CSV 압축을 풀고 분류표와 함께 `/artifacts/`에 넣는다.
+스크립트는 상품 1,989건·카테고리 42건의 행 수, 상품명·Seed ID·도매꾹 ID
+유일성, category 부모 계층, 상품→category FK·경로·taxonomy 매핑과 파일 해시를
+검증한다. `product_catalog_seed_v5.csv.gz`, `category_seed_v5.csv.gz`,
+`taxonomy.json`, `catalog.json`을 함께 커밋하고 이미지를 재빌드한다.
 [자료 갱신 안내](../packaging/demand-clustering/runtime-assets/README.md)와
-[컨테이너 실행 안내](DEMAND_CLUSTERING_CONTAINER.md)를 따른다.
+[컨테이너 실행 안내](DEMAND_CLUSTERING_CONTAINER.md)를 따른다. 기존 MFDS profile/claim
+생성 스크립트는 오프라인 평가 자료로만 남으며 운영 이미지 입력이 아니다.
 
 ## 별칭·자연어 해석 회귀 검증
 
@@ -118,7 +98,7 @@ PYTHONPATH=src python scripts/evaluation/evaluate_b_v22_parser_regression.py \
 ```
 
 - pytest는 A의 94개 category/surface 연결, A 부재·삭제·오류, B 표현 보존, A 우선 적용,
-  profile 생성·버전 검사와 모의 배치를 검증한다. 의도한 A 연결 변경은 검수 후 고정 fixture를 갱신한다.
+  v5 시드·taxonomy 검사와 모의 배치를 검증한다. 의도한 A 연결 변경은 검수 후 고정 fixture를 갱신한다.
 - 실행기는 기존 B / A 별칭만 / A+B의 세 설정으로 129건의 동결 평가셋을 채점하고,
   별칭 전환 사례 15건을 합친 144건의 상태·조건·선호 그룹·자유 텍스트·동등 코드를 비교한다.
 - `--input`으로 추가 비교 CSV를 지정하고, `--baseline-taxonomy`로 이전 분류표를 지정할 수 있다.
@@ -142,7 +122,9 @@ PYTHONPATH=src python scripts/evaluation/evaluate_b_v22_parser_regression.py \
 127/129 정답, 자동 PARSED 오판 0건이며 알려진 인용·전언 관련 실패 2건을 회귀 기준으로 둔다.
 5,000건은 과거 규칙 개발에 사용한 합성 자료다. 이 결과를 실제 사용자 정확도로 해석하지 않는다.
 
-## 2026-09-11 검증 결과
+## 과거 2026-09-11 MFDS profile 검증 결과
+
+아래는 현재 v5 운영 자료로 전환하기 전의 회귀 기록이다.
 
 - C/API를 제외한 저장소 테스트: 559 passed. 별칭·profile·모의 배치·패키지 경계 검사 포함.
 - 기존 B / A-only / A+B 모두 동결 평가셋 127/129 정답, 자동 PARSED 오판 0건.

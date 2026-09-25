@@ -37,6 +37,11 @@ from .candidate_finder import (
     find_same_catalog_gathering_boards,
     select_clustering_board_candidate,
 )
+from .catalog_seed_planner import (
+    CatalogSeedSubstituteProposalPlanner,
+    RuntimeSeedCatalogProfile,
+    build_runtime_seed_catalog,
+)
 from .claim_containment_index import (
     ClaimContainmentLookup,
     IdentityClaimContainmentIndex,
@@ -120,6 +125,7 @@ __all__ = [
     "ClusteringInputBatch",
     "ClaimContainmentLookup",
     "ClaimIndexedSubstituteProposalPlanner",
+    "CatalogSeedSubstituteProposalPlanner",
     "DemandBoardInput",
     "DemandClusteringBatchPlan",
     "DemandInput",
@@ -144,6 +150,7 @@ __all__ = [
     "RetrievedProductCandidate",
     "RejectedSubstituteBoard",
     "RuntimeCatalogProfile",
+    "RuntimeSeedCatalogProfile",
     "SubstituteBoardAdmissionDecision",
     "SubstituteBoardCandidateInput",
     "SubstituteDemandInput",
@@ -156,6 +163,7 @@ __all__ = [
     "build_substitute_board_admission_plan",
     "build_substitute_offer_plan_request",
     "build_runtime_catalog_profiles",
+    "build_runtime_seed_catalog",
     "character_ngram_cosine_similarity",
     "evaluate_price_band_compatibility",
     "execute_demand_clustering_batch",

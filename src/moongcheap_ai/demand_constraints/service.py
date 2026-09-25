@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -19,6 +20,12 @@ from .input_policy import (
 from .taxonomy_matcher import TaxonomyFacetMatcher
 
 
+InputPolicyFactory = Callable[
+    [TaxonomyFacetMatcher, ConstraintExtractor],
+    ConstraintInputPolicy,
+]
+
+
 @dataclass(frozen=True, slots=True)
 class DemandConstraintParser:
     """Parse and normalize a demand's Korean requirement without a model call."""
@@ -33,12 +40,25 @@ class DemandConstraintParser:
         *,
         rules_path: str | Path,
         aliases_path: str | Path | None = None,
-        policy_cls: type[ConstraintInputPolicy] = ConstraintInputPolicy,
+        input_policy_factory: InputPolicyFactory | None = None,
+        policy_cls: type[ConstraintInputPolicy] | None = None,
     ) -> DemandConstraintParser:
+        """Build a parser with an optionally specialized input policy.
+
+        The default preserves the shared service contract. Callers that own a
+        channel-specific policy can inject a ``ConstraintInputPolicy`` subclass
+        without changing this module or duplicating parser dependency setup.
+        """
+
         matcher = TaxonomyFacetMatcher(taxonomy, aliases_path)
         classifier = ConstraintClassifier.from_path(rules_path)
         extractor = ConstraintExtractor(matcher, classifier)
-        return cls(extractor, policy_cls(matcher, extractor))
+        if input_policy_factory is not None and policy_cls is not None:
+            raise ValueError(
+                "provide only one of input_policy_factory or policy_cls"
+            )
+        factory = input_policy_factory or policy_cls or ConstraintInputPolicy
+        return cls(extractor, factory(matcher, extractor))
 
     def parse(self, category_id: str, extra_requirement: str) -> ExtractionResult:
         """Return the frozen language-only result for evaluation compatibility."""

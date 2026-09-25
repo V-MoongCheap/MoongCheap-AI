@@ -79,7 +79,7 @@ B 전용 overlay는 Cloud와 같은 `moongcheap-develop`을 사용한다. 기존
 | `DB_URL` | `backend-env` | `DB_URL` | Backend JDBC URL; 앱에서 `jdbc:` 제거 |
 | `DB_USERNAME` | `backend-env` | `DB_USERNAME` | Backend와 같은 DB 계정 |
 | `DB_PASSWORD` | `backend-env` | `DB_PASSWORD` | 해당 DB 계정 비밀번호 |
-| `BACKEND_INTERNAL_KEY` | `backend-env` | `MOONGCHEAP_INTERNAL_API_KEY` | Backend와 공유하는 `X-Internal-Key` 값; Cloud 공급 추가 필요 |
+| `BACKEND_INTERNAL_KEY` | `backend-env` | `MOONGCHEAP_INTERNAL_API_KEY` | Backend와 공유하는 `X-Internal-Api-Key` 값; Cloud 템플릿 매핑 완료, 실제 동기화 확인 필요 |
 
 앱은 DB 세 값을 읽어 PostgreSQL DSN을 조합한다. 계정·비밀번호는 공백을 보존하고
 URL 인코딩하며, IPv6 주소와 libpq 호환 query(`sslmode` 등)는 유지한다. `DB_URL`에
@@ -98,33 +98,34 @@ AI DB 계정에는 `demand`, `demand_board`, `reject_history`의 SELECT 권한�
 제외한다. 테이블 누락이나 권한 오류로 이력을 조회하지 못하면 배치가 실패한다.
 
 Backend와 합의한 내부 키의 원본은 **AWS Parameter Store `SecureString`**이며,
-HTTP 헤더 이름은 **`X-Internal-Key`**다. Cloud의 일반 Secrets Manager 정책이나
+HTTP 헤더 이름은 Backend `InternalApiKeyFilter`와 같은 **`X-Internal-Api-Key`**다. Cloud의 일반 Secrets Manager 정책이나
 RDS 계정 저장 방식을 이 내부 키의 별도 합의에 그대로 적용하지 않는다.
 
 앱의 입력 계약은 `BACKEND_INTERNAL_KEY` 환경 변수다. 배포 환경이 Parameter Store를
 조회해 `backend-env`의 `MOONGCHEAP_INTERNAL_API_KEY` 항목을 공급해야 한다.
-2026-09-21 확인한 Cloud `develop` (`57cd52e`)의 ExternalSecret 템플릿에는
-DB 세 항목은 있지만 내부 인증 키 항목은 없다. 따라서 이 참조 변경만으로 배포 준비가
-끝나지는 않는다. Parameter 경로·조회 권한·동기화 구성과 해당 key의 공급을 Cloud에서
-완료하기 전까지 `suspend: true`를 유지한다. 앱은 SSM을 직접 호출하지 않으며,
+2026-09-23 확인한 Cloud `develop` (`8fd7e20`)의 ExternalSecret 템플릿에는
+DB 세 항목과 내부 인증 키 항목이 모두 매핑돼 있다. 다만 실제 AWS 원본 값, 조회 권한과
+클러스터의 ExternalSecret 동기화 성공 여부는 별도 확인이 필요하다. 실제 DB·Backend
+연동 검증을 완료하기 전까지 `suspend: true`를 유지한다. 앱은 SSM을 직접 호출하지 않으며,
 `secretKeyRef` 자체가 SSM을 조회하지도 않는다.
-([Cloud ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
+([Cloud ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/8fd7e20/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
 
 Secret 공급 주체의 AWS 권한과 ECR 이미지 pull 권한은 별도의 인프라 설정이다.
 실제 비밀 값과 `.env`는 Git·이미지·로그에 넣지 않는다. 키 교체 시 Backend와 AI의
 반영 시점을 맞추고, 이미 실행 중인 프로세스의 환경 변수가 자동 교체된다고 가정하지 않는다.
 
-## 모델과 상품 profile은 이미지에 포함
+## 모델과 v5 상품 시드는 이미지에 포함
 
-B 담당자가 확정한 상품 profile·taxonomy와 E5 모델을 Dockerfile이 이미지에 넣는다.
+B 담당자가 확정한 Backend v5 상품 시드·taxonomy와 E5 모델을 Dockerfile이 이미지에 넣는다.
 인프라는 이미지 빌드·배포를 수행하며 별도의 PVC 생성, 데이터 복사 Job이나 모델 선택이 필요 없다.
-`packaging/demand-clustering/runtime-assets/`에 상품 압축본·분류표와 검증 manifest가 있다.
+`packaging/demand-clustering/runtime-assets/`에 v5 시드 압축본·분류표와 검증 manifest가 있다.
 모델은 `model.json`의 고정 revision을 빌드 때 다운로드하고 파일별 SHA256을 검사한다.
 
 | 이미지 내부 경로 | 내용 |
 | --- | --- |
-| `/artifacts/catalog_profiles.csv` | 확정된 상품 profile |
-| `/artifacts/taxonomy.json` | profile과 함께 검증한 A V2.2 분류표 |
+| `/artifacts/product_catalog_seed_v5.csv` | Backend에 적재하는 도매꾹 v5 상품 시드 |
+| `/artifacts/category_seed_v5.csv` | Backend category 시드와 상품 FK 검증 기준 |
+| `/artifacts/taxonomy.json` | 문장 구조화와 상품명 facet 추출에 사용하는 V2.2 분류표 |
 | `/models/multilingual-e5-small` | E5 가중치·tokenizer·SentenceTransformer 설정 |
 
 ConfigMap은 위 경로를 그대로 지정한다. `/artifacts`와 `/models` 위에 볼륨을 마운트하면
@@ -132,7 +133,10 @@ ConfigMap은 위 경로를 그대로 지정한다. `/artifacts`와 `/models` 위
 파일은 non-root UID 65534가 읽을 수 있으며 실행 중 다운로드하지 않는다.
 자료 버전은 이미지 안의 `/artifacts/manifest.json`, 모델의 `image-model-manifest.json`에 기록된다.
 자료 갱신은 B 담당자가 [runtime-assets 갱신 절차](../packaging/demand-clustering/runtime-assets/README.md)에
-따라 커밋하고 이미지를 재빌드한다. 상품도감 ID와 DB 입력 ID의 일치 계약은 계속 적용한다.
+따라 커밋하고 이미지를 재빌드한다. DB가 생성한 `product_catalog.id`는
+이미지에 고정하지 않고, UNIQUE인 `product_catalog.name`을 v5 시드와 정확히
+일치시켜 런타임에 결합한다. 시드에 없는 사용자 추가 상품은 기본 보드
+처리는 계속하고 대체상품 제안만 건너뛴다.
 
 ## 공유 BE·AI Worker에 배치
 
@@ -226,8 +230,7 @@ B에 연결할 때는 저장소 루트를 build context로 유지하고 이 값�
 [빌드 에이전트](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/platform/jenkins/values.yaml))
 
 Backend `develop` (`89a4935`)에는 합의한 두 internal API와 `reject_history` migration이
-있다. 단, 인증 필터는 아직 `X-Internal-Api-Key`를 읽는다. AI의 합의된 `X-Internal-Key`를
-바꾸지 않고 Backend에서 정합성을 맞춘 뒤 연동한다. AI의 `BACKEND_INTERNAL_KEY`와
+있다. AI도 Backend 인증 필터와 같은 `X-Internal-Api-Key`를 보내도록 맞췄다. AI의 `BACKEND_INTERNAL_KEY`와
 Backend의 `MOONGCHEAP_INTERNAL_API_KEY`에는 같은 키 값을 각각 주입해야 한다.
 ([Backend 인증 필터](https://github.com/V-MoongCheap/MoongCheap-Backend/blob/89a4935/src/main/java/com/moongcheap_backend/auth/infrastructure/InternalApiKeyFilter.java))
 
@@ -264,7 +267,7 @@ Secret·노드·재시도·보안·이미지 내부 경로·PVC 미사용과 A �
 
 1. 실제 Namespace와 ECR 이미지 경로·Git SHA 태그.
 2. ConfigMap의 Backend Service 주소(개발 예시는 `http://backend` 반영 완료).
-   profile·taxonomy·모델 경로는 이미지 기본값을 유지한다.
+   v5 시드·taxonomy·모델 경로는 이미지 기본값을 유지한다.
 3. `backend-env`의 DB 세 항목과 Parameter Store 내부 키 항목 공급.
 4. BE·AI NodePool의 실제 라벨·taint 정책, 합산 CPU/메모리 여유와 DB·Backend 네트워크 연결.
 5. 테스트 데이터로 실제 연동 검증 후 스케줄·제한 시간을 확인하고 `suspend: false`로 전환.

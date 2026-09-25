@@ -163,33 +163,33 @@ UNASSIGNED
 
 ## 10. 후속 결정 상태
 
-- 상품 기능 보존은 identity 또는 승인된 방향성 coverage relation으로 정의했다.
-- CPU 검색은 E5-small 기능문구 Top-10, 생존 0일 때 Top-20 확장으로 평가했다.
-- 현재 배치 CLI는 활성 보드 catalog의 claim 포함관계 인덱스를 사용한다.
-  E5는 PASSTHROUGH 선호 점수에 사용하며, 위 Top-K/관계 검색 평가와 별개다.
+- 현재 배치 CLI는 Backend v5 시드의 같은 말단 카테고리로 후보를 제한하고
+  상품명에 명시된 facet만 사용한다. claim ID는 운영 경로에서 사용하지 않는다.
+- CPU E5는 PASSTHROUGH 선호 점수에 사용한다. 기능문구 Top-K·coverage relation은
+  오프라인 평가 경로로만 남긴다.
 - 자연어 조건은 MUST/EXCLUDE hard gate, PREFER/PASSTHROUGH 순위,
   CONFLICT/NONE 비차단으로 정했다.
 - relation 310개는 도메인 승인 전이며 운영 loader가 차단한다.
 
 남은 연동·협의 사항은 다음과 같다.
 
-- Part A 상품도감 기준 profile·taxonomy 공급과 DB 입력 catalog ID 일치 확인
+- Backend v5 시드와 DB 상품명 결합 실연동 확인
 - CPU E5 모델 파일 공급과 버전 관리
 - 합의한 두 Backend 내부 API의 실제 연동과 Parameter Store 관리 내부 키의 Pod 환경 변수 공급
 - 재제안은 허용하되, 이미 거절한 동일 보드·상품을 제외할지와 거절 이력 조회 방식
 - Seller Offer 매칭과 낙찰 방식
 
-현재 배치에 필요한 외부 입력은 Part A 상품도감 기준 artifact와 PostgreSQL 수요·보드
+현재 배치에 필요한 외부 입력은 Backend v5 시드 artifact와 PostgreSQL 수요·보드
 snapshot이다. relation 도메인 승인과 오프라인 embedding artifact 발행은 별도 평가
 경로의 후속 과제이며 현재 배치 실행의 선행 조건은 아니다.
 
 ## 11. 현재 구현과의 차이
 
 - Part B에는 공유 PostgreSQL 조회, 원상품 계획 API, DB 재조회, 활성 보드
-  profile join, 대체 제안 API까지 연결하는 CLI가 있다.
+  v5 시드 join, 대체 제안 API까지 연결하는 CLI가 있다.
 - 실패한 요청을 저장·재전송하지 않고 다음 정기 배치에서 DB 최신 상태로
   다시 계산한다. 상태 재검증과 DML은 Backend가 수행한다.
-- 합의한 Backend 양쪽 API의 실제 구현, 상품도감 ID 일치, 인증 키 주입과
+- 합의한 Backend 양쪽 API의 실제 구현, DB 상품명과 v5 시드 일치, 인증 키 주입과
   시간별 스케줄 배포는 별도 실연동 검증이 필요하다.
 
 따라서 현 상태를 대체상품 후보 제안 기능이 완성됐다고 표현하지 않는다.

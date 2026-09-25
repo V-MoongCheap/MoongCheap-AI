@@ -8,7 +8,6 @@ from moongcheap_ai.demand_clustering import (
     PostgreSQLClusteringInputReader,
 )
 
-
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "erd_v2_input.json"
 
 
@@ -53,8 +52,14 @@ class PostgreSQLClusteringInputReaderTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
-        cls.demand_row = fixture["demands"][0]
-        cls.board_row = fixture["demand_boards"][0]
+        cls.demand_row = {
+            **fixture["demands"][0],
+            "catalog_name": "도매꾹 원상품",
+        }
+        cls.board_row = {
+            **fixture["demand_boards"][0],
+            "catalog_name": "도매꾹 후보상품",
+        }
         cls.as_of = datetime.fromisoformat("2026-08-28T12:00:00+09:00")
 
     def make_reader(
@@ -85,11 +90,13 @@ class PostgreSQLClusteringInputReaderTest(unittest.TestCase):
 
         self.assertEqual(connection.cursor_calls, 1)
         self.assertEqual([demand.id for demand in batch.demands], [1001])
+        self.assertEqual(batch.demands[0].catalog_name, "도매꾹 원상품")
         self.assertEqual(
             batch.demands[0].extra_requirement,
             "캡슐형이면 좋겠어요.",
         )
         self.assertEqual([board.id for board in batch.boards], [3001])
+        self.assertEqual(batch.boards[0].catalog_name, "도매꾹 후보상품")
         self.assertEqual(
             batch.rejected_demand_board_pairs,
             frozenset({(1001, 3001)}),
@@ -113,6 +120,8 @@ class PostgreSQLClusteringInputReaderTest(unittest.TestCase):
         board_sql, board_params = cursor.executions[1]
         rejection_sql, rejection_params = cursor.executions[2]
         self.assertIn('"pay_method_id" IS NOT NULL', demand_sql)
+        self.assertIn('JOIN "product_catalog"', demand_sql)
+        self.assertIn('AS "catalog_name"', demand_sql)
         self.assertIn('"demand_board_id" IS NULL', demand_sql)
         self.assertIn('"extra_requirement"', demand_sql)
         self.assertNotIn('"label" IS NOT NULL', demand_sql)
@@ -120,6 +129,7 @@ class PostgreSQLClusteringInputReaderTest(unittest.TestCase):
         self.assertIn("INTERVAL '2 days'", demand_sql)
         self.assertNotIn("FOR UPDATE", demand_sql)
         self.assertIn('"sale_end_at" > %(as_of)s', board_sql)
+        self.assertIn('JOIN "product_catalog"', board_sql)
         self.assertNotIn("FOR UPDATE", board_sql)
         self.assertEqual(
             demand_params,

@@ -18,7 +18,6 @@ from urllib.parse import parse_qsl, quote, unquote, urlparse, urlsplit, urlunspl
 import pandas as pd
 from dotenv import load_dotenv
 
-from .part_a_integration import build_part_b_parser, file_digest, validate_profile_versions
 from .backend_board_plan import post_board_assignment_plan
 from .backend_plan_client import post_substitute_board_admission_plan
 from .batch_execution import (
@@ -28,19 +27,17 @@ from .batch_execution import (
     SubstitutePlanPoster,
     execute_demand_clustering_batch,
 )
+from .catalog_seed_planner import CatalogSeedSubstituteProposalPlanner
 from .config import load_min_cluster_participants
 from .e5_runtime_scorer import (
     E5RuntimeScorerConfig,
     E5RuntimeTextSimilarityScorer,
 )
+from .part_a_integration import build_part_b_parser, file_digest
 from .postgres_reader import (
     PostgreSQLClusteringInputReader,
     PostgreSQLConnection,
 )
-from .substitute_proposal_planner import (
-    ClaimIndexedSubstituteProposalPlanner,
-)
-
 
 SHARED_DATABASE_URL_ENV = "SHARED_DATABASE_URL"
 DB_URL_ENV = "DB_URL"
@@ -48,7 +45,7 @@ DB_USERNAME_ENV = "DB_USERNAME"
 DB_PASSWORD_ENV = "DB_PASSWORD"
 BACKEND_BASE_URL_ENV = "BACKEND_BASE_URL"
 BACKEND_INTERNAL_KEY_ENV = "BACKEND_INTERNAL_KEY"
-MFDS_CATALOG_PROFILES_PATH_ENV = "MFDS_CATALOG_PROFILES_PATH"
+DEMAND_CATALOG_SEED_PATH_ENV = "DEMAND_CATALOG_SEED_PATH"
 DEMAND_TAXONOMY_PATH_ENV = "DEMAND_TAXONOMY_PATH"
 DEMAND_CONSTRAINT_RULES_PATH_ENV = "DEMAND_CONSTRAINT_RULES_PATH"
 DEMAND_CONSTRAINT_ALIASES_PATH_ENV = "DEMAND_CONSTRAINT_ALIASES_PATH"
@@ -59,7 +56,7 @@ POSTGRES_CONNECT_TIMEOUT_SECONDS_ENV = "POSTGRES_CONNECT_TIMEOUT_SECONDS"
 DEFAULT_BACKEND_HTTP_TIMEOUT_SECONDS = 15
 DEFAULT_POSTGRES_CONNECT_TIMEOUT_SECONDS = 10
 FORMATION_RULE_VERSION = "board-formation-v1"
-SUBSTITUTE_RULE_VERSION = "substitute-admission-v2"
+SUBSTITUTE_RULE_VERSION = "substitute-admission-v3-catalog-seed"
 JOB_RESULT_SCHEMA_VERSION = "demand-clustering-job-result.v0.1"
 
 
@@ -82,7 +79,7 @@ class DemandClusteringJobConfig:
     database_url: str
     backend_base_url: str
     backend_internal_key: str
-    catalog_profiles_path: Path
+    catalog_seed_path: Path
     taxonomy_path: Path
     constraint_rules_path: Path
     constraint_aliases_path: Path | None
@@ -274,9 +271,9 @@ def load_job_config(
             source,
             BACKEND_INTERNAL_KEY_ENV,
         ),
-        catalog_profiles_path=_required_file(
+        catalog_seed_path=_required_file(
             source,
-            MFDS_CATALOG_PROFILES_PATH_ENV,
+            DEMAND_CATALOG_SEED_PATH_ENV,
         ),
         taxonomy_path=_required_file(source, DEMAND_TAXONOMY_PATH_ENV),
         constraint_rules_path=_required_file(
@@ -377,9 +374,8 @@ def run_demand_clustering_job(
 
     if config.constraint_compat_aliases_path is None:
         raise ConfigurationError("B base aliases are required for the runtime")
-    profiles = pd.read_csv(config.catalog_profiles_path, dtype=str).fillna("")
+    catalog_seed = pd.read_csv(config.catalog_seed_path, dtype=str).fillna("")
     taxonomy = _load_taxonomy(config.taxonomy_path)
-    validate_profile_versions(profiles, taxonomy)
     parser, integration = build_part_b_parser(
         taxonomy,
         rules_path=config.constraint_rules_path,
@@ -387,10 +383,11 @@ def run_demand_clustering_job(
         compatibility_aliases_path=config.constraint_compat_aliases_path,
     )
     integration["taxonomySha256"] = file_digest(config.taxonomy_path)
-    integration["profileCount"] = len(profiles)
+    integration["catalogSeedCount"] = len(catalog_seed)
+    integration["catalogBinding"] = "BACKEND_UNIQUE_NAME_EXACT"
     scorer = E5RuntimeTextSimilarityScorer(config.e5)
-    planner = ClaimIndexedSubstituteProposalPlanner(
-        profiles,
+    planner = CatalogSeedSubstituteProposalPlanner(
+        catalog_seed,
         taxonomy,
         parser,
         text_similarity_scorer=scorer,
@@ -421,7 +418,6 @@ def run_demand_clustering_job(
                     config.backend_http_timeout_seconds
                 )
             ),
-            input_validator=planner.validate_input_profile_coverage,
             event_handler=event_handler,
         )
     finally:

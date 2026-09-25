@@ -29,7 +29,6 @@ from moongcheap_ai.demand_clustering.runtime_job import (
     run_demand_clustering_job,
 )
 
-
 ROOT = Path(__file__).parents[2]
 NOW = datetime.fromisoformat("2026-09-08T12:34:56+09:00")
 PLANNED_AT = NOW
@@ -38,7 +37,7 @@ CATEGORY = "health-functional-food:protein"
 
 def _artifact_paths(tmp_path: Path) -> dict[str, Path]:
     taxonomy = {
-        "taxonomy_version": "v2.1",
+        "version": "v2.1",
         "categories": [{
             "category_id": CATEGORY,
             "facets": [
@@ -72,31 +71,28 @@ def _artifact_paths(tmp_path: Path) -> dict[str, Path]:
         encoding="utf-8",
     )
 
-    profile_rows = []
+    seed_rows = []
     for catalog_id, name in (
         (101, "원상품 보드 상품"),
         (202, "대체 후보 상품"),
         (303, "대체 요청 원상품"),
     ):
-        profile_rows.append({
-            "catalog_id": str(catalog_id),
-            "product_name": name,
-            "service_category_id": CATEGORY,
-            "taxonomy_version": "v2.1",
-            "product_form": "정",
-            "functional_ingredients_json": '["단백질"]',
-            "main_functionality_claim_ids_json": '["protein"]',
-            "main_functionality_claim_texts_json": '["단백질 보충"]',
-            "intake_method_text": "1일 1회 섭취",
-            "profile_status": "EVIDENCE_READY",
+        seed_rows.append({
+            "catalog_seed_id": f"catalog-seed-domeggook-{catalog_id}",
+            "source_product_id": str(catalog_id),
+            "name": name,
+            "category_seed_id": "cat-v5-protein",
+            "source_category_path": "식품 > 건강식품 > 단백질",
+            "source_category_id": CATEGORY,
+            "status": "ACTIVE",
         })
-    profiles_path = tmp_path / "profiles.csv"
-    pd.DataFrame(profile_rows).to_csv(profiles_path, index=False)
+    seed_path = tmp_path / "product_catalog_seed_v5.csv"
+    pd.DataFrame(seed_rows).to_csv(seed_path, index=False)
 
     model_path = tmp_path / "e5-model"
     model_path.mkdir()
     return {
-        "profiles": profiles_path,
+        "seed": seed_path,
         "taxonomy": taxonomy_path,
         "model": model_path,
     }
@@ -110,7 +106,7 @@ def _environment(tmp_path: Path) -> dict[str, str]:
         ),
         "BACKEND_BASE_URL": "http://backend:8080/",
         "BACKEND_INTERNAL_KEY": "service-secret",
-        "MFDS_CATALOG_PROFILES_PATH": str(paths["profiles"]),
+        "DEMAND_CATALOG_SEED_PATH": str(paths["seed"]),
         "DEMAND_TAXONOMY_PATH": str(paths["taxonomy"]),
         "DEMAND_CONSTRAINT_RULES_PATH": str(
             ROOT / "config/demand_constraint_rules.json"
@@ -136,6 +132,11 @@ def _demand_row(
         "id": demand_id,
         "demand_board_id": None,
         "catalog_id": catalog_id,
+        "catalog_name": {
+            101: "원상품 보드 상품",
+            202: "대체 후보 상품",
+            303: "대체 요청 원상품",
+        }[catalog_id],
         "desired_price_min": 10_001,
         "desired_price_max": 20_000,
         "quantity": 1,
@@ -159,6 +160,11 @@ def _board_row(
     return {
         "id": board_id,
         "catalog_id": catalog_id,
+        "catalog_name": {
+            101: "원상품 보드 상품",
+            202: "대체 후보 상품",
+            303: "대체 요청 원상품",
+        }[catalog_id],
         "participant_count": participant_count,
         "price_min": 10_001,
         "price_max": 20_000,
@@ -402,7 +408,7 @@ def test_runs_complete_batch_with_fake_postgres_and_backend(
         database_url="postgresql://reader:secret@postgres:5432/moongcheap",
         backend_base_url="http://backend:8080",
         backend_internal_key="service-secret",
-        catalog_profiles_path=paths["profiles"],
+        catalog_seed_path=paths["seed"],
         taxonomy_path=paths["taxonomy"],
         constraint_rules_path=ROOT / "config/demand_constraint_rules.json",
         constraint_aliases_path=None,
@@ -458,7 +464,7 @@ def test_runs_complete_batch_with_fake_postgres_and_backend(
         calls.append("substitute")
         assert backend_base_url == config.backend_base_url
         assert internal_key == config.backend_internal_key
-        assert request["ruleVersion"] == "substitute-admission-v2"
+        assert request["ruleVersion"] == "substitute-admission-v3-catalog-seed"
         expected_proposals = [] if expected_board_id is None else [{
             "demandId": 7,
             "expectedOriginalCatalogId": 303,
@@ -516,31 +522,91 @@ def test_runs_complete_batch_with_fake_postgres_and_backend(
     assert next_result.execution.substitute_request["proposals"] == []
 
 
-def test_profile_version_mismatch_stops_before_database_or_backend(tmp_path):
+def test_user_added_catalog_still_runs_base_formation_and_skips_substitution(
+    tmp_path: Path,
+) -> None:
+    paths = _artifact_paths(tmp_path)
+    config = DemandClusteringJobConfig(
+        database_url="postgresql://reader:secret@postgres:5432/moongcheap",
+        backend_base_url="http://backend:8080",
+        backend_internal_key="service-secret",
+        catalog_seed_path=paths["seed"],
+        taxonomy_path=paths["taxonomy"],
+        constraint_rules_path=ROOT / "config/demand_constraint_rules.json",
+        constraint_aliases_path=None,
+        constraint_compat_aliases_path=(
+            ROOT / "config/demand_constraint_aliases.json"
+        ),
+        e5=E5RuntimeScorerConfig(paths["model"], batch_size=8),
+        min_participants=5,
+    )
+    new_demand = {
+        **_demand_row(1, 101),
+        "catalog_id": 999,
+        "catalog_name": "사용자 추가 상품",
+    }
+    new_board = {
+        **_board_row(31, 101, participant_count=5),
+        "catalog_id": 999,
+        "catalog_name": "사용자 추가 상품",
+    }
+    connection = FakeConnection([
+        [new_demand],
+        [new_board],
+        [],
+        [new_demand],
+        [new_board],
+        [],
+    ])
+
+    def post_formation(base_url, key, request):
+        assert request["existingBoardAssignments"] == [{
+            "demandBoardId": 31,
+            "demandIds": [1],
+        }]
+        return BackendBoardPlanApplyResult("APPLIED", 1, 0, ())
+
+    def post_substitute(base_url, key, request):
+        assert request["proposals"] == []
+        return BackendPlanApplyResult("APPLIED", 0, 0, 0)
+
+    result = run_demand_clustering_job(
+        config,
+        planned_at=PLANNED_AT,
+        connection_factory=lambda database_url, timeout: connection,
+        formation_plan_poster=post_formation,
+        substitute_plan_poster=post_substitute,
+    )
+
+    assert result.execution.formation_request["existingBoardAssignments"]
+    assert result.execution.substitute_request["proposals"] == []
+
+
+def test_unknown_seed_category_stops_before_database_or_backend(tmp_path):
     environment = _environment(tmp_path)
-    profiles = pd.read_csv(environment["MFDS_CATALOG_PROFILES_PATH"], dtype=str)
-    profiles["taxonomy_version"] = "v2.2"
-    profiles.to_csv(environment["MFDS_CATALOG_PROFILES_PATH"], index=False)
+    seed = pd.read_csv(environment["DEMAND_CATALOG_SEED_PATH"], dtype=str)
+    seed["source_category_id"] = "unknown-category"
+    seed.to_csv(environment["DEMAND_CATALOG_SEED_PATH"], index=False)
     config = load_job_config(environment)
 
     def must_not_connect(*args):
-        pytest.fail("version mismatch must be detected before database access")
+        pytest.fail("unknown category must be detected before database access")
 
-    with pytest.raises(ValueError, match="do not match v2.1"):
+    with pytest.raises(ValueError, match="taxonomy is missing category"):
         run_demand_clustering_job(config, planned_at=PLANNED_AT, connection_factory=must_not_connect)
 
 
-def test_empty_profiles_stop_before_database_or_backend(tmp_path):
+def test_empty_seed_stops_before_database_or_backend(tmp_path):
     environment = _environment(tmp_path)
-    profiles_path = Path(environment["MFDS_CATALOG_PROFILES_PATH"])
-    profiles = pd.read_csv(profiles_path, dtype=str)
-    profiles.iloc[0:0].to_csv(profiles_path, index=False)
+    seed_path = Path(environment["DEMAND_CATALOG_SEED_PATH"])
+    seed = pd.read_csv(seed_path, dtype=str)
+    seed.iloc[0:0].to_csv(seed_path, index=False)
     config = load_job_config(environment)
 
     def must_not_connect(*args):
-        pytest.fail("empty profiles must be detected before database access")
+        pytest.fail("empty seed must be detected before database access")
 
-    with pytest.raises(ValueError, match="profiles must not be empty"):
+    with pytest.raises(ValueError, match="catalog seed must not be empty"):
         run_demand_clustering_job(
             config,
             planned_at=PLANNED_AT,

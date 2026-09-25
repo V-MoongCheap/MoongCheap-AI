@@ -2,7 +2,7 @@
 
 흐름 (Option A, 「AI-Backend 낙찰 판정 연동 API 기능 요구 명세서」)
 
-    GET  /api/awarding/pending?size=N          → parse_pending
+    GET  /api/awarding/internal/pending?size=N → parse_pending
     판정                                       → offer_ranking.rank_offers
     POST /api/awarding/internal/result         ← build_result_requests
 
@@ -31,7 +31,7 @@ from moongcheap_ai.seller_matching.offer_ranking import (
 )
 
 HEADER_NAME = "X-Internal-Api-Key"
-PENDING_PATH = "/api/awarding/pending"
+PENDING_PATH = "/api/awarding/internal/pending"
 RESULT_PATH = "/api/awarding/internal/result"
 PENDING_SCHEMA_VERSION = "awarding-pending.v0.1"
 RESULT_SCHEMA_VERSION = "awarding-result.v0.1"

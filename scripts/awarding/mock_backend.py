@@ -3,7 +3,7 @@
 Backend develop 의 낙찰 API 동작을 좁게 흉내 낸다 (2026-09-17 코드 열람 기준).
 
 - `/api/awarding/**` 는 `X-Internal-Api-Key` 가 맞지 않으면 401 `COMMON_401`
-- `GET /api/awarding/pending?size=` — 1~100, 기본 50. 대기 board 를 순서대로 최대 size 개, `hasNext`
+- `GET /api/awarding/internal/pending?size=` — 1~100, 기본 50. 대기 board 를 순서대로 최대 size 개, `hasNext`
 - `POST /api/awarding/internal/result` — 형식 위반은 400. 그 밖에는 200 + `appliedCount` · `staleRejectedCount`
   · 이미 처리된 board → stale
   · evaluations 가 그 board 의 상품 전건과 다름 → stale
@@ -125,7 +125,7 @@ def make_handler(backend: MockAwardingBackend):
 
         def do_GET(self) -> None:
             url = urlparse(self.path)
-            if url.path != "/api/awarding/pending":
+            if url.path != "/api/awarding/internal/pending":
                 return self._send(404, {"error": "not found"})
             if not self._authorized():
                 return None
