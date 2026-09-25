@@ -24,6 +24,7 @@ Backend  평가 이력 저장 + 상태 반영 + 공동구매 생성
 | `scripts/awarding/run_awarding_test_drive.py` | 한 번 실행하고 보고서를 내는 시험 운전 |
 | `scripts/awarding/mock_backend.py` | 로컬 가짜 Backend |
 | `scripts/awarding/sample_pending.json` | 예시 조회 응답 |
+| `scripts/awarding/verify_runtime_image.py` | 배포 이미지의 필수 파일·Mock 파일 부재 검사. 이미지에는 포함하지 않음 |
 
 ## 판정 규칙
 
@@ -60,6 +61,9 @@ docker run --rm --platform linux/amd64 --network none --read-only \
 
 이미지는 두 단계다. 인자 없이 빌드하면 **배포 단계(runtime)** 가 나오고 배치 실행에 필요한 것만 담는다.
 Mock 서버와 loopback 시험은 **시험 단계(test)** 에만 있어 배포 이미지에 들어가지 않는다.
+`build_image.sh`는 runtime 빌드 뒤 실제 이미지의 `/app` 하위 파일을 검사한다.
+필수 파일이 없거나 Mock 파일이 다른 하위 경로로 유입되어도 빌드 검증 명령이 실패한다.
+검사기는 이미지 외부에서 stdin으로 실행하며, 취약점 검사나 빌드 재현성 검증은 수행하지 않는다.
 
 기본 실행은 파일 판정만 한다. 예상 요약은 조회 4, 판정 3, 계약 오류 1, 낙찰 2이며 `sent: false`다.
 Mock 서버까지 포함한 자동 테스트 드라이브:
