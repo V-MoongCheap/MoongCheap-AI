@@ -26,7 +26,7 @@ docker run --rm --network none --read-only \
 
 - `packaging/demand-clustering/`의 `pyproject.toml`과 `uv.lock`으로 B파트 의존성을 고정한다. PyTorch는 CPU 전용 index를 사용한다.
 - 빌드용 uv와 캐시는 최종 이미지에 복사하지 않는다. 패키지는 non-editable로 설치한다.
-- 이미지에는 Python 의존성, 앱, 규칙·별칭, 상품 profile·taxonomy와 고정 E5 모델을 포함한다.
+- 이미지에는 Python 의존성, 앱, 규칙·별칭, Backend v5 상품 시드·taxonomy와 고정 E5 모델을 포함한다.
   전용 `.dockerignore`는 소스와 확정된 `runtime-assets/`만 허용한다. 비밀 값·원재료·
   로컬 모델 cache는 제외한다. E5는 빌드 중 Hugging Face에서 다운로드하고 SHA256을 검증한다.
 - 모델 다운로드를 포함한 빌드에는 인터넷이 필요하다. 실행 중 모델 다운로드·PVC는 필요 없다.
@@ -39,8 +39,9 @@ docker run --rm --network none --read-only \
 
 | 입력 | 컨테이너 기본 경로 | 공급 방식 |
 | --- | --- | --- |
-| Part A 상품도감 기준의 상품 profile | `/artifacts/catalog_profiles.csv` | 이미지에 포함 |
-| profile과 일치하는 taxonomy | `/artifacts/taxonomy.json` | 이미지에 포함 |
+| Backend에 적재하는 도매꾹 v5 상품 시드 | `/artifacts/product_catalog_seed_v5.csv` | 이미지에 포함 |
+| Backend category 시드 | `/artifacts/category_seed_v5.csv` | 이미지에 포함, 상품 FK 검증용 |
+| 문장 구조화·상품명 facet 추출용 taxonomy | `/artifacts/taxonomy.json` | 이미지에 포함 |
 | CPU multilingual-e5-small 모델 | `/models/multilingual-e5-small` | 빌드 때 다운로드하여 이미지에 포함 |
 | 자연어 규칙 | `/app/config/demand_constraint_rules.json` | 이미지에 포함 |
 | 선택 A V2.2 승인 별칭 | `/app/config/model1_aliases_reviewed_v2.json` | 이미지에 포함 |
@@ -48,14 +49,17 @@ docker run --rm --network none --read-only \
 
 경로는 Dockerfile과 ConfigMap에 같은 값으로 지정돼 있다. 이 경로 위에 외부 볼륨을
 마운트하지 않는다. 이미지의 파일은 UID 65534가 읽을 수 있다.
-상품 profile·taxonomy·release manifest는 저장소의
+상품 시드·taxonomy·release manifest는 저장소의
 `packaging/demand-clustering/runtime-assets/`에서 가져와 빌드 시 검증·포함한다.
-현재 `v2_2_20260921_image`는 45,996건의 V2.2 profile과 최신 A 분류표를 묶는다.
-`catalog_id`는 기존 MFDS ID를 보존하며 배포 대상 DB와의 ID 계약은 바뀌지 않는다.
+현재 자료는 v5 상품 1,989건이며 1,890건은 V2.2 분류표에 매핑되고
+99건은 미매핑이다. DB가 생성한 `product_catalog.id`를 이미지에 고정하지
+않고 UNIQUE인 `product_catalog.name`을 v5 시드의 상품명과 정확히 일치시켜
+런타임에 결합한다. 이름이 없거나 분류가 미매핑인 상품은 기본 보드
+처리를 막지 않고 대체상품 제안만 건너뛴다.
 
 자료 갱신은 B 담당자가 [자료 갱신 안내](../packaging/demand-clustering/runtime-assets/README.md)에
 따라 확정본을 커밋하고 이미지를 재빌드하는 작업이다. 인프라 팀은 별도 CSV·모델 선택이나
-PVC 공급을 하지 않는다. [V2.2 연계 안내](PART_B_V22_INTEGRATION.md)에 생성·검증 명령이 있다.
+PVC 공급을 하지 않는다. [V2.2 연계 안내](PART_B_V22_INTEGRATION.md)에 문장 구조화·자료 검증 계약이 있다.
 
 `DEMAND_CONSTRAINT_ALIASES_PATH`는 A 승인 별칭, `DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH`는
 필수 B 기본 별칭이다. B는 항상 읽고, A에 없는 표현·카테고리도 계속 활용한다.
@@ -65,14 +69,14 @@ A에서 삭제된 표현도 B에 남아 있으면 사용한다. A 경로를 설�
 B 경로를 비우거나 B 파일이 없으면 설정 오류다. `partAIntegration.aliasMode`와
 `primaryAliasLoadStatus`로 A 사용·미사용 이유를 구분한다.
 배치 출력의 `partAIntegration`에서 적용 버전·파일 해시를 확인한다.
-profile 생성과 별칭 변경 검증은 [V2.2 연계 안내](PART_B_V22_INTEGRATION.md)를 따른다.
+v5 시드 포장과 별칭 변경 검증은 [V2.2 연계 안내](PART_B_V22_INTEGRATION.md)를 따른다.
 
 E5는 `model.json`에 고정한 `intfloat/multilingual-e5-small` revision
 `614241f622f53c4eeff9890bdc4f31cfecc418b3`를 빌드 중 다운로드한다.
 가중치·tokenizer·설정은 symlink 없는 실제 파일로 이미지에 들어간다.
 `HF_HUB_OFFLINE=1`과 `TRANSFORMERS_OFFLINE=1`을 유지한다.
 
-외부 네트워크·모델/자료 마운트 없이 다음 검증으로 전체 profile·별칭·실제 E5 임베딩을
+외부 네트워크·모델/자료 마운트 없이 다음 검증으로 v5 시드·별칭·실제 E5 임베딩을
 확인한다. DB·Backend에는 연결하지 않으며 내부에서 테스트용 설정만 사용한다.
 
 ```bash
@@ -84,12 +88,10 @@ docker run --rm -i --network none --read-only \
   < scripts/deployment/verify_demand_clustering_image.py
 ```
 
-2026-09-21 로컬 검증에서 Docker 이미지 빌드, Kaniko v1.23.2 `--no-push` 빌드와
-위 오프라인 검증이 통과했다. Kaniko는 비밀 값·로컬 자료가 없는 빌드 입력만으로 실행했다.
-UID 65534, 읽기 전용 root, 네트워크 차단, 모델·데이터 볼륨 없음 조건에서
-45,996개 profile·A+B 별칭 로드와 실제 E5 query/passage 임베딩을 확인했다.
-배포 매니페스트·자료 검증 및 관련 runtime/profile/alias 테스트는 212개 통과했다.
-이는 실제 DB·Backend 호출이나 ECR push 결과를 뜻하지 않는다.
+위 검증은 압축본 해시와 1,989건의 행 수, 상품명·Seed ID·도매꾹 ID의
+유일성, taxonomy 매핑, A+B 별칭 로드와 실제 E5 query/passage 임베딩을
+확인한다. 실제 DB의 상품명 일치, Backend API 호출이나 ECR push는 별도 연동
+검증 대상이다.
 
 별도로 주입할 필수 값은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `BACKEND_BASE_URL`,
 `BACKEND_INTERNAL_KEY`다. 기본 K8s 설정은 `backend-env`의 기존 DB 세 항목을 받아
@@ -153,41 +155,10 @@ Secret 공급은 인프라가 준비하고, 모델·상품 자료는 이미지�
 
 ## 오프라인 자원 측정
 
-측정 스크립트는 DB·Backend에 연결하지 않는다. 실제 profile을 읽어 운영 parser와
-proposal planner를 초기화한 뒤, 합성 자연어 입력을 해석하고 실제 E5로 query와
-상품 profile 문장을 임베딩한다. 원상품 클러스터링, 전체 후보 순회와 API 왕복은
-측정하지 않는다. 출력의 `processPeakRssMiB`는 프로세스 최대 RSS,
-`cgroupPeakMiB`는 읽을 수 있는 경우 컨테이너 cgroup의 최대 메모리다.
-
-현재 이미지는 자료와 모델을 포함하므로 측정 스크립트만 연결한다. 아래의 과거 측정은
-당시 자료 기준이며 현재 이미지의 측정값으로 간주하지 않는다.
-
-```bash
-docker run --rm --network none --read-only \
-  --tmpfs /tmp:rw,nosuid,nodev,size=256m \
-  --cap-drop ALL --security-opt no-new-privileges \
-  --cpus 1 --memory 4g --memory-swap 4g \
-  --mount "type=bind,src=$PWD/scripts/inspect/probe_demand_clustering_runtime.py,dst=/probe.py,readonly" \
-  --entrypoint python demand-clustering-job:local /probe.py \
-  --profiles /artifacts/catalog_profiles.csv --taxonomy /artifacts/taxonomy.json \
-  --model /models/multilingual-e5-small --query-count 1000 --passage-count 1000
-```
-
-### 2026-09-09 로컬 측정
-
-- Docker Desktop/WSL2 Linux amd64, CPU quota 1, swap 비활성, E5 batch size 32.
-- profile 45,719건 전체 로드, claim 인덱스 대상 44,919건, 16개 카테고리.
-- taxonomy는 `tests/demand_constraints/fixtures/v042_taxonomy.json`을 사용했다.
-  현재 입력에 대한 구성요소 측정이며 실제 DB 연동이나 운영 부하 검증을 대체하지 않는다.
-  상품도감·ID는 Part A를 기준으로 하며 실제 입력 수요·보드도 같은 ID를 사용해야 한다.
-- E5 revision: `614241f622f53c4eeff9890bdc4f31cfecc418b3`, PyTorch `2.14.0+cpu`.
-- 100 query / 100 passage: 30.65초, 최대 RSS 2,063.05 MiB,
-  cgroup 최대 2,033.89 MiB. 컨테이너 메모리 한도 3 GiB에서 완료했다.
-- 1,000 query / 1,000 passage: 134.98초, 최대 RSS 2,375.41 MiB,
-  cgroup 최대 2,226.61 MiB. 컨테이너 메모리 한도 4 GiB에서 완료했다.
-
-100건 측정만으로도 512 MiB나 1 GiB를 잡을 근거는 없다. 실제 배포 artifact와 예상
-배치 수요·활성 보드 수를 기준으로 전체 배치를 다시 측정해 requests/limits와
+기존 3/4 GiB 제안은 E5 모델을 포함한 과거 오프라인 측정에서 최대 약
+2.4 GiB를 사용한 결과에 여유를 둔 값이다. 당시의 MFDS profile/claim 측정
+스크립트는 현재 v5 시드 런타임 계약이 아니므로 재사용하지 않는다. 실제 배포
+수요·활성 보드 수를 기준으로 전체 배치를 다시 측정해 requests/limits와
 실행 제한 시간을 조정해야 한다.
 
 ## 실제 연동 전 준비 상태 — 2026-09-09 로컬 확인
@@ -195,20 +166,15 @@ docker run --rm --network none --read-only \
 | 항목 | 확인 결과 | 다음에 필요한 것 |
 | --- | --- | --- |
 | 이미지·E5 | 빌드, 오프라인 CPU 실행 검증 완료 | 인프라의 이미지 배포; 현재 모델은 이미지에 포함 |
-| 상품 profile | 현재 Part A 분류 기준으로 재생성한 45,719건·15개 필드가 기존 profile과 모두 일치 | 현재 이미지에는 V2.2 45,996건을 포함; DB ID 계약 확인은 별도 |
-| taxonomy | 테스트 fixture가 현재 profile의 16개 카테고리를 포함하며 runtime 로드 확인 | 현재 profile·taxonomy를 이미지에 함께 포함 |
+| v5 상품 시드 | 1,989건, 상품명·Seed ID·도매꾹 ID 유일성 검증 | 배포 DB의 상품명과 정확 일치 실연동 확인 |
+| taxonomy | v5 1,890건 매핑, 99건 미매핑 | 미매핑 상품은 대체제안만 건너뜀는지 실연동 확인 |
 | 연결 설정 | 실제 배포 연동 미검증; backend-env DB 세 항목 재사용, 내부 키 항목 공급 대기 | DB·Backend 연결 확인, 내부 키 주입과 헤더 이름 정합성 확인 |
 | Backend API | 합의한 두 API가 동작하는 배포 대상은 미확인 | 대상 환경에서 API 1·2 및 `X-Internal-Api-Key` 계약 지원 여부 확인 |
 | 거절 이력 | 갱신 ERD 이미지 기준 `reject_history` 조회·후보 제외 구현 | 실제 테이블 배포, 거절과 상태 복귀의 원자적 저장, SELECT 권한 및 API 2의 동시성 재검증 확인 |
 
-상품도감과 catalog ID의 기준은 Part A이며 Part B가 별도 ID를 만들거나 Backend
-ERD 변경을 요구하지 않는다. 위 2026-09-09 측정에서는 Part A 입력 45,996건에서 분류 제외 277건을 빼면
-profile 45,719건이다. 이 중 claim 근거를 사용할 수 있는 44,919건은 후보 인덱스에
-들어가며, 근거 부족 800건은 제외된다. 현재 이미지는 2026-09-11 V2.2 생성 경로와 같이 45,996건을 보존한다. Part A의
-후속 변경은 profile·taxonomy 재생성 및 이미지 갱신으로 반영한다.
-
-실제 연동 때는 PostgreSQL 수요·보드의 catalog ID가 이 상품도감과 일치하고 profile에
-존재하는지 확인한다. 현재 파일 재현 검증이 실제 DB의 ID 일치까지 확인한 것은 아니다.
+실제 연동 때는 PostgreSQL 수요·보드의 `catalog_id`가 가리키는
+`product_catalog.name`이 v5 시드의 `name`과 일치하는지 확인한다. 숫자 ID 범위가
+다른 것은 정상이며, 현재 파일 검증이 실제 DB의 이름 일치까지 확인한 것은 아니다.
 
 준비가 완료되면 읽기 전용 세션 및 입력 ID 일치 여부부터 확인한다. 실제 API
 반영 검증은 대상 환경과 사용할 테스트 수요를 명시적으로 정한 뒤 별도로 수행한다.

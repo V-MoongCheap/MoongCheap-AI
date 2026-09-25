@@ -23,10 +23,10 @@ Part A의 Labeling 완료를 기다리지 않고 필요한 자연어 조건을 �
 Backend mutation 요청에는 전송하지 않는다.
 
 대체상품 경로는 원상품 계획에 포함되지 않은 미편입 수요에 대해 실행한다.
-현재 CLI는 활성 보드 catalog의 동일 서비스 카테고리와 claim ID 포함관계를
-`IdentityClaimContainmentIndex`로 검사한다. 원상품의 모든 claim이 후보에 있어야
-통과하며, E5 Top-K 검색이나 방향성 relation 확장은 이 운영 경로에 연결하지 않는다.
-상품명·수출표식·record type으로 판매 가능 여부를 판단하지 않는다. 이후
+현재 CLI는 Backend의 UNIQUE 상품명으로 도매꾹 v5 seed를 결합하고, 동일한 v5
+말단 카테고리에 속한 활성 보드만 대체상품 후보로 사용한다. 상품명에 taxonomy의
+제형·원료 값이 명시된 경우에만 해당 facet을 사용하며 MFDS claim ID는 운영 경로에
+사용하지 않는다. 이후
 MUST/EXCLUDE는 board hard gate, PREFER는 순위,
 PASSTHROUGH는 주입형 text scorer에 사용하고, CONFLICT/NONE은 자연어 조건으로
 보드를 차단하지 않는다. 선택 결과는 `SUBSTITUTE_OFFERED` 후보 한 건이며 확정
@@ -61,7 +61,7 @@ import하지 않는다. 공통 profile 상태와 relation fingerprint 계약은 
 원상품 계획을 세우고 API 1을 적용한 뒤 PostgreSQL을 다시 읽는다. 이번 API 1의
 처리 대상과 두 조회 사이에 새로 들어온 수요는 같은 실행의 대체상품 후보에서
 제외한다. Backend가 생성했다고 응답한 보드가 재조회에서 보이지 않으면 API 2를
-호출하지 않는다. 자연어 parser, 상품 profile, claim 인덱스와 선호 점수기를
+호출하지 않는다. 자연어 parser, v5 시드 인덱스와 선호 점수기를
 결합하는 proposal planner를 주입한다. DB 연결과 1회 실행 CLI, 전용 Dockerfile은
 구현되어 있으며, 이미지 배포와 시간별 스케줄 등록은 인프라 측 작업이다.
 빌드·실행 방법은 [컨테이너 안내](../../../docs/DEMAND_CLUSTERING_CONTAINER.md)를 참고한다.
@@ -75,8 +75,8 @@ AWS Parameter Store의 `SecureString`으로 관리하고 배포 환경에서
 `BACKEND_BASE_URL`은 일반 설정으로 주입한다. 기존 `BACKEND_SERVICE_TOKEN`은
 사용하지 않는다. 운영 최소 참가자 수 `CLUSTER_MIN_PARTICIPANTS`는 5 이상이어야 한다.
 
-`ClaimIndexedSubstituteProposalPlanner`는 재조회된 활성 보드 catalog만 대상으로
-같은 서비스 카테고리와 claim ID 포함관계를 먼저 검사한다. 통과한 보드는 기존
+`CatalogSeedSubstituteProposalPlanner`는 재조회된 활성 보드 catalog만 대상으로
+같은 v5 말단 카테고리와 명시적으로 확인된 상품명 facet을 먼저 검사한다. 통과한 보드는 기존
 가격·MUST·EXCLUDE gate와 PREFER·PASSTHROUGH 순위 계산을 거쳐 API 2 제안 행이
 된다. PASSTHROUGH 의미 점수기는 `E5RuntimeTextSimilarityScorer`로 주입한다.
 이 점수기는 PASSTHROUGH 수요와 후보가 있는 배치에서만 CPU 모델을 지연 로드하고,
@@ -89,11 +89,10 @@ AWS Parameter Store의 `SecureString`으로 관리하고 배포 환경에서
 uv sync --project packaging/demand-clustering --locked --extra embeddings
 ```
 
-planner에 로드하는 profile의 `catalog_id`는 PostgreSQL 입력의
-`product_catalog.id`와 같아야 한다. 상품도감과 ID는 Part A를 기준으로 하며,
-Part B가 별도 ID를 만들지 않는다. 현재 Part A 산출물로 profile을 검증하고 후속
-산출물은 버전 갱신으로 반영한다. 실제 DB 연동 시에는 입력 수요·보드가 같은
-상품도감 ID를 사용하는지 확인한다.
+planner는 v5 seed의 상품명과 PostgreSQL `product_catalog.name`을 정확히 결합한다.
+숫자 `product_catalog.id`는 Backend가 소유하며 이미지에 고정하지 않는다. v5에
+없는 사용자 추가 상품과 이름이 변경된 상품은 기본 클러스터링에는 참여하지만
+대체상품 제안에서는 제외한다.
 
 ## 1회 배치 실행
 
@@ -107,7 +106,7 @@ Backend DB 계정을 공유하며, 이 세션 설정이 DB role의 권한을 변
 
 - 비밀 설정: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `BACKEND_INTERNAL_KEY`
 - 기존 직접 DSN 입력: `SHARED_DATABASE_URL` (비어 있지 않으면 DB 세 변수보다 우선)
-- 일반 설정: `BACKEND_BASE_URL`, `MFDS_CATALOG_PROFILES_PATH`,
+- 일반 설정: `BACKEND_BASE_URL`, `DEMAND_CATALOG_SEED_PATH`,
   `DEMAND_TAXONOMY_PATH`, `DEMAND_CONSTRAINT_RULES_PATH`,
   `DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH` (B 기본 별칭), `E5_MODEL_PATH`
 - 선택 설정: `DEMAND_CONSTRAINT_ALIASES_PATH` (A 승인 별칭; 없으면 B만 사용),
@@ -123,8 +122,8 @@ DSN을 만든다. IPv6 주소와 libpq 호환 query를 보존하며, JDBC 전용
 기존 `SHARED_DATABASE_URL` 직접 입력은 PostgreSQL DSN이어야 하며 JDBC 형식을
 사용하지 않는다. `BACKEND_BASE_URL`에는
 경로가 아닌 Backend 서비스의 HTTP(S) base URL을 넣는다. artifact와 모델 경로가
-존재하지 않거나 PostgreSQL 입력의 catalog ID가 profile에 없으면 Backend mutation
-전에 실패한다.
+존재하지 않으면 시작하지 않는다. 개별 DB 상품이 seed에 없어도 기본 보드 계획은
+중단하지 않고 해당 상품의 대체상품 제안만 건너뛴다.
 
 로컬에서는 환경 파일을 명시해 실행할 수 있다.
 
