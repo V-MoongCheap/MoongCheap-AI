@@ -151,7 +151,31 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
             r"(.+?)(?:이어야|여야)\s*하지만,?\s*(?:동시에\s*)?(.+?)(?:피하고\s*싶어(?:요|해요|합니다)?)[.!?]?",
             value,
         )
-        return (match.group(1), match.group(2)) if match else None
+        return (
+            (match.group(1), f"{match.group(2)} 피하고 싶어요")
+            if match
+            else None
+        )
+
+    def _branch_constraint_type(self, text: str) -> str:
+        """Return the branch polarity used only for A conflict diagnostics."""
+        explicit = self._explicit_requirement_type(text)
+        if explicit is not None:
+            return explicit
+        if re.search(r"(?:이어야|여야)", normalize(text)):
+            return "MUST"
+        return "MUST"
+
+    @staticmethod
+    def _values_conflict(
+        left_code: int,
+        right_code: int,
+        left_type: str,
+        right_type: str,
+    ) -> bool:
+        if left_code == right_code:
+            return {left_type, right_type} == {"MUST", "EXCLUDE"}
+        return left_type != "EXCLUDE" and right_type != "EXCLUDE"
 
     @staticmethod
     def _conjunction_match(text: str) -> re.Match[str] | None:
@@ -169,12 +193,19 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
             return ()
         left = self._branch_facets(category_id, branches[0])
         right = self._branch_facets(category_id, branches[1])
+        left_type = self._branch_constraint_type(branches[0])
+        right_type = self._branch_constraint_type(branches[1])
         conflicts = {
             (left_item.facet_name, left_item.value_code, right_item.value_code)
             for left_item in left
             for right_item in right
             if left_item.facet_name == right_item.facet_name
-            and left_item.value_code != right_item.value_code
+            and self._values_conflict(
+                left_item.value_code,
+                right_item.value_code,
+                left_type,
+                right_type,
+            )
         }
         return tuple(
             f"CONFLICTING_VALUES:{facet}:{left_code}:{right_code}"
@@ -187,13 +218,20 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
             return (), (), ()
         left, left_equivalences = self._resolved_branch_facets(category_id, branches[0])
         right, right_equivalences = self._resolved_branch_facets(category_id, branches[1])
+        left_type = self._branch_constraint_type(branches[0])
+        right_type = self._branch_constraint_type(branches[1])
         equivalences = self._dedupe_equivalences((*left_equivalences, *right_equivalences))
         conflicts = {
             (left_item.facet_name, left_item.value_code, right_item.value_code)
             for left_item in left
             for right_item in right
             if left_item.facet_name == right_item.facet_name
-            and left_item.value_code != right_item.value_code
+            and self._values_conflict(
+                left_item.value_code,
+                right_item.value_code,
+                left_type,
+                right_type,
+            )
         }
         warnings = tuple(
             f"CONFLICTING_VALUES:{facet}:{left_code}:{right_code}"
@@ -204,6 +242,62 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
     def interpret(self, category_id: str, text: str, *, is_substitutable: bool):
         value = text.strip()
         if value and is_substitutable and self.classifier.input_channel_typed_nonblocking_states:
+            branches = self._conflict_branches(value)
+            if branches is not None:
+                left, left_equivalences = self._resolved_branch_facets(category_id, branches[0])
+                right, right_equivalences = self._resolved_branch_facets(category_id, branches[1])
+                left_type = self._branch_constraint_type(branches[0])
+                right_type = self._branch_constraint_type(branches[1])
+                branch_conflicts = {
+                    (left_item.facet_name, left_item.value_code, right_item.value_code)
+                    for left_item in left
+                    for right_item in right
+                    if left_item.facet_name == right_item.facet_name
+                    and self._values_conflict(
+                        left_item.value_code,
+                        right_item.value_code,
+                        left_type,
+                        right_type,
+                    )
+                }
+                if not branch_conflicts and left and right:
+                    facets = tuple(dict.fromkeys((*left, *right)))
+                    parsed = self._preference_result(
+                        category_id,
+                        value,
+                        facets,
+                        polarity_source="A_BRANCH_POLARITY",
+                        modality_scope="EXPLICIT_REQUIREMENT_FRAME",
+                    )
+                    types = {
+                        (item.facet_name, item.value_code): left_type
+                        for item in left
+                    }
+                    types.update({
+                        (item.facet_name, item.value_code): right_type
+                        for item in right
+                    })
+                    constraints = tuple(
+                        replace(
+                            item,
+                            constraint_type=types.get(
+                                (item.facet_name, item.value_code),
+                                item.constraint_type,
+                            ),
+                        )
+                        for item in parsed.constraints
+                    )
+                    return DemandRequirementResult(
+                        status="PARSED",
+                        constraints=constraints,
+                        warnings=(),
+                        clauses=(value,),
+                        interpretation_method="A_BRANCH_POLARITY",
+                        effective_requirement_mode="STRUCTURED",
+                        taxonomy_equivalences=self._dedupe_equivalences(
+                            (*left_equivalences, *right_equivalences)
+                        ),
+                    )
             conflict, _, equivalences = self.resolved_conflict(category_id, value)
             if conflict:
                 return DemandRequirementResult(
@@ -227,7 +321,7 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
             for warning in baseline.warnings
         )
         explicit = None
-        if value and (result.status == "PARSED" or safe_review):
+        if value and safe_review:
             explicit = self._explicit_requirement_result(category_id, value)
         if explicit is None:
             return result
