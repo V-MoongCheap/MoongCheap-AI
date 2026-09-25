@@ -29,3 +29,11 @@ COPYFILE_DISABLE=1 tar --no-xattrs --no-acls -czf - "${files[@]}" |
   DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-0}" docker build \
     --platform "$target_platform" --target "$build_target" \
     -f docker/Dockerfile.awarding -t "$image_tag" -
+
+# FROM/COPY 문법을 추측하지 않고 실제 배포 이미지 파일을 검사한다.
+# 검증 스크립트 자체는 이미지에 넣지 않고 stdin으로 전달한다.
+if [[ "$build_target" == "runtime" ]]; then
+  docker run --rm -i --platform "$target_platform" --network none --read-only \
+    --cap-drop ALL --security-opt no-new-privileges --entrypoint python \
+    "$image_tag" - < scripts/awarding/verify_runtime_image.py
+fi
