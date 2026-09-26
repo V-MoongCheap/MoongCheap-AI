@@ -1,0 +1,7 @@
+demand_id,catalog_id,label,category_id,quantity,is_substitutable
+D001,C100,홍삼정,health-functional-food:red_ginseng,3,true
+D002,C100,홍삼정,health-functional-food:red_ginseng,2,true
+D003,C101,홍삼정,health-functional-food:red_ginseng,5,true
+D004,C200,비타민C,health-functional-food:vitamin_c,4,true
+D005,C200,비타민C,health-functional-food:vitamin_c,1,true
+D006,C201,비타민C,health-functional-food:vitamin_c,2,false
