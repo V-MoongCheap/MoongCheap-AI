@@ -41,6 +41,7 @@ def test_part_a_returns_backend_contract_without_clustering(tmp_path):
     assert constraints[0]["facetKey"] == "product_form"
     assert constraints[0]["valueCode"] == 1
     assert result.loc[2, "effectiveRequirementMode"] == "SEMANTIC_TEXT"
+    assert result.loc[2, "processed_at"] == ""
     assert len(json.loads(result.loc[3, "preferenceGroups"])) == 1
     assert summary["externalLlmCalls"] == 0
     assert summary["clustering"] == "NOT_PERFORMED"

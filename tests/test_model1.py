@@ -15,6 +15,7 @@ from moongcheap_ai.data_foundation.model1_postprocess import (
     map_products,
     normalize_candidates,
 )
+from moongcheap_ai.data_foundation.category_v2_1 import classify_v2_1
 
 
 def test_composite_values_are_split_before_deduplication():
@@ -45,7 +46,9 @@ def test_compact_prompt_bounds_evidence_and_requires_contract_shape():
     )
     assert "at most 1 facet and 1 value" in prompt
     assert "source_text" in prompt
-    assert "long" not in prompt
+    assert "semantic stable key" in prompt
+    assert "evidence_text" in prompt
+    assert "long" * 100 not in prompt
 
 
 def _frame():
@@ -97,6 +100,16 @@ def test_sampling_handles_empty_or_partially_schematized_input():
         "sampling_reason",
     ]
     assert len(partial) == 1
+
+
+def test_generic_protein_word_in_function_text_does_not_make_protein_category():
+    row = pd.Series({
+        "product_type": "비오틴",
+        "functional_ingredients": "비오틴",
+        "main_functionality": "단백질 대사와 에너지 생성에 필요",
+        "name": "활력충전 비오틴",
+    })
+    assert classify_v2_1(row)[0] != "PROTEIN"
 
 
 def test_mock_output_parser_accepts_input_evidence():

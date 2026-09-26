@@ -40,7 +40,8 @@ class DemandConstraintParser:
         *,
         rules_path: str | Path,
         aliases_path: str | Path | None = None,
-        input_policy_factory: InputPolicyFactory = ConstraintInputPolicy,
+        input_policy_factory: InputPolicyFactory | None = None,
+        policy_cls: type[ConstraintInputPolicy] | None = None,
     ) -> DemandConstraintParser:
         """Build a parser with an optionally specialized input policy.
 
@@ -52,7 +53,12 @@ class DemandConstraintParser:
         matcher = TaxonomyFacetMatcher(taxonomy, aliases_path)
         classifier = ConstraintClassifier.from_path(rules_path)
         extractor = ConstraintExtractor(matcher, classifier)
-        return cls(extractor, input_policy_factory(matcher, extractor))
+        if input_policy_factory is not None and policy_cls is not None:
+            raise ValueError(
+                "provide only one of input_policy_factory or policy_cls"
+            )
+        factory = input_policy_factory or policy_cls or ConstraintInputPolicy
+        return cls(extractor, factory(matcher, extractor))
 
     def parse(self, category_id: str, extra_requirement: str) -> ExtractionResult:
         """Return the frozen language-only result for evaluation compatibility."""

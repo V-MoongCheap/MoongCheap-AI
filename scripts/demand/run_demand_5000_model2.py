@@ -36,6 +36,13 @@ def _model_name(explicit: str | None) -> str:
     return explicit or os.environ.get("MODEL2_MODEL", "") or os.environ.get("MODEL1_MODEL", "")
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _empty_model_frame(sample: pd.DataFrame, reason: str) -> pd.DataFrame:
     result = sample[["demand_id", "catalog_id", "category_id"]].copy()
     result["model_label"] = ""
@@ -98,6 +105,12 @@ def main() -> None:
     parser.add_argument("--model", default=None)
     parser.add_argument("--batch-size", type=int, default=10)
     parser.add_argument("--max-llm-calls", type=int, default=100)
+    parser.add_argument(
+        "--enable-llm-fallback",
+        action="store_true",
+        default=_env_bool("LABELING_LLM_FALLBACK_ENABLED"),
+        help="Allow the model to replace only unresolved Rule rows; disabled by default.",
+    )
     parser.add_argument("--reuse-llm-sample", action="store_true", help="Reuse an existing 200-row Model 2 result")
     args = parser.parse_args()
     started = time.perf_counter()
@@ -115,7 +128,10 @@ def main() -> None:
     facets = build_product_facet_map(facet_frame)
     print({"stage": "facet_map", "keys": len(facets)}, flush=True)
     taxonomy_loader = load_json_taxonomy(args.taxonomy)
-    rule = label_demands(demands, taxonomy_loader, product_facet_map=facets)
+    # Product Facets remain catalog provenance. They must not become implicit
+    # consumer constraints when extra_requirement is empty; unmentioned
+    # facets are represented as ALL by the demand labeler.
+    rule = label_demands(demands, taxonomy_loader)
     rule["interpretation_method"] = "RULE_ALIAS"
     print({"stage": "rule_labeled", "rows": len(rule)}, flush=True)
     _write(rule, args.output_dir / "demand_5000_rule_labeled_v1.csv")
@@ -124,13 +140,16 @@ def main() -> None:
     _write(sample, args.output_dir / "model2_eval_sample_200_v1.csv")
     model = _model_name(args.model)
     model_available = bool(model and os.environ.get("MODEL2_PROVIDER", os.environ.get("MODEL1_PROVIDER", "ollama")) == "ollama")
+    fallback_enabled = bool(model_available and args.enable_llm_fallback)
     model_meta: dict[str, object] = {"provider": "ollama", "model": model or None, "status": "BLOCKED_NO_EXECUTABLE_MODEL"}
     model_result = _empty_model_frame(sample, "MODEL2_MODEL is not configured")
     sample_output = args.output_dir / "model2_llm_labeled_200_v1.csv"
     if args.reuse_llm_sample and sample_output.exists():
         model_result = pd.read_csv(sample_output, dtype=str).fillna("")
         model_meta = {"provider": "ollama", "model": model or None, "status": "COMPLETED_REUSED", "call_count": (len(sample) + args.batch_size - 1) // args.batch_size, "runtime_seconds": None}
-    elif model_available:
+    # A configured model must not cause an implicit server-side model load.
+    # Experimental LLM execution is opt-in together with the fallback flag.
+    elif fallback_enabled:
         model_result, model_meta = _model_result(sample, args.taxonomy, args.product_facets, model, args.batch_size)
     _write(model_result, sample_output)
     print({"stage": "sample_written", "model_available": model_available}, flush=True)
@@ -138,10 +157,10 @@ def main() -> None:
     review_candidates = rule[rule["label_status"] != "LABELED"].copy()
     limited = review_candidates.iloc[: max(0, args.max_llm_calls * args.batch_size)].copy()
     full_model = None
-    if model_available and not limited.empty:
+    if fallback_enabled and not limited.empty:
         full_model, full_meta = _model_result(limited, args.taxonomy, args.product_facets, model, args.batch_size)
         model_meta["full_hybrid"] = full_meta
-    hybrid = _build_hybrid(rule, limited, full_model, args.max_llm_calls, model_available)
+    hybrid = _build_hybrid(rule, limited, full_model, args.max_llm_calls, fallback_enabled)
     comparison = hybrid[["demand_id", "catalog_id", "category_id", "scenario_type", "label", "label_status", "hybrid_label", "hybrid_status", "interpretation_method", "hybrid_model_status"]].rename(columns={"label": "rule_label", "label_status": "rule_status"})
     if not model_result.empty:
         comparison = comparison.merge(model_result.rename(columns={"model_status": "llm_status", "model_warnings": "llm_warnings"})[["demand_id", "model_label", "llm_status", "llm_warnings"]], on="demand_id", how="left")
@@ -156,6 +175,7 @@ def main() -> None:
     quality = quality_report(demands, set(demands["product_reference"]), set(taxonomy_categories))
     _write(demands, args.output_dir / "grounded_demand_5000_raw.csv")
     _write(quality, args.output_dir / "demand_5000_quality_report_v1.csv")
+    model_meta["llm_fallback_enabled"] = fallback_enabled
     report = quality_markdown(demands, quality) + "\n\n## Model 2 실행\n\n```json\n" + json.dumps(model_meta, ensure_ascii=False, indent=2, default=str) + "\n```\n"
     report += f"\n- Rule Labeling rows: {len(rule)}\n- Rule needs review: {int((rule['label_status'] != 'LABELED').sum())}\n- Hybrid LLM assisted: {int((hybrid['interpretation_method'] == 'HYBRID_RULE_LLM').sum())}\n- B export rows: {len(clustering)}\n- Runtime seconds: {time.perf_counter() - started:.3f}\n"
     (args.output_dir / "demand_5000_model2_report_v1.md").write_text(report, encoding="utf-8")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from datetime import datetime
+import math
 from types import TracebackType
 from typing import Any, Protocol, Self
 
@@ -47,17 +48,33 @@ def write_label_results(
     overwritten accidentally.
     ``REVIEW`` rows are intentionally not persisted as completed labels.
     """
-    timestamp = processed_at.isoformat() if isinstance(processed_at, datetime) else str(processed_at)
+    timestamp = processed_at.isoformat() if isinstance(processed_at, datetime) else str(processed_at).strip()
+    if not timestamp:
+        raise ValueError("processed_at is required for direct DB labeling")
     updates = []
+    seen_ids: set[str] = set()
     for row in rows:
-        if str(row.get("label_status", "")).strip().upper() == "REVIEW":
+        status = str(row.get("label_status", "")).strip().upper()
+        if status == "REVIEW":
             continue
+        # A warning-bearing result is diagnostic only.  It must not mark the
+        # demand as processed because the next batch must be able to retry it
+        # after the taxonomy/model policy is improved.
+        if status != "LABELED":
+            raise ValueError(f"unsupported label_status for DB write: {status or '<blank>'}")
         demand_id = row.get("demand_id")
-        if demand_id in (None, ""):
+        if demand_id is None or (isinstance(demand_id, float) and math.isnan(demand_id)) or str(demand_id).strip().casefold() in {"", "nan", "none"}:
             raise ValueError("demand_id is required for direct DB labeling")
+        demand_key = str(demand_id).strip()
+        if demand_key in seen_ids:
+            raise ValueError(f"duplicate demand_id in DB labeling batch: {demand_key}")
+        seen_ids.add(demand_key)
+        label = str(row.get("label", "")).strip()
+        if not label:
+            raise ValueError(f"label is required for demand_id: {demand_key}")
         updates.append({
-            "demand_id": demand_id,
-            "label": str(row.get("label", "")),
+            "demand_id": demand_key,
+            "label": label,
             "processed_at": timestamp,
         })
 

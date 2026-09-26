@@ -30,23 +30,39 @@ def _allowed(loader: TaxonomyLoader, category_id: str) -> dict[str, list[dict[st
 
 
 def _prompt(rows: list[dict[str, Any]], loader: TaxonomyLoader) -> str:
-    categories = {}
+    category_specs = {}
+    compact_rows = []
     for row in rows:
         category_id = str(row["category_id"])
-        categories[category_id] = _allowed(loader, category_id)
-    facet_order = {}
-    for category_id, facet_values in categories.items():
-        facet_order[category_id] = list(facet_values)
+        allowed = _allowed(loader, category_id)
+        category_specs[category_id] = {
+            "facet_names": list(allowed),
+            "values": {
+                name: [
+                    {"code": item.get("code"), "value": item.get("value", "")}
+                    for item in values
+                ]
+                for name, values in allowed.items()
+            },
+        }
+        compact_rows.append(
+            {
+                "demand_id": str(row["demand_id"]),
+                "category_id": category_id,
+                "extra_requirement": str(row.get("extra_requirement", "")),
+                "product_defaults": row.get("product_defaults", {}),
+            }
+        )
     return (
-        "You classify Korean consumer demand into the provided taxonomy. Return JSON only. "
-        "Return exactly one result for every input demand_id, with no omitted or invented IDs. "
-        "For every demand return demand_id and facet_values, mapping the exact facet names listed below to an integer code. "
-        "Use product_defaults unless extra_requirement explicitly conflicts; then extra_requirement wins. "
-        "Never use numeric facet names, shortened names, or invent a facet or code. Code 0 means ALL.\n"
-        f"Facet names by category, in order: {json.dumps(facet_order, ensure_ascii=False)}\n"
-        f"Taxonomy: {json.dumps(categories, ensure_ascii=False)}\n"
-        f"Demands: {json.dumps(rows, ensure_ascii=False)}\n"
-        'Schema: {"results":[{"demand_id":"...","facet_values":{"facet_name":0}}]}'
+        "Classify Korean consumer demand. Return JSON only, with no explanation. "
+        "Return exactly one result for each demand_id. For each result, facet_values "
+        "must be a flat object whose keys are the exact facet_names for that demand's "
+        "category. Never use a category_id as a facet key, never nest facet_values, "
+        "never invent a facet/code, and use code 0 for ALL. Use product_defaults when "
+        "extra_requirement is empty.\n"
+        f"Category specifications: {json.dumps(category_specs, ensure_ascii=False)}\n"
+        f"Demands: {json.dumps(compact_rows, ensure_ascii=False)}\n"
+        'Schema: {"results":[{"demand_id":"...","facet_values":{"exact_facet_name":0}}]}'
     )
 
 
@@ -114,6 +130,11 @@ class OllamaDemandLabeler:
                 demand_id = str(item["demand_id"])
                 if demand_id in expected_ids:
                     output[demand_id] = _normalise_model_facet_values(item["facet_values"])
+            missing_ids = expected_ids - set(output)
+            if missing_ids:
+                raise LLMLabelingError(
+                    "Ollama omitted demand IDs: " + ", ".join(sorted(missing_ids))
+                )
         except (OSError, urllib.error.URLError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             raise LLMLabelingError(str(exc)) from exc
         finally:
@@ -176,7 +197,17 @@ def compare_labeling_methods(demands: pd.DataFrame, loader: TaxonomyLoader, prod
     rows: list[dict[str, Any]] = []
     for position, (_, source) in enumerate(demands.fillna("").iterrows()):
         rule_row = rule.iloc[position]
-        base = {"demand_id": source["demand_id"], "catalog_id": source["catalog_id"], "category_id": source["category_id"], "is_substitutable": source["is_substitutable"], "rule_label": rule_row["label"], "rule_status": rule_row["label_status"], "rule_facet_values": rule_row["facet_values"]}
+        base = {
+            "demand_id": source["demand_id"],
+            "catalog_id": source["catalog_id"],
+            "category_id": source["category_id"],
+            # Gold/evaluation inputs may intentionally omit operational fields.
+            # Keep comparison focused on labeling and use the contract default.
+            "is_substitutable": source.get("is_substitutable", ""),
+            "rule_label": rule_row["label"],
+            "rule_status": rule_row["label_status"],
+            "rule_facet_values": rule_row["facet_values"],
+        }
         model = model_values.get(str(source["demand_id"]))
         if model is not None:
             values, warnings = _apply_model_result(source, model, loader, product_facet_map.get(str(source["catalog_id"]), []))

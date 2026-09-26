@@ -2,12 +2,12 @@
 
 ## 현재 결정
 
-모델을 정하지 않은 상태가 아니다. MVP 적용 방식은 다음과 같이 결정되어 있다.
+현재 운영 구조와 기본 모델 사용 정책을 확정한다. LLM 후보의 탐색 결과를
+최종 Taxonomy나 Label의 자동 승인 근거로 사용하지 않는다.
 
-- **Model 1:** `kakaocorp/kanana-nano-2.1b-instruct`를 Facet 후보 생성 보조로 사용한다. 다만 Rule/통계 Evidence와 Human Review가 최종 승격 조건이다.
-- **Model 2:** Rule-first Hybrid를 사용한다. `qwen2.5:7b-instruct`는 Rule이 해결하지 못한 양성 요구에만 fallback으로 호출한다.
-- **LLM-only:** 운영 경로에서 사용하지 않는다.
-- **Embedding:** Model 2가 아니라 B/C의 Clustering·Seller Matching 실험 대상으로 둔다.
+- Model 1: `kakaocorp/kanana-nano-2.1b-instruct`를 오프라인 후보 생성기로 사용한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다.
+- Model 2: `Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 명확한 행은 Rule/Alias가 처리하고, `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 `qwen2.5:7b-instruct` 모델 런타임으로 보조한다. 실제 배포 위치는 Cloud 설정에 따르며, 통신 기준은 Ollama API다.
+- LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
 ## 안전한 fallback 경계
 
@@ -21,7 +21,123 @@ Qwen은 이미 `PARSED` 또는 `NONE`인 Rule 결과를 덮어쓰지 않는다. 
 
 ## 검증 전제
 
-- Model 1 결과는 자동 Taxonomy 확정이 아니다.
-- Model 2 Gold 85건은 사람 최종 승인 전 후보이다.
-- Qwen 실제 배포 검증은 Ollama 서비스와 모델 가중치가 필요하다.
-- Backend 실제 ID/DB 계정, AWS/EKS Secret과 CI/CD 검증은 외부 환경에서 수행한다.
+| Partition | Row pass |
+| --- | ---: |
+| DEV | 100/100 (100%) |
+| HOLDOUT | 50/50 (100%) |
+| CHALLENGE | 50/50 (100%) |
+| Overall | 200/200 (100%) |
+
+이 Gold는 합성·검토 데이터이므로 실제 사용자 정확도의 증명으로 사용하지 않는다. LLM fallback은 이 baseline을 안정적으로 개선하는 경우에만 채택한다.
+
+### Model 1 Hybrid smoke
+
+동일한 Model 1 입력과 기존 후보 결과를 Rule/Model/Hybrid로 비교했다.
+
+| 항목 | 건수 |
+| --- | ---: |
+| Rule 후보 | 56 |
+| Model 후보 | 12 |
+| Hybrid 후보 | 67 |
+| Rule 근거로 승격된 Model 후보 | 1 |
+| Model 단독 Review 후보 | 11 |
+
+현재 결과는 Model 1 LLM을 자동 확정할 만큼의 근거가 아니다. Rule 근거가 없는 Model-only 후보는 모두 검토 대기로 유지한다.
+
+## 최종 선택 기준
+
+### Model 1
+
+후보 모델별로 동일 입력·Prompt·출력 Schema를 사용하고 다음을 비교한다.
+
+1. 구조화 출력 성공률
+2. 입력에 존재하는 Evidence ID/원문 인용률
+3. 실제 데이터에 없는 Facet·Value 생성률
+4. 중복·과도한 세분화 비율
+5. Category 간 일관성
+6. Human Review 승인률
+7. 실행 시간·메모리·재현성
+
+LLM 후보가 Rule/통계 근거를 개선하지 못하면 Model 1은 Rule/통계 기반으로 운영하고 LLM은 탐색 보조로만 둔다.
+
+### Model 2
+
+다음 세 구조를 같은 Gold와 이상 입력에 대해 비교한다.
+
+```text
+RULE_ONLY
+RULE_FIRST_HYBRID
+LLM_ONLY
+```
+
+필수 지표:
+
+- 구조화 Facet Label 정확도
+- 상태/모드/제약조건 정확도
+- Unknown·Abstention 적절성
+- Schema 실패율
+- 미응답·누락률
+- Rule 대비 개선폭
+- 처리 시간과 비용
+
+최신 Gold 15건에서 Rule-first의 의미 일치는 15/15였고, 지원 Gold는 Rule이 모두 처리했다. 따라서 Qwen은 Rule 결과를 대체하는 모델이 아니라 Rule이 확정하지 못한 행만 보조하는 fallback으로 사용한다. Qwen 단독 결과는 정상 응답 12건 중 1건이 잘못된 `ALL`을 생성했으므로 운영 방식으로 채택하지 않는다.
+
+### 서버 배포 제약을 반영한 추가 모델 평가
+
+현재 A labeling CronJob은 CPU 1 / Memory 2Gi request, CPU 2 / Memory 3Gi limit이며,
+현재 Docker 이미지에는 Ollama와 모델 가중치를 포함하지 않는다. 모델을 A Pod 내부,
+sidecar 또는 별도 Worker Pod 중 어디에 배치할지는 아직 확정되지 않았다. 따라서 로컬 GPU에서
+정상 실행되는 것만으로는 서버 후보로 승격하지 않는다.
+
+Model 2의 통신 기준은 현재 Ollama `/api/generate`다. vLLM/OpenAI 호환 API는
+현재 운영 기준이 아니며, 변경할 경우 별도 Adapter와 재평가가 필요하다.
+
+| 후보 | 양자화/크기 | 동일 Gold 및 샘플 측정 | 결론 |
+| --- | --- | --- | --- |
+| `qwen2.5:7b-instruct` | Q4_K_M / 4.7GB | Gold 단독 12/15 정상 응답, 1건 오판. 미확정 800건에서 223건 적용 | 제한적 fallback으로 선택. Model-only는 제외 |
+| `qwen3:4b` | Q4_K_M / Ollama 상주 약 2.9GB | Gold 15건 성공. 조건 포함 10건 중 비기본 결과 2건. 200건 303초 | 품질 부족으로 제외 |
+| `llama3.2:3b` | Q4_K_M / 2.0GB | Gold 15건 중 6건 실패 및 Taxonomy 오류 | 제외 |
+| `exaone3.5:2.4b` | Q4_K_M / 1.6GB | Gold 15건 전건 HTTP 500 | 제외 |
+
+Qwen 3 4B의 200건 결과는 Mac GPU 실행이라 Kubernetes CPU 처리량을 보장하지
+않는다. 또한 응답 성공률과 조건 해석 정확도는 별개다. Qwen 2.5 7B fallback의
+실제 서버 처리량과 리소스 적합성은 Cloud 배포 환경에서 별도 확인한다.
+
+따라서 최종 Model 2 운영 방식은 다음과 같다.
+
+1. Rule/Alias 기반 Labeling을 기본 서버 경로로 사용한다.
+2. `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 모델 런타임으로 보낸다.
+3. LLM 결과는 Taxonomy 검증과 Evidence Gate를 통과한 경우에만 적용한다.
+4. 부정 조건은 Rule Parser가 최종 판정하며, LLM은 부정 조건을 덮어쓰지 않는다.
+5. Qwen 2.5 7B Q4를 현재 모델 후보로 유지한다. 실제 모델 실행 위치,
+   Service endpoint, 리소스 및 프로토콜은 Cloud 배포 방식 확정 후 반영한다.
+
+## 다음 실행 순서
+
+1. Model 1 후보 모델을 동일한 multisource 입력으로 실행
+2. Model 1 후보 결과를 Evidence gate와 Human Review queue로 평가
+3. Model 2 후보 모델을 동일한 Dev/Holdout/Challenge 입력으로 실행
+4. Rule-only와 Hybrid의 개선폭 비교
+5. Model 1 Evidence Gate와 Model 2 Rule-first 회귀 결과를 CI에서 검증
+6. 승인된 Taxonomy와 Labeling policy를 `category.facet` 및 런타임 문서에 반영
+
+## 자동 검증 명령
+
+Model 1 후보는 아래 Evidence Gate를 통과한 뒤에만 검토 큐로 보낸다.
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
+  --input <multisource_model_input.jsonl> \
+  --candidates <multisource_model_candidates.csv> \
+  --output <model1_quality_audit.json>
+```
+
+오프라인 5천 건 생성기의 LLM fallback은 `LABELING_LLM_FALLBACK_ENABLED=false`가
+기본값이다. 서버 런타임에서는 Ollama endpoint가 공급되는 환경에
+`A_LLM_ENABLED=true`와 `A_LLM_MODEL=qwen2.5:7b-instruct`를 주입한다.
+`A_LLM_MAX_ROWS`는 기본 `0`(무제한)이며, 양수여도 페이지 분할로 전체 미확정 행을
+처리하고 누락하지 않는다. 검증 실패·부정·충돌·Taxonomy 외부 결과는 `REVIEW`로 남기며
+Backend/DB 완료 처리 대상에서 제외한다.
+오프라인 실험에서는 `--enable-llm-fallback`을 명시한다.
+
+실제 모델 가중치·Ollama/Hugging Face/API 환경이 없는 경우에는 모델을 실행한 것처럼 처리하지 않고, 해당 후보를 `NOT_RUN`으로 기록한다.
