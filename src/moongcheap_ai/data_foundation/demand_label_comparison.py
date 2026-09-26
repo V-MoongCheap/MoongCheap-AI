@@ -130,6 +130,11 @@ class OllamaDemandLabeler:
                 demand_id = str(item["demand_id"])
                 if demand_id in expected_ids:
                     output[demand_id] = _normalise_model_facet_values(item["facet_values"])
+            missing_ids = expected_ids - set(output)
+            if missing_ids:
+                raise LLMLabelingError(
+                    "Ollama omitted demand IDs: " + ", ".join(sorted(missing_ids))
+                )
         except (OSError, urllib.error.URLError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             raise LLMLabelingError(str(exc)) from exc
         finally:

@@ -38,14 +38,26 @@ python -m moongcheap_ai.data_foundation.runtime_job `
   로컬 Rule 회귀 테스트를 할 때만 허용한다.
 - `A_LLM_MODEL`: 사용할 LLM 모델 이름. 현재 후보는
   `qwen2.5:7b-instruct` Q4다.
-- `A_LLM_ENDPOINT`: 원격 LLM Worker 방식을 선택할 때 사용하는
-  Ollama-compatible endpoint. A Pod 내부 실행 또는 sidecar 방식을 선택하면
-  이 값의 사용 여부가 달라진다.
+- `A_LLM_ENDPOINT`: 현재 표준인 Ollama `/api/generate` endpoint. Cloud develop
+  설정의 기본 주소는 `http://ollama:11434`이며, 실제 배치 위치에 따라 주입
+  방식은 달라질 수 있다.
 - Cloud develop의 기존 `A_MODEL2_FALLBACK_*`, `A_MODEL2_OLLAMA_BASE_URL` 이름도
   과도기 호환용으로 읽지만, 새 설정의 표준 이름은 `A_LLM_*`다.
 - `A_LLM_TIMEOUT_SECONDS`: LLM 요청 timeout. 기본 300초
 - `A_LLM_BATCH_SIZE`: 한 번에 보낼 행 수. 기본 5
-- `A_LLM_MAX_ROWS`: 한 배치에서 LLM으로 보낼 최대 행 수. 기본 100
+- `A_LLM_MAX_ROWS`: 한 페이지에 보낼 행 수를 제한하는 선택적 운영 설정이다.
+  `0` 또는 미설정이면 미해결 행 전체를 한 실행에서 처리한다. 양수를 설정해도
+  나머지 행을 버리지 않고 다음 페이지로 계속 처리한다.
+- `A_LLM_RETRIES`: 배치 요청 재시도 횟수. 기본값은 `2`이며, 재시도 후에도
+  실패한 배치는 더 작은 단위로 분할하여 다른 수요의 처리를 계속한다.
+
+Model 2 통신 계약은 현재 Ollama HTTP API를 기준으로 한다.
+
+- Method: `POST`
+- Path: `/api/generate`
+- Request: `model`, `prompt`, JSON `format`, `stream=false`
+- Response: `response` 문자열 안의 JSON 결과
+- 기본 모델: `qwen2.5:7b-instruct`
 
 ## Backend 계약
 
@@ -66,11 +78,13 @@ Backend API를 거치지 않고 직접 DB에 반영한다.
 - Taxonomy와 Product Facet artifact는 버전 경로로 마운트한다.
 - DB URL은 Secret으로 주입한다. Backend API 경로를 사용할 때만 Internal Key도
   추가로 주입한다.
-- API 호출 실패 시 임의 재시도하지 않고 다음 배치에서 미처리 수요를 재조회한다.
+- API 호출은 설정된 횟수만큼 재시도한다. 그래도 실패하면 배치를 반으로
+  분할하여 재시도하고, 단일 수요까지 실패한 행만 `FAILED/REVIEW`로 남긴다.
 - 모델 사용은 필수지만, A Pod 내부 실행·sidecar·별도 LLM Worker 중 배치 방식은
   아직 미정이다. 현재 A 이미지에는 모델 가중치나 Ollama가 포함되어 있지 않으므로,
   A 이미지에 포함하는 방식을 선택하면 Dockerfile과 리소스 계약을 추가로 갱신해야 한다.
-- Rule이 이미 처리한 행은 LLM으로 덮어쓰지 않는다. `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 LLM 후보로 보낸다.
+- Rule이 이미 처리한 행은 LLM으로 덮어쓰지 않는다. `REVIEW`/`CONFLICT`/
+  `PASSTHROUGH`/`LABELED_WITH_REVIEW` 행만 LLM 후보로 보낸다.
 - LLM 결과는 Taxonomy에 존재하는 Facet/Value를 모두 반환하고, 비어 있지 않은 요구사항을 `ALL`로 만들지 않을 때만 적용한다.
 - 부정 표현은 Rule Parser가 담당하며 LLM은 부정 조건을 최종 확정하지 않는다.
 - `.env`, API Key, Raw Review, 생성 산출물은 Git에 올리지 않는다.

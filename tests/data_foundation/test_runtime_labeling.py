@@ -3,8 +3,20 @@ import json
 import pandas as pd
 
 from moongcheap_ai.data_foundation.backend_contract import validate_backend_response
+from moongcheap_ai.data_foundation.backend_contract import build_label_result_payload
+from moongcheap_ai.data_foundation import runtime_job
+from moongcheap_ai.data_foundation.demand_label_comparison import LLMLabelingError
 from moongcheap_ai.data_foundation.labeling import taxonomy_from_category_facet_rows
-from moongcheap_ai.data_foundation.runtime_job import _first_env, run_batch
+from moongcheap_ai.data_foundation.runtime_job import _first_env, _limit_llm_target, _llm_pages, run_batch
+
+
+def test_llm_target_is_never_dropped_and_positive_limit_creates_pages() -> None:
+    target = pd.DataFrame({"demand_id": [str(index) for index in range(105)]})
+
+    assert len(_limit_llm_target(target, 0)) == 105
+    assert len(_limit_llm_target(target, -1)) == 105
+    assert len(_limit_llm_target(target, 100)) == 105
+    assert [len(page) for page in _llm_pages(target, 100)] == [100, 5]
 
 
 def test_runtime_accepts_cloud_develop_model2_environment_aliases() -> None:
@@ -17,6 +29,58 @@ def test_runtime_accepts_cloud_develop_model2_environment_aliases() -> None:
     assert _first_env(source, "A_LLM_ENABLED", "A_MODEL2_FALLBACK_ENABLED") == "true"
     assert _first_env(source, "A_LLM_MODEL", "A_MODEL2_FALLBACK_MODEL") == "qwen2.5:3b"
     assert _first_env(source, "A_LLM_ENDPOINT", "A_MODEL2_OLLAMA_BASE_URL") == "http://127.0.0.1:11434"
+
+
+def test_backend_payload_excludes_all_unresolved_review_statuses() -> None:
+    frame = pd.DataFrame([
+        {"demand_id": "1", "catalog_id": "10", "category_id": "c1", "label": "1", "facet_values": "{}", "label_status": "LABELED"},
+        {"demand_id": "2", "catalog_id": "11", "category_id": "c1", "label": "0", "facet_values": "{}", "label_status": "LABELED_WITH_REVIEW"},
+        {"demand_id": "3", "catalog_id": "12", "category_id": "c1", "label": "0", "facet_values": "{}", "label_status": "REVIEW"},
+        {"demand_id": "4", "catalog_id": "13", "category_id": "c1", "label": "1", "facet_values": "{}", "label_status": "PARSED"},
+    ])
+
+    payload = build_label_result_payload(frame, processed_at="2026-09-26T00:00:00Z")
+
+    assert [row["demandId"] for row in payload["results"]] == [1, 4]
+
+
+def test_runtime_splits_failed_llm_batches_and_processes_every_row(tmp_path, monkeypatch) -> None:
+    taxonomy = {
+        "categories": [{
+            "category_id": "c1",
+            "facets": [{
+                "name": "form", "order": 1,
+                "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "분말"}],
+            }],
+        }],
+    }
+    path = tmp_path / "taxonomy.json"
+    path.write_text(json.dumps(taxonomy, ensure_ascii=False), encoding="utf-8")
+    demands = pd.DataFrame([
+        {"demand_id": str(i), "catalog_id": str(i), "category_id": "c1", "extra_requirement": "조건 확인"}
+        for i in range(3)
+    ])
+
+    class FlakyLabeler:
+        call_count = 0
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def classify(self, rows, loader):
+            type(self).call_count += 1
+            if len(rows) > 1:
+                raise LLMLabelingError("synthetic batch failure")
+            return {str(rows[0]["demand_id"]): {"form": {"code": 1}}}
+
+    monkeypatch.setattr(runtime_job, "OllamaDemandLabeler", FlakyLabeler)
+    labeled, _ = runtime_job.run_batch(
+        demands, path, llm_model="test", llm_batch_size=3, llm_retries=0
+    )
+
+    assert len(labeled) == 3
+    assert set(labeled["llm_status"]) == {"APPLIED"}
+    assert FlakyLabeler.call_count > 3
 
 
 def test_label_runtime_builds_backend_payload(tmp_path) -> None:
