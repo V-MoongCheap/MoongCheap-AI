@@ -92,6 +92,7 @@ def test_writer_rejects_invalid_completed_rows() -> None:
     for row, message in [
         ({"demand_id": "1", "label": "", "label_status": "LABELED"}, "label is required"),
         ({"demand_id": "1", "label": "1", "label_status": "UNKNOWN"}, "unsupported label_status"),
+        ({"demand_id": "1", "label": "1", "label_status": "LABELED_WITH_REVIEW"}, "unsupported label_status"),
         ({"demand_id": float("nan"), "label": "1", "label_status": "LABELED"}, "demand_id"),
     ]:
         with pytest.raises(ValueError, match=message):

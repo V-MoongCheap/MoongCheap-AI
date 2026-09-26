@@ -57,7 +57,10 @@ def write_label_results(
         status = str(row.get("label_status", "")).strip().upper()
         if status == "REVIEW":
             continue
-        if status not in {"LABELED", "LABELED_WITH_REVIEW"}:
+        # A warning-bearing result is diagnostic only.  It must not mark the
+        # demand as processed because the next batch must be able to retry it
+        # after the taxonomy/model policy is improved.
+        if status != "LABELED":
             raise ValueError(f"unsupported label_status for DB write: {status or '<blank>'}")
         demand_id = row.get("demand_id")
         if demand_id is None or (isinstance(demand_id, float) and math.isnan(demand_id)) or str(demand_id).strip().casefold() in {"", "nan", "none"}:

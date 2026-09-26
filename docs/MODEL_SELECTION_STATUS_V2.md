@@ -6,7 +6,7 @@
 최종 Taxonomy나 Label의 자동 승인 근거로 사용하지 않는다.
 
 - Model 1: `kakaocorp/kanana-nano-2.1b-instruct`를 오프라인 후보 생성기로 사용한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다.
-- Model 2: `Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 명확한 행은 Rule/Alias가 처리하고, `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 Qwen 모델 런타임으로 보조한다. 런타임 배치 위치는 미정이다.
+- Model 2: `Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 명확한 행은 Rule/Alias가 처리하고, `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 `qwen2.5:7b-instruct` 모델 런타임으로 보조한다. 실제 배포 위치는 Cloud 설정에 따르며, 통신 기준은 Ollama API다.
 - LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
 ## 안전한 fallback 경계
@@ -80,7 +80,7 @@ LLM_ONLY
 - Rule 대비 개선폭
 - 처리 시간과 비용
 
-Rule-first Hybrid가 Rule-only보다 유의미하게 개선되지 않으면 Model 2 LLM fallback은 사용하지 않는다. 현재 최신 Gold 15건에서는 Rule-first의 의미 일치가 15/15였으므로, fallback은 기본 비활성 상태로 유지한다.
+최신 Gold 15건에서 Rule-first의 의미 일치는 15/15였고, 지원 Gold는 Rule이 모두 처리했다. 따라서 Qwen은 Rule 결과를 대체하는 모델이 아니라 Rule이 확정하지 못한 행만 보조하는 fallback으로 사용한다. Qwen 단독 결과는 정상 응답 12건 중 1건이 잘못된 `ALL`을 생성했으므로 운영 방식으로 채택하지 않는다.
 
 ### 서버 배포 제약을 반영한 추가 모델 평가
 
@@ -89,16 +89,19 @@ Rule-first Hybrid가 Rule-only보다 유의미하게 개선되지 않으면 Mode
 sidecar 또는 별도 Worker Pod 중 어디에 배치할지는 아직 확정되지 않았다. 따라서 로컬 GPU에서
 정상 실행되는 것만으로는 서버 후보로 승격하지 않는다.
 
+Model 2의 통신 기준은 현재 Ollama `/api/generate`다. vLLM/OpenAI 호환 API는
+현재 운영 기준이 아니며, 변경할 경우 별도 Adapter와 재평가가 필요하다.
+
 | 후보 | 양자화/크기 | 동일 Gold 및 샘플 측정 | 결론 |
 | --- | --- | --- | --- |
-| `qwen2.5:7b-instruct` | Q4_K_M / 4.7GB | 85건 153초, 실패 0건. 현재 Pod 리소스 초과 | 제외 |
+| `qwen2.5:7b-instruct` | Q4_K_M / 4.7GB | Gold 단독 12/15 정상 응답, 1건 오판. 미확정 800건에서 223건 적용 | 제한적 fallback으로 선택. Model-only는 제외 |
 | `qwen3:4b` | Q4_K_M / Ollama 상주 약 2.9GB | Gold 15건 성공. 조건 포함 10건 중 비기본 결과 2건. 200건 303초 | 품질 부족으로 제외 |
 | `llama3.2:3b` | Q4_K_M / 2.0GB | Gold 15건 중 6건 실패 및 Taxonomy 오류 | 제외 |
 | `exaone3.5:2.4b` | Q4_K_M / 1.6GB | Gold 15건 전건 HTTP 500 | 제외 |
 
 Qwen 3 4B의 200건 결과는 Mac GPU 실행이라 Kubernetes CPU 처리량을 보장하지
-않는다. 또한 응답 성공률과 조건 해석 정확도는 별개다. 현재 후보 중 서버
-리소스와 품질을 동시에 만족한 LLM은 없다.
+않는다. 또한 응답 성공률과 조건 해석 정확도는 별개다. Qwen 2.5 7B fallback의
+실제 서버 처리량과 리소스 적합성은 Cloud 배포 환경에서 별도 확인한다.
 
 따라서 최종 Model 2 운영 방식은 다음과 같다.
 
@@ -130,9 +133,11 @@ PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
 ```
 
 오프라인 5천 건 생성기의 LLM fallback은 `LABELING_LLM_FALLBACK_ENABLED=false`가
-기본값이다. 서버 런타임은 모델 실행 방식이 확정된 뒤 `A_LLM_ENABLED=true`와
-`A_LLM_MODEL=qwen2.5:7b-instruct`를 주입한다. 원격 Worker 방식을 선택한 경우에만
-`A_LLM_ENDPOINT`도 함께 주입한다.
+기본값이다. 서버 런타임에서는 Ollama endpoint가 공급되는 환경에
+`A_LLM_ENABLED=true`와 `A_LLM_MODEL=qwen2.5:7b-instruct`를 주입한다.
+`A_LLM_MAX_ROWS`는 기본 `0`(무제한)이며, 양수여도 페이지 분할로 전체 미확정 행을
+처리하고 누락하지 않는다. 검증 실패·부정·충돌·Taxonomy 외부 결과는 `REVIEW`로 남기며
+Backend/DB 완료 처리 대상에서 제외한다.
 오프라인 실험에서는 `--enable-llm-fallback`을 명시한다.
 
 실제 모델 가중치·Ollama/Hugging Face/API 환경이 없는 경우에는 모델을 실행한 것처럼 처리하지 않고, 해당 후보를 `NOT_RUN`으로 기록한다.

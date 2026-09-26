@@ -197,7 +197,17 @@ def compare_labeling_methods(demands: pd.DataFrame, loader: TaxonomyLoader, prod
     rows: list[dict[str, Any]] = []
     for position, (_, source) in enumerate(demands.fillna("").iterrows()):
         rule_row = rule.iloc[position]
-        base = {"demand_id": source["demand_id"], "catalog_id": source["catalog_id"], "category_id": source["category_id"], "is_substitutable": source["is_substitutable"], "rule_label": rule_row["label"], "rule_status": rule_row["label_status"], "rule_facet_values": rule_row["facet_values"]}
+        base = {
+            "demand_id": source["demand_id"],
+            "catalog_id": source["catalog_id"],
+            "category_id": source["category_id"],
+            # Gold/evaluation inputs may intentionally omit operational fields.
+            # Keep comparison focused on labeling and use the contract default.
+            "is_substitutable": source.get("is_substitutable", ""),
+            "rule_label": rule_row["label"],
+            "rule_status": rule_row["label_status"],
+            "rule_facet_values": rule_row["facet_values"],
+        }
         model = model_values.get(str(source["demand_id"]))
         if model is not None:
             values, warnings = _apply_model_result(source, model, loader, product_facet_map.get(str(source["catalog_id"]), []))
