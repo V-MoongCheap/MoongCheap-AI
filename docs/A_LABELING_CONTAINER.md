@@ -37,6 +37,10 @@ A_MODEL2_FALLBACK_TIMEOUT_SECONDS=300
 A_MODEL2_FALLBACK_BATCH_SIZE=5
 ```
 
+LLM을 활성화한 실행은 DB 처리 전에 Ollama `/api/tags`에서 위 모델의 존재를 확인한다.
+모델이 없거나 Ollama가 준비되지 않았으면 실패 종료하며 `demand.processed_at`을 기록하지
+않는다. 따라서 다음 스케줄 실행에서 해당 Demand가 다시 조회된다.
+
 fallback은 Rule 결과를 대체하지 않고 `PASSTHROUGH`, `TAXONOMY_AMBIGUOUS`,
 또는 명시적 제외/충돌이 아닌 `REVIEW`만 대상으로 한다. 응답이 현재 Taxonomy의
 Facet/Value로 완전히 검증되고 typed constraint를 만들 수 있을 때만 `PARSED`로

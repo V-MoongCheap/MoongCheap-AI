@@ -1,11 +1,12 @@
 import json
 
 import pandas as pd
+import pytest
 
 from moongcheap_ai.data_foundation.backend_contract import validate_backend_response
 from moongcheap_ai.data_foundation.backend_contract import build_label_result_payload
 from moongcheap_ai.data_foundation import runtime_job
-from moongcheap_ai.data_foundation.demand_label_comparison import LLMLabelingError
+from moongcheap_ai.data_foundation.demand_label_comparison import LLMLabelingError, ensure_ollama_model_available
 from moongcheap_ai.data_foundation.labeling import taxonomy_from_category_facet_rows
 from moongcheap_ai.data_foundation.runtime_job import _first_env, _limit_llm_target, _llm_pages, run_batch
 
@@ -29,6 +30,43 @@ def test_runtime_accepts_cloud_develop_model2_environment_aliases() -> None:
     assert _first_env(source, "A_LLM_ENABLED", "A_MODEL2_FALLBACK_ENABLED") == "true"
     assert _first_env(source, "A_LLM_MODEL", "A_MODEL2_FALLBACK_MODEL") == "qwen2.5:3b"
     assert _first_env(source, "A_LLM_ENDPOINT", "A_MODEL2_OLLAMA_BASE_URL") == "http://127.0.0.1:11434"
+
+
+def test_ollama_model_preflight_accepts_exact_model(monkeypatch) -> None:
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({"models": [{"name": "qwen2.5:7b-instruct"}]}).encode()
+
+    monkeypatch.setattr(
+        "moongcheap_ai.data_foundation.demand_label_comparison.urllib.request.urlopen",
+        lambda request, timeout: Response(),
+    )
+    ensure_ollama_model_available("http://ollama:11434", "qwen2.5:7b-instruct")
+
+
+def test_ollama_model_preflight_rejects_missing_model(monkeypatch) -> None:
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({"models": [{"name": "other:latest"}]}).encode()
+
+    monkeypatch.setattr(
+        "moongcheap_ai.data_foundation.demand_label_comparison.urllib.request.urlopen",
+        lambda request, timeout: Response(),
+    )
+    with pytest.raises(LLMLabelingError, match="not available"):
+        ensure_ollama_model_available("http://ollama:11434", "qwen2.5:7b-instruct")
 
 
 def test_backend_payload_excludes_all_unresolved_review_statuses() -> None:

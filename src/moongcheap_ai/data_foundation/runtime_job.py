@@ -15,7 +15,12 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from .backend_contract import build_label_result_payload, post_label_results
-from .demand_label_comparison import LLMLabelingError, OllamaDemandLabeler, _apply_model_result
+from .demand_label_comparison import (
+    LLMLabelingError,
+    OllamaDemandLabeler,
+    _apply_model_result,
+    ensure_ollama_model_available,
+)
 from .labeling import (
     TaxonomyLoader,
     taxonomy_from_category_facet_rows,
@@ -373,6 +378,27 @@ def main(argv: list[str] | None = None) -> int:
     source = os.environ
     taxonomy_path = args.taxonomy or Path(source.get("A_TAXONOMY_PATH", "config/facet_taxonomy_v2_2.json"))
 
+    model2_fallback_enabled = source.get("A_MODEL2_FALLBACK_ENABLED", "false").strip().lower() in {"1", "true", "yes"}
+    llm_enabled = source.get("A_LLM_ENABLED", "false").strip().lower() in {"1", "true", "yes"}
+    llm_model = _first_env(
+        source,
+        "A_LLM_MODEL",
+        "A_MODEL2_FALLBACK_MODEL",
+        default="qwen2.5:7b-instruct",
+    ) if (llm_enabled or model2_fallback_enabled) else None
+    llm_endpoint = _first_env(
+        source,
+        "A_LLM_ENDPOINT",
+        "A_MODEL2_OLLAMA_BASE_URL",
+        default="http://localhost:11434",
+    )
+    if llm_model:
+        ensure_ollama_model_available(
+            llm_endpoint,
+            llm_model,
+            timeout=int(_first_env(source, "A_LLM_PREFLIGHT_TIMEOUT_SECONDS", default="10")),
+        )
+
     connection = None
     write_to_database = args.write_db or source.get("A_WRITE_DATABASE", "").strip().lower() in {"1", "true", "yes"}
     if args.dry_run and write_to_database:
@@ -412,18 +438,13 @@ def main(argv: list[str] | None = None) -> int:
             alias_registry_path=primary_alias_registry,
             rules_path=args.rules or Path(source.get("A_RULES_PATH", "config/demand_constraint_rules.json")),
             compatibility_alias_registry_path=compatibility_alias_registry,
-            model2_fallback_enabled=source.get("A_MODEL2_FALLBACK_ENABLED", "false").strip().lower() in {"1", "true", "yes"},
+            model2_fallback_enabled=model2_fallback_enabled,
             model2_fallback_model=source.get("A_MODEL2_FALLBACK_MODEL", "qwen2.5:7b-instruct"),
             model2_fallback_endpoint=source.get("A_MODEL2_OLLAMA_BASE_URL", "http://localhost:11434"),
             model2_fallback_timeout=int(source.get("A_MODEL2_FALLBACK_TIMEOUT_SECONDS", "300")),
             model2_fallback_batch_size=int(source.get("A_MODEL2_FALLBACK_BATCH_SIZE", "5")),
-            llm_model=llm_model,
-            llm_endpoint=_first_env(
-                source,
-                "A_LLM_ENDPOINT",
-                "A_MODEL2_OLLAMA_BASE_URL",
-                default="http://localhost:11434",
-            ),
+            llm_model=llm_model if llm_enabled else None,
+            llm_endpoint=llm_endpoint,
             llm_timeout=int(_first_env(source, "A_LLM_TIMEOUT_SECONDS", "A_MODEL2_FALLBACK_TIMEOUT_SECONDS", default="300")),
             llm_batch_size=int(_first_env(source, "A_LLM_BATCH_SIZE", "A_MODEL2_FALLBACK_BATCH_SIZE", default="5")),
             llm_max_rows=int(_first_env(source, "A_LLM_MAX_ROWS", default="0")),
@@ -452,7 +473,7 @@ def main(argv: list[str] | None = None) -> int:
             response = {"status": "DRY_RUN"}
         print(json.dumps({"status": "COMPLETED", "rows": len(labeled), "output": str(args.output), "model2Fallback": labeled.attrs.get("model2_fallback", {}), "backend": response}, ensure_ascii=False))
         return 0
-    except (ValueError, RuntimeError, OSError) as error:
+    except (LLMLabelingError, ValueError, RuntimeError, OSError) as error:
         print(json.dumps({"status": "FAILED", "error": str(error)}, ensure_ascii=False), file=sys.stderr)
         return 1
     finally:

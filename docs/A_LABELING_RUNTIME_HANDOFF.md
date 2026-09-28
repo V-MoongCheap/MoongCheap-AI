@@ -44,6 +44,9 @@ python -m moongcheap_ai.data_foundation.runtime_job `
 - Cloud develop의 기존 `A_MODEL2_FALLBACK_*`, `A_MODEL2_OLLAMA_BASE_URL` 이름도
   과도기 호환용으로 읽지만, 새 설정의 표준 이름은 `A_LLM_*`다.
 - `A_LLM_TIMEOUT_SECONDS`: LLM 요청 timeout. 기본 300초
+- `A_LLM_PREFLIGHT_TIMEOUT_SECONDS`: 배치 시작 시 `/api/tags` 모델 존재 확인 timeout. 기본 10초.
+  `A_LLM_ENABLED=true` 또는 `A_MODEL2_FALLBACK_ENABLED=true`이면 모델이 없을 때 DB를
+  조회·수정하지 않고 실패 종료한다. 따라서 다음 CronJob에서 같은 미처리 Demand를 재시도한다.
 - `A_LLM_BATCH_SIZE`: 한 번에 보낼 행 수. 기본 5
 - `A_LLM_MAX_ROWS`: 한 페이지에 보낼 행 수를 제한하는 선택적 운영 설정이다.
   `0` 또는 미설정이면 미해결 행 전체를 한 실행에서 처리한다. 양수를 설정해도

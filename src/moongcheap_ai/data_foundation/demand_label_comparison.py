@@ -18,6 +18,32 @@ class LLMLabelingError(RuntimeError):
     pass
 
 
+def ensure_ollama_model_available(endpoint: str, model: str, timeout: int = 10) -> None:
+    """Fail fast unless Ollama exposes the exact model required by the batch.
+
+    This check runs before the database write path. A missing model therefore
+    leaves every demand eligible for the next CronJob run.
+    """
+    request = urllib.request.Request(f"{endpoint.rstrip('/')}/api/tags", method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        models = payload.get("models", [])
+        names = {
+            str(item.get("name", "")).strip()
+            for item in models
+            if isinstance(item, dict)
+        }
+        if model not in names:
+            raise LLMLabelingError(
+                f"Ollama model is not available: {model}; available models: {sorted(name for name in names if name)}"
+            )
+    except LLMLabelingError:
+        raise
+    except (OSError, urllib.error.URLError, json.JSONDecodeError, AttributeError, TypeError, ValueError) as exc:
+        raise LLMLabelingError(f"Ollama model preflight failed: {exc}") from exc
+
+
 def _allowed(loader: TaxonomyLoader, category_id: str) -> dict[str, list[dict[str, Any]]]:
     category = loader.category(category_id)
     return {
