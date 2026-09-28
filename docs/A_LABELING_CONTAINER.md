@@ -89,10 +89,12 @@ Cloud `develop` GitOps 기준 ECR은 다음과 같이 AI 공용 저장소와 컴
 
 Cloud `develop`에는 기존 `A_MODEL2_*` 환경변수 이름이 남아 있을 수 있다. A 런타임은
 현재 표준인 `A_LLM_*` 이름을 우선 사용하면서 해당 Cloud 별칭도 호환한다. 모델을 A Pod
-내부에 포함할지, sidecar로 둘지, 별도 Worker Pod에서 호출할지는 아직 미정이다.
+내부에 포함하지 않고 Cloud가 준비하는 Ollama 서비스로 호출하는 방향이다. Cloud는
+LLM workload를 `m6i.xlarge` CPU NodePool에 배치할 계획이며, 최종 Kubernetes label·
+taint·toleration과 Ollama Service 주소는 Cloud가 확정 후 GitOps에 반영한다.
 
-현재 A 이미지에는 모델 가중치나 Ollama를 포함하지 않는다. 배포 방식이 확정되면
-선택한 방식에 따라 다음 값을 반영해야 한다.
+현재 A 이미지에는 모델 가중치나 Ollama를 포함하지 않는다. Ollama 서비스와 모델이
+준비된 뒤 다음 값을 배포 환경에 주입한다.
 
 - `A_LLM_ENABLED=true`
 - `A_LLM_MODEL=qwen2.5:7b-instruct` (현재 운영 후보)

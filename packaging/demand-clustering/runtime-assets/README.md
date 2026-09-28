@@ -1,8 +1,9 @@
-# B 이미지에 포함할 실행 자료
+# B 로컬 검증용 레거시 실행 자료
 
-이 디렉터리는 Backend가 실제로 사용하는 도매꾹 v5 도감과 같은 상품 집합을
-`demand-clustering` 이미지에 넣는다. 배치가 DB를 시드하거나 MFDS 상품으로
-Backend 도감을 교체하지 않는다.
+이 디렉터리의 seed/taxonomy 파일은 과거 v5 이미지 번들 방식의 재현 테스트와
+`prepare_demand_clustering_assets.py` 검증용으로만 보관한다. 현재 운영 이미지에는
+넣지 않는다. 운영 배치에는 Backend의 실제 `product_catalog.id`를 가진
+`catalog_profiles.csv`와 일치하는 `taxonomy.json`을 별도 artifact release로 공급한다.
 
 | 파일 | 역할 |
 | --- | --- |
@@ -12,11 +13,9 @@ Backend 도감을 교체하지 않는다.
 | `catalog.json` | 행 수, 해시, DB 결합 방식과 대체상품 정책 |
 | `model.json` | E5 저장소·고정 revision·파일별 SHA256 |
 
-빌드하면 `/artifacts/product_catalog_seed_v5.csv`,
-`/artifacts/category_seed_v5.csv`와
-`/artifacts/taxonomy.json`이 생성된다. Backend `product_catalog.id`는 DB가
-생성하므로 이미지에 고정하지 않는다. 런타임은 Backend의 UNIQUE 상품명과 v5
-상품명을 정확히 비교해 현재 DB ID에 결합한다.
+레거시 검증 명령을 실행하면 `/artifacts/product_catalog_seed_v5.csv`,
+`/artifacts/category_seed_v5.csv`와 `/artifacts/taxonomy.json`이 생성된다.
+이 결과를 운영 배치에 직접 공급하거나 Backend ID의 대체값으로 사용하지 않는다.
 
 상품명이 v5에 없거나 v5 카테고리가 taxonomy에 매핑되지 않은 경우에도 동일상품
 보드 편입과 신규 보드 생성은 진행한다. 해당 상품의 대체상품 제안만 건너뛴다.
@@ -41,7 +40,7 @@ python scripts/deployment/prepare_demand_clustering_assets.py pack-seed \
   --assets packaging/demand-clustering/runtime-assets
 ```
 
-두 CSV gzip, `taxonomy.json`, `catalog.json`을 함께 커밋한다. 빌드 단계는
+레거시 검증 시 두 CSV gzip, `taxonomy.json`, `catalog.json`을 함께 검사한다. 빌드 단계는
 압축본·복원 CSV·taxonomy 해시, 행 수, 상품명·Seed ID·도매꾹 ID의
 유일성, category 부모 계층, 상품→category FK·경로·taxonomy 매핑을 다시
 검증한다.

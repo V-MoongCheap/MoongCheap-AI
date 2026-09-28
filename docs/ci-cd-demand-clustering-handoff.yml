@@ -100,6 +100,12 @@ resources:
   gpu: false
   status: "초기 제안값; 구성요소 측정 조건과 한계는 docs/DEMAND_CLUSTERING_CONTAINER.md 참고"
 
+llm_node_pool:
+  instance_type: m6i.xlarge
+  architecture: linux/amd64
+  selector_status: "Cloud가 Kubernetes label·taint·toleration을 확정한 뒤 GitOps에 반영"
+  note: "이 B CronJob의 selector에 AWS 인스턴스 타입을 직접 넣지 않는다. LLM을 호출하는 A/Model 2 경로의 Ollama 배치 기준이다."
+
 runtime_filesystem:
   read_only_root: true
   run_as_user: 65534

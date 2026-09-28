@@ -104,9 +104,8 @@ Backend DB 계정을 공유하며, 이 세션 설정이 DB role의 권한을 변
 
 필수 운영 설정은 다음과 같다.
 
-- 비밀 설정: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `BACKEND_INTERNAL_KEY`
-- 기존 직접 DSN 입력: `SHARED_DATABASE_URL` (비어 있지 않으면 DB 세 변수보다 우선)
-- 일반 설정: `BACKEND_BASE_URL`, `DEMAND_CATALOG_SEED_PATH`,
+- 비밀 설정: `SHARED_DATABASE_URL`, `BACKEND_INTERNAL_KEY`
+- 일반 설정: `BACKEND_BASE_URL`, `MFDS_CATALOG_PROFILES_PATH`,
   `DEMAND_TAXONOMY_PATH`, `DEMAND_CONSTRAINT_RULES_PATH`,
   `DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH` (B 기본 별칭), `E5_MODEL_PATH`
 - 선택 설정: `DEMAND_CONSTRAINT_ALIASES_PATH` (A 승인 별칭; 없으면 B만 사용),
@@ -114,16 +113,20 @@ Backend DB 계정을 공유하며, 이 세션 설정이 DB role의 권한을 변
   `E5_BATCH_SIZE`, `BACKEND_HTTP_TIMEOUT_SECONDS`,
   `POSTGRES_CONNECT_TIMEOUT_SECONDS`
 
-기본 K8s 설정은 `backend-env`의 DB 세 항목을 같은 이름으로 받고,
+운영 Kubernetes 설정은 읽기 전용 PostgreSQL DSN을 `SHARED_DATABASE_URL`로 받고,
 `MOONGCHEAP_INTERNAL_API_KEY`를 `BACKEND_INTERNAL_KEY`로 매핑한다. 내부 키 항목은
-Cloud에서 추가 공급해야 하며, 참조를 바꾸는 것만으로 생성되지 않는다.
-`DB_URL`의 `jdbc:` 접두사를 제거하고 URL 인코딩한 계정·비밀번호를 넣어 PostgreSQL
-DSN을 만든다. IPv6 주소와 libpq 호환 query를 보존하며, JDBC 전용 query는 지원하지 않는다.
-기존 `SHARED_DATABASE_URL` 직접 입력은 PostgreSQL DSN이어야 하며 JDBC 형식을
-사용하지 않는다. `BACKEND_BASE_URL`에는
+Cloud에서 별도로 공급해야 하며, 참조를 바꾸는 것만으로 생성되지 않는다.
+`SHARED_DATABASE_URL`은 PostgreSQL DSN이어야 하며 JDBC 형식을 사용하지 않는다.
+`BACKEND_BASE_URL`에는
 경로가 아닌 Backend 서비스의 HTTP(S) base URL을 넣는다. artifact와 모델 경로가
 존재하지 않으면 시작하지 않는다. 개별 DB 상품이 seed에 없어도 기본 보드 계획은
 중단하지 않고 해당 상품의 대체상품 제안만 건너뛴다.
+
+`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`와 `DEMAND_CATALOG_SEED_PATH`는 운영 배포
+계약이 아니다. Backend export/PVC를 준비하지 못한 로컬 회귀 테스트에서만 하위
+호환용으로 사용할 수 있다. `MFDS_CATALOG_PROFILES_PATH`가 설정되면 Backend의
+실제 `product_catalog.id`를 기준으로 한 profile을 우선 사용하며, Seed ID나 식약처
+원본 상품번호를 운영 catalog ID로 해석하지 않는다.
 
 로컬에서는 환경 파일을 명시해 실행할 수 있다.
 

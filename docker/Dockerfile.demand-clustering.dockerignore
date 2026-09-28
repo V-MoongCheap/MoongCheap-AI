@@ -1,18 +1,9 @@
-# Only reviewed runtime assets join the source inputs; exclude raw data and secrets.
+# Only the application and dependency metadata join the source inputs.
 **
 !packaging/
 !packaging/demand-clustering/
 !packaging/demand-clustering/pyproject.toml
 !packaging/demand-clustering/uv.lock
-!packaging/demand-clustering/runtime-assets/
-!packaging/demand-clustering/runtime-assets/product_catalog_seed_v5.csv.gz
-!packaging/demand-clustering/runtime-assets/category_seed_v5.csv.gz
-!packaging/demand-clustering/runtime-assets/catalog.json
-!packaging/demand-clustering/runtime-assets/taxonomy.json
-!packaging/demand-clustering/runtime-assets/model.json
-!scripts/
-!scripts/deployment/
-!scripts/deployment/prepare_demand_clustering_assets.py
 !src/
 !src/moongcheap_ai/
 !src/moongcheap_ai/**

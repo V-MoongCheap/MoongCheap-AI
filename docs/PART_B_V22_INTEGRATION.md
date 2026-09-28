@@ -30,7 +30,7 @@ Part B는 `constraints`의 `MUST`/`EXCLUDE`만 hard gate로 사용하고, `PREFE
 | 설정 | 자료와 역할 |
 | --- | --- |
 | `DEMAND_TAXONOMY_PATH` | A `config/facet_taxonomy_v2_2.json`을 복사한 배포용 `taxonomy.json` |
-| `DEMAND_CATALOG_SEED_PATH` | Backend와 같은 도매꾹 v5 `product_catalog_seed_v5.csv` |
+| `MFDS_CATALOG_PROFILES_PATH` | Backend 실제 `product_catalog.id`를 가진 `catalog_profiles.csv` |
 | `DEMAND_CONSTRAINT_RULES_PATH` | 이미지에 포함된 B `config/demand_constraint_rules.json` |
 | `DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH` | 이미지에 포함된 필수 B `config/demand_constraint_aliases.json` |
 | `DEMAND_CONSTRAINT_ALIASES_PATH` | 이미지에 포함된 선택 A `config/model1_aliases_reviewed_v2.json` |
@@ -48,12 +48,12 @@ Part B는 `constraints`의 `MUST`/`EXCLUDE`만 hard gate로 사용하고, `PREFE
 `aliasMode=A_AND_B/B_ONLY`, `primaryAliasLoadStatus=LOADED/NOT_CONFIGURED`로
 실제 사용한 조합을 확인한다. B 별칭은 B의 개발·검수 자료이며 A 승인 상태로 바꾸지 않는다.
 
-## v5 상품 시드 준비
+## Backend ID 기반 runtime profile 준비
 
-Backend가 적재하는 `product_catalog_seed_v5.csv`를 그대로 이미지 입력으로
-포장한다. 런타임에서 DB의 숫자 `product_catalog.id`를 시드 ID로 간주하지
-않는다. Backend에서 UNIQUE인 `product_catalog.name`과 v5 `name`을 정확히 일치시켜
-현재 DB ID에 결합한다.
+운영 배치는 Backend가 전달한 `product_catalog.id`를 profile의 `catalog_id`로
+사용한다. AI가 임시 Seed ID나 식약처 원본 상품번호를 운영 `catalog_id`로
+사용하지 않는다. `catalog_profiles.csv`와 `taxonomy.json`은 같은 release 디렉터리에
+두고, profile의 모든 Backend ID가 배치 입력 범위에 존재하는지 시작 전에 검증한다.
 
 `extra_requirement`의 MUST/PREFER/EXCLUDE 구조화는 V2.2 taxonomy와 기존 B 파서를
 그대로 사용한다. 대체상품 후보는 같은 v5 말단 카테고리와 같은
@@ -61,11 +61,15 @@ Backend가 적재하는 `product_catalog_seed_v5.csv`를 그대로 이미지 입
 같은 원료를 요구한다. MFDS claim ID와 기능 containment는 운영 경로에서
 사용하지 않는다.
 
-상품명이 v5에 없는 사용자 추가 상품과 `source_category_id`가 빈 99건은
-동일상품 보드 편입·신규 보드 생성을 계속하고 대체상품 제안만 건너뛴다.
-따라서 일부 상품 불일치가 전체 배치나 기본 보드 생성을 중단하지 않는다.
+profile 근거가 부족한 상품은 동일상품 보드 생성에는 영향을 주지 않으며,
+대체상품 제안만 보수적으로 제외한다. 다만 Backend 입력의 `catalog_id`가
+profile에 전혀 없으면 매핑 오류이므로 배치를 시작하지 않고 오류를 기록한다.
 
-확정된 시드를 다음 명령으로 이미지 입력에 반영한다.
+Backend export와 AI 측 MFDS/Facet 근거를 결합해 profile release를 생성한다.
+생성된 CSV는 Git에 커밋하지 않고 Cloud가 관리하는 artifact/PVC에 전달한다.
+운영 전에는 manifest의 profile·taxonomy SHA256과 행 수를 함께 확인한다.
+
+레거시 v5 seed 검증이 필요한 경우에만 다음 명령을 사용한다.
 
 ```bash
 python scripts/deployment/prepare_demand_clustering_assets.py pack-seed \

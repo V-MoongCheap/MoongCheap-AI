@@ -1,7 +1,10 @@
 # 인프라 인계 — 생성형 AI 파트
 
 Cloud 저장소에 직접 올리지 않고, 인프라가 그대로 가져다 쓸 수 있는 형태로 이 폴더에 둔다.
-기준은 **Cloud `develop` `57cd52e`** (2026-09-21 열람)이다.
+이 폴더는 과거 Cloud 확인 내용을 보관한 참고 자료다. 현재 B 실행 계약은
+`k8s/README.md`, `docs/DEMAND_CLUSTERING_CONTAINER.md`,
+`docs/ci-cd-demand-clustering-handoff.yml`을 기준으로 한다. Cloud `develop`의
+실제 Secret·Helm·노드풀 상태는 배포 시 다시 확인한다.
 
 ## 1. 어느 파일을 어디에
 

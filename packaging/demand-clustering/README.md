@@ -46,9 +46,10 @@ Dockerfile은 이 프로젝트의 lockfile로 의존성을 설치하고 non-edit
 docker build -f docker/Dockerfile.demand-clustering -t demand-clustering-job:local .
 ```
 
-모델·Backend v5 상품/카테고리 시드·taxonomy는 빌드 시 이미지에 포함한다. `runtime-assets/`의 확정된
-상품 자료와 파일별 SHA256을 사용하며, E5는 고정 revision을 Hugging Face에서 다운로드한다.
-빌드 환경에는 패키지·모델 다운로드를 위한 네트워크가 필요하지만, 실행 환경에서는
-PVC나 모델·데이터 마운트, 모델 다운로드가 필요하지 않다. 자료를 바꾸면 이미지를 재빌드한다.
+운영 이미지는 Python 의존성·애플리케이션·규칙/별칭만 포함한다. Backend ID가 포함된
+`catalog_profiles.csv`, 일치하는 `taxonomy.json`, E5 모델 cache는 이미지에 넣지 않고
+배포 환경의 읽기 전용 artifact/PVC에서 공급한다. 따라서 모델·자료를 바꾸어도 이미지
+재빌드와 데이터 혼합이 발생하지 않으며, profile과 taxonomy는 같은 release 디렉터리에서
+함께 전환해야 한다. 모델 다운로드는 빌드·실행 중 하지 않는다.
 [자료 갱신 방법](runtime-assets/README.md)과 [컨테이너 안내](../../docs/DEMAND_CLUSTERING_CONTAINER.md),
 인프라 전달 값은 [B파트 인계서](../../docs/ci-cd-demand-clustering-handoff.yml)를 참고한다.

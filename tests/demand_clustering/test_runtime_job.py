@@ -89,10 +89,32 @@ def _artifact_paths(tmp_path: Path) -> dict[str, Path]:
     seed_path = tmp_path / "product_catalog_seed_v5.csv"
     pd.DataFrame(seed_rows).to_csv(seed_path, index=False)
 
+    profile_path = tmp_path / "catalog_profiles.csv"
+    pd.DataFrame([
+        {
+            "catalog_id": str(catalog_id),
+            "product_name": name,
+            "service_category_id": CATEGORY,
+            "taxonomy_version": "v2.1",
+            "product_form": "정",
+            "functional_ingredients_json": json.dumps(["단백질"]),
+            "main_functionality_claim_ids_json": json.dumps(["claim-protein"]),
+            "main_functionality_claim_texts_json": json.dumps(["단백질"]),
+            "intake_method_text": "1일 1회 섭취",
+            "profile_status": "EVIDENCE_READY",
+        }
+        for catalog_id, name in (
+            (101, "원상품 보드 상품"),
+            (202, "대체 후보 상품"),
+            (303, "대체 요청 원상품"),
+        )
+    ]).to_csv(profile_path, index=False)
+
     model_path = tmp_path / "e5-model"
     model_path.mkdir()
     return {
         "seed": seed_path,
+        "profiles": profile_path,
         "taxonomy": taxonomy_path,
         "model": model_path,
     }
@@ -625,6 +647,21 @@ def test_a_path_is_optional_b_base_is_required(tmp_path, primary_path):
     del environment["DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH"]
     with pytest.raises(ConfigurationError, match="DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH"):
         load_job_config(environment)
+
+
+def test_backend_profile_path_is_preferred_over_legacy_seed(tmp_path):
+    environment = _environment(tmp_path)
+    environment.pop("DEMAND_CATALOG_SEED_PATH")
+    environment["MFDS_CATALOG_PROFILES_PATH"] = str(
+        Path(environment["E5_MODEL_PATH"]).parent / "catalog_profiles.csv"
+    )
+
+    config = load_job_config(environment)
+
+    assert config.catalog_profiles_path == Path(
+        environment["MFDS_CATALOG_PROFILES_PATH"]
+    )
+    assert config.catalog_seed_path is None
 
 
 @pytest.mark.parametrize("target", [{"code": 999, "value": "정"}, {"code": 1, "value": "캡슐"}])
