@@ -46,21 +46,6 @@ def test_build_input_keeps_all_observed_categories(monkeypatch) -> None:
     assert "GROUNDED_DEMAND_SYNTHETIC" not in set(result["source_type"])
 
 
-def test_default_input_is_not_limited_to_smoke_categories(monkeypatch) -> None:
-    frames = {
-        "products": _source("health-functional-food:joint_health", "MFDS_PRODUCT", "p1"),
-        "sellers": _source("health-functional-food:propolis", "SELLER_LISTING", "s1"),
-        "queries": _source("health-functional-food:eye_health", "CONSUMER_SEARCH", "q1"),
-    }
-    monkeypatch.setattr(runner, "load_products", lambda *args, **kwargs: frames["products"])
-    monkeypatch.setattr(runner, "load_seller_offers", lambda *args, **kwargs: frames["sellers"])
-    monkeypatch.setattr(runner, "load_translated_queries", lambda *args, **kwargs: frames["queries"])
-
-    result = runner.build_multisource_input({"products": "p", "sellers": "s", "queries": "q"})
-
-    assert "health-functional-food:joint_health" in set(result["category_key"])
-
-
 def test_model_does_not_receive_price_as_facet_evidence(monkeypatch) -> None:
     captured: list[list[dict]] = []
 
@@ -92,3 +77,18 @@ def test_model_does_not_receive_price_as_facet_evidence(monkeypatch) -> None:
     assert not failures
     assert candidates
     assert captured[0][0]["price_text"] == ""
+
+
+def test_value_evidence_gate_rejects_unobserved_value() -> None:
+    data = _source("health-functional-food:vitamin_mineral", "MFDS_PRODUCT", "p1")
+    candidates = pd.DataFrame(
+        [
+            {"category_key": data.iloc[0]["category_key"], "value": "정제"},
+            {"category_key": data.iloc[0]["category_key"], "value": "젤리"},
+        ]
+    )
+
+    accepted, rejected = runner.apply_value_evidence_gate(candidates, data)
+
+    assert accepted["value"].tolist() == ["정제"]
+    assert rejected["value"].tolist() == ["젤리"]

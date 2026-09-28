@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 
 from moongcheap_ai.data_foundation.model1 import (
@@ -8,6 +10,7 @@ from moongcheap_ai.data_foundation.model1 import (
     create_model_adapter,
     parse_model_output,
     sample_products,
+    sample_products_by_category,
 )
 from moongcheap_ai.data_foundation.model1 import _build_compact_prompt
 from moongcheap_ai.data_foundation.model1_postprocess import (
@@ -100,6 +103,22 @@ def test_sampling_handles_empty_or_partially_schematized_input():
         "sampling_reason",
     ]
     assert len(partial) == 1
+
+
+def test_generic_sampling_does_not_classify_non_health_products():
+    frame = pd.DataFrame([
+        {"source_product_id": "d1", "category_key": "kitchen:pan", "category_name": "프라이팬", "product_name": "스텐 프라이팬"},
+        {"source_product_id": "c1", "category_key": "cosmetics:cleanser", "category_name": "클렌징", "product_name": "클렌징폼"},
+    ])
+    result = sample_products_by_category(frame, max_per_category=5)
+    assert set(result["category_key"]) == {"kitchen:pan", "cosmetics:cleanser"}
+    assert not result["category_key"].str.startswith("health-functional-food:").any()
+
+
+def test_default_facet_prompt_is_domain_neutral():
+    prompt = (Path(__file__).parents[1] / "prompts" / "facet_discovery_v0.txt").read_text(encoding="utf-8")
+    assert "health-functional-food" not in prompt
+    assert "general e-commerce product catalog" in prompt
 
 
 def test_generic_protein_word_in_function_text_does_not_make_protein_category():

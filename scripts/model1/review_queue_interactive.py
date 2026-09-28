@@ -23,6 +23,12 @@ DECISION_COLUMNS = {
 }
 
 
+def _looks_composite(value: str) -> bool:
+    """Flag likely multi-value candidates without deciding their meaning."""
+    text = str(value or "")
+    return any(token in text for token in (",", "，", "/", "·", " 및 ", " 또는 ", " + "))
+
+
 def _value(row: pd.Series, *names: str) -> str:
     for name in names:
         value = str(row.get(name, "") or "").strip()
@@ -44,6 +50,9 @@ def display_row(row: pd.Series, position: int, total: int) -> None:
     print(f"카테고리: {_value(row, 'category_name', 'category_key', 'category_id')}")
     print(f"Facet 후보: {_value(row, 'facet_name', 'facet_candidate', 'facet_id')}")
     print(f"Value 후보: {_value(row, 'facet_value', 'value_candidate', 'value')}")
+    candidate_value = _value(row, "facet_value", "value_candidate", "value")
+    if _looks_composite(candidate_value):
+        print("⚠ 복합 표현 후보: 여러 Value인지, 하나의 공식 원료명인지 확인하세요.")
     print(f"모델: {_value(row, 'model')}")
     print(f"검수 상태: {_value(row, 'review_status', 'reviewer_status')}")
     print(f"검수 사유: {_preview(_value(row, 'review_reason', 'review_reasons'))}")
@@ -95,7 +104,9 @@ def _ask_edit(row: pd.Series) -> tuple[str, str, str]:
     old_facet = _value(row, "facet_name", "facet_candidate", "facet_id")
     old_value = _value(row, "facet_value", "value_candidate", "value")
     facet = input(f"수정할 Facet [{old_facet}]: ").strip() or old_facet
-    value = input(f"수정할 Value [{old_value}]: ").strip()
+    value = input(
+        f"수정할 Value [{old_value}] (여러 Value면 JSON 예: [\"분말\", \"캡슐\"]): "
+    ).strip()
     note = input("수정 사유: ").strip()
     if not value:
         raise ValueError("수정 시 Value는 비워둘 수 없습니다.")

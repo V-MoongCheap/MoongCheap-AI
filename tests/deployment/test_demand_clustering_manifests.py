@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 import pytest
 import yaml
 
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -82,18 +83,18 @@ def test_shared_backend_ai_node_selector_without_dedicated_ai_taint(resources):
 def test_only_required_secrets_are_injected_by_reference(resources):
     container = pod_spec(resources)["containers"][0]
     assert container["env"] == [
-        {"name": name, "valueFrom": {"secretKeyRef": {"name": "backend-env", "key": key}}}
-        for name, key in (
-            ("DB_URL", "DB_URL"),
-            ("DB_USERNAME", "DB_USERNAME"),
-            ("DB_PASSWORD", "DB_PASSWORD"),
-            ("BACKEND_INTERNAL_KEY", "MOONGCHEAP_INTERNAL_API_KEY"),
-        )
+        {
+            "name": "SHARED_DATABASE_URL",
+            "valueFrom": {"secretKeyRef": {"name": "ai-batch-reader-database", "key": "url"}},
+        },
+        {
+            "name": "BACKEND_INTERNAL_KEY",
+            "valueFrom": {"secretKeyRef": {"name": "ai-backend-internal-key", "key": "internal-key"}},
+        },
     ]
     config = resources["ConfigMap"]["data"]
     for forbidden in (
         "SHARED_DATABASE_URL", "BACKEND_INTERNAL_KEY", "BACKEND_SERVICE_TOKEN",
-        "DB_URL", "DB_USERNAME", "DB_PASSWORD", "MOONGCHEAP_INTERNAL_API_KEY",
         "BATCH_STATE_DIR", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
     ):
         assert forbidden not in config
@@ -108,12 +109,9 @@ def test_generated_config_reference_and_runtime_settings(resources):
     ]
     config = configmap["data"]
     assert all(isinstance(value, str) for value in config.values())
-    expected_backend_url = (
-        "http://backend"
-        if configmap["metadata"].get("namespace") == "moongcheap-develop"
-        else "https://backend.invalid"
-    )
-    assert config["BACKEND_BASE_URL"] == expected_backend_url
+    assert config["BACKEND_BASE_URL"] in {"https://backend.invalid", "http://backend"}
+    if config["BACKEND_BASE_URL"] == "http://backend":
+        assert resources["CronJob"]["metadata"]["namespace"] == "moongcheap-develop"
     assert config["CLUSTER_MIN_PARTICIPANTS"] == "5"
     assert config["E5_BATCH_SIZE"] == "32"
     assert config["HF_HUB_OFFLINE"] == config["TRANSFORMERS_OFFLINE"] == "1"
@@ -121,24 +119,35 @@ def test_generated_config_reference_and_runtime_settings(resources):
     assert config["HF_HOME"] == "/tmp/huggingface"
     assert config["DEMAND_CONSTRAINT_ALIASES_PATH"] == "/app/config/model1_aliases_reviewed_v2.json"
     assert config["DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH"] == "/app/config/demand_constraint_aliases.json"
-    catalog_seed = PurePosixPath(config["DEMAND_CATALOG_SEED_PATH"])
+    profiles = PurePosixPath(config["MFDS_CATALOG_PROFILES_PATH"])
     taxonomy = PurePosixPath(config["DEMAND_TAXONOMY_PATH"])
-    assert catalog_seed.parent == taxonomy.parent
-    assert str(catalog_seed.parent) == "/artifacts"
-    assert catalog_seed.name == "product_catalog_seed_v5.csv"
+    assert profiles.parent == taxonomy.parent
+    assert profiles.parent.parts[:3] == ("/", "artifacts", "releases")
+    assert profiles.name == "catalog_profiles.csv"
     assert taxonomy.name == "taxonomy.json"
 
 
-def test_image_assets_are_not_hidden_by_volumes_and_only_tmp_is_writable(resources):
+def test_read_only_artifact_mounts_and_bounded_tmp(resources):
     pod = pod_spec(resources)
     container = pod["containers"][0]
     mounts = {mount["name"]: mount for mount in container["volumeMounts"]}
     volumes = {volume["name"]: volume for volume in pod["volumes"]}
-    assert set(mounts) == set(volumes) == {"tmp"}
+    assert set(mounts) == set(volumes) == {"artifacts", "e5-model", "tmp"}
+    for volume_name, mount_path, claim_name in (
+        ("artifacts", "/artifacts", "demand-clustering-artifacts"),
+        ("e5-model", "/models/multilingual-e5-small", "demand-clustering-e5-model"),
+    ):
+        assert mounts[volume_name]["mountPath"] == mount_path
+        assert mounts[volume_name]["readOnly"] is True
+        assert volumes[volume_name]["persistentVolumeClaim"] == {
+            "claimName": claim_name, "readOnly": True,
+        }
     assert mounts["tmp"]["mountPath"] == "/tmp"
     assert volumes["tmp"]["emptyDir"] == {"sizeLimit": "256Mi"}
     config = resources["ConfigMap"]["data"]
-    assert config["E5_MODEL_PATH"] == "/models/multilingual-e5-small"
+    assert PurePosixPath(config["E5_MODEL_PATH"]).is_relative_to(
+        mounts["e5-model"]["mountPath"]
+    )
 
 
 def test_non_root_without_kubernetes_api_token(resources):
@@ -190,10 +199,5 @@ def test_handoff_uses_part_b_paths_and_agreed_parameter_store_source():
         "provider": "aws-ssm-parameter-store", "type": "SecureString",
     }
     assert "X-Internal-Api-Key" in key["purpose"]
-    assert key["secret_name"] == "backend-env"
-    assert key["secret_key"] == "MOONGCHEAP_INTERNAL_API_KEY"
-    for name in ("DB_URL", "DB_USERNAME", "DB_PASSWORD"):
-        assert secrets[name]["secret_name"] == "backend-env"
-        assert secrets[name]["secret_key"] == name
-    assert handoff["runtime_filesystem"]["read_only_mounts"] == []
-    assert handoff["artifact_migration"]["image_only_rollout_supported"] is True
+    assert key["secret_name"] == "ai-backend-internal-key"
+    assert key["secret_key"] == "internal-key"

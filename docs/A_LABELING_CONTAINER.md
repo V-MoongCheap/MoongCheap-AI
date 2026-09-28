@@ -96,13 +96,15 @@ Cloud `develop`에는 기존 `A_MODEL2_*` 환경변수 이름이 남아 있을 �
 
 - `A_LLM_ENABLED=true`
 - `A_LLM_MODEL=qwen2.5:7b-instruct` (현재 운영 후보)
-- 원격 Worker 방식을 선택하는 경우 `A_LLM_ENDPOINT=<실제 Worker Service endpoint>`
+- `A_LLM_ENDPOINT=http://ollama:11434` (Cloud develop의 Ollama API 기준)
 - A CronJob이 참조하는 `ai-labeling-database` Secret과 `url` key
 
+Model 2 호출은 현재 Ollama `/api/generate` 계약을 사용한다. vLLM/OpenAI
+호환 endpoint로 변경하려면 별도 Adapter와 계약 검증이 필요하다.
+
 Cloud develop의 현재 예시에는 `A_MODEL2_FALLBACK_ENABLED=false`와
-`A_MODEL2_OLLAMA_BASE_URL=http://ollama:11434`가 남아 있고, 이 저장소가 확인한
-GitOps 파일에는 해당 Worker Service 정의가 없다. 이는 현재 배포 방식이 미정인
-상태에서 확인된 정합성 보류 사항이며, 방식을 확정한 뒤 Cloud 설정을 맞춰야 한다.
+`A_MODEL2_OLLAMA_BASE_URL=http://ollama:11434`가 남아 있다. A 런타임은 이 이름을
+과도기 호환하며, 배포 시 모델 사용을 활성화해야 한다.
 
 실제 Dev 반영 시 Cloud가 다음 placeholder를 교체한다.
 

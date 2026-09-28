@@ -22,7 +22,7 @@ from moongcheap_ai.data_foundation.model1 import (
 PROMPT_PATH = (
     Path(__file__).resolve().parents[2]
     / "prompts"
-    / "facet_discovery_multisource_v1.txt"
+    / "facet_discovery_multisource_v2_general_few_shot.txt"
 )
 SMOKE_CATEGORY_KEYS = {
     "health-functional-food:vitamin_mineral",
@@ -573,6 +573,46 @@ def select_candidates(candidates: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def apply_value_evidence_gate(
+    candidates: pd.DataFrame, input_data: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Keep only values literally observed in the same category's input."""
+    if candidates.empty:
+        return candidates.copy(), candidates.copy()
+    text_columns = [
+        column
+        for column in (
+            "product_name",
+            "product_form",
+            "functional_ingredients",
+            "regulated_function",
+            "consumer_search_text",
+            "intake_method",
+            "seller_condition",
+            "evidence_text",
+        )
+        if column in input_data.columns
+    ]
+    observed: dict[str, str] = {}
+    for category, group in input_data.groupby("category_key", sort=False):
+        blob = " ".join(
+            str(value)
+            for value in group[text_columns].to_numpy().ravel()
+            if str(value).strip()
+        )
+        observed[str(category)] = _normalize(blob)
+    result = candidates.copy()
+    result["evidence_gate_status"] = [
+        "PASS"
+        if _normalize(value) and _normalize(value) in observed.get(str(category), "")
+        else "REJECT"
+        for category, value in zip(result["category_key"], result["value"])
+    ]
+    accepted = result[result["evidence_gate_status"].eq("PASS")].copy()
+    rejected = result[result["evidence_gate_status"].eq("REJECT")].copy()
+    return accepted, rejected
+
+
 def run_model(
     model_name: str,
     data: pd.DataFrame,
@@ -747,6 +787,10 @@ def main() -> None:
     )
     args = parser.parse_args()
     api_key = os.getenv(args.api_key_env, "") if args.api_key_env else ""
+    # Final benchmark winner for the production-shaped path: observed
+    # category summary plus the parser/evidence gate. Disable explicitly with
+    # MODEL1_CATEGORY_SUMMARY=false for an ablation run.
+    os.environ.setdefault("MODEL1_CATEGORY_SUMMARY", "true")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     data = build_multisource_input(
         {
@@ -810,7 +854,10 @@ def main() -> None:
         for column in candidate_frame.columns:
             candidate_frame[column] = candidate_frame[column].map(_clean_output_text)
     candidate_frame = add_data_selection_reason(candidate_frame, data)
-    selected = select_candidates(candidate_frame)
+    gated_candidates, rejected_candidates = apply_value_evidence_gate(
+        candidate_frame, data
+    )
+    selected = select_candidates(gated_candidates)
     raw_path = args.output_dir / "multisource_model_raw_v1.jsonl"
     raw_path.write_text(
         "\n".join(json.dumps(row, ensure_ascii=True) for row in all_raw) + "\n",
@@ -818,6 +865,11 @@ def main() -> None:
     )
     candidate_frame.to_csv(
         args.output_dir / "multisource_model_candidates_v1.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
+    rejected_candidates.to_csv(
+        args.output_dir / "multisource_model_evidence_gate_rejected_v1.csv",
         index=False,
         encoding="utf-8-sig",
     )
