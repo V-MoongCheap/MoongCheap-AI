@@ -68,6 +68,8 @@ data/reports/*
 codex_private_handoff/
 
 # Review artifacts may contain source review text and stay local-only.
+data/review/*
+!data/review/.gitkeep
 data/processed/reviews/nutrime/nutrime_consumer_facet_discovery.csv
 data/review/model1_mixability_review_details.csv
 data/review/model1_new_facet_human_review.csv
