@@ -104,5 +104,9 @@ TOKENIZERS_PARALLELISM=false .venv-model-kanana/bin/python \
 ```
 
 MPS 여부는 환경별로 `torch.backends.mps.is_available()`를 별도 확인한다.
+Model 1의 Transformers adapter는 `MODEL1_DEVICE=auto`일 때 MPS, CUDA, CPU 순으로
+사용 가능한 장치를 선택한다. 특정 장치를 강제하려면 `MODEL1_DEVICE=cpu`, `mps`,
+또는 `cuda`를 지정한다. macOS 버전이나 PyTorch 빌드가 MPS를 지원하지 않으면
+`auto`는 CPU로 동작한다.
 현재 검증에서는 Transformers 4.57.6에서 모델 로드와 64-token 생성이
 성공했으며, 해당 실행 환경에서는 MPS가 노출되지 않아 CPU로 동작했다.

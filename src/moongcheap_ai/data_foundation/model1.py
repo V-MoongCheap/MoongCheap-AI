@@ -311,6 +311,7 @@ class TransformersAdapter:
     def _get_pipeline(self):
         if self._pipeline is None:
             try:
+                import torch
                 from transformers import AutoTokenizer, pipeline
 
                 tokenizer = AutoTokenizer.from_pretrained(
@@ -318,10 +319,27 @@ class TransformersAdapter:
                     use_fast=False,
                     trust_remote_code=self.trust_remote_code,
                 )
+                requested_device = os.getenv("MODEL1_DEVICE", "auto").strip().casefold()
+                if requested_device == "auto":
+                    if torch.backends.mps.is_available():
+                        device = torch.device("mps")
+                    elif torch.cuda.is_available():
+                        device = torch.device("cuda")
+                    else:
+                        device = -1
+                elif requested_device == "cpu":
+                    device = -1
+                elif requested_device in {"mps", "cuda"}:
+                    device = torch.device(requested_device)
+                else:
+                    raise ValueError(
+                        "MODEL1_DEVICE must be auto, cpu, mps, or cuda"
+                    )
                 self._pipeline = pipeline(
                     "text-generation",
                     model=self.model,
                     tokenizer=tokenizer,
+                    device=device,
                     trust_remote_code=self.trust_remote_code,
                 )
             except Exception as exc:
