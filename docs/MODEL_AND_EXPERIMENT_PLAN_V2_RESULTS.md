@@ -10,7 +10,7 @@
 
 | Task | 선정 Model / Method | 주요 결과 | 선정 이유 |
 | --- | --- | --- | --- |
-| Facet Discovery | Rule/통계 기반 + Kanana 후보 보조 + Evidence Gate | Kanana 210행 실행, 후보 105행, 실패 20행, Rule 승격 0행 | Model-only 자동 확정 근거가 부족하며 Rule 근거와 Human Review가 안전함 |
+| Facet Discovery | Rule/통계 기반 + Qwen3 4B 후보 보조 + Evidence Gate | 동일 smoke에서 Qwen3 4B 4/4 후보·실패 0건·33.00초; 30 Category × 3회 평균 성공률 87.78%, 값 근거율 100% | Kanana보다 구조화 출력과 실행 안정성이 높고, Evidence Gate로 자동 확정을 제한함 |
 | 자연어 해석 | Rule-first Hybrid + Qwen 2.5 7B 제한적 fallback | 동일 200건에서 Rule-only 69%, Model-only 59%, Hybrid 71% | Model-only보다 안전하고 Rule-only보다 2%p 개선 |
 | Clustering | 동일 Catalog + Facet Compatibility + 가격 Rule | MVP 기준 적용 | 명확한 조건을 Rule로 통제하고 Embedding은 후보 검색 보조로 분리 |
 | Seller Matching | Structured Rule + Weighted Scoring | Category, Facet, 가격, 수량, MOQ 중심 | 필수조건 위반을 명시적으로 통제할 수 있음 |
@@ -18,7 +18,7 @@
 
 ### 10.2 Model 1: Facet Discovery 결과
 
-대상 모델:
+초기 비교 대상 모델:
 
 ```text
 kakaocorp/kanana-nano-2.1b-instruct
@@ -54,6 +54,11 @@ Rule/통계 근거 생성
 → Human Review
 → Taxonomy 확정
 ```
+
+추가 동일조건 smoke 비교에서 Kanana는 4회 호출 모두 JSON 파싱에 실패했고
+180.27초가 걸렸다. Qwen3 4B는 4회 호출 모두 후보를 생성하고 실패가 없었으며
+33.00초가 걸렸다. 따라서 현재 MVP의 Model 1 보조 모델은 Qwen3 4B로 확정하고,
+Kanana 결과와 실행 명령은 비교·재현 자료로만 유지한다.
 
 ### 10.3 Model 2: 전체 후보 비교 결과
 
@@ -174,7 +179,7 @@ Model 2 실행에는 동일한 Taxonomy, Demand 입력, Product Facet 매핑, Ol
 
 ## 15. 다음 실험 및 구현 단계
 
-1. Model 1 Facet Review Queue를 Human Review하여 Taxonomy V0를 확정한다.
+1. Qwen3 4B 후보를 Evidence Gate에 통과시킨 뒤 Model 1 Facet Review Queue를 Human Review하여 Taxonomy V0를 확정한다.
 2. 확정 Taxonomy와 Product Facet 매핑을 기준으로 Model 2를 재평가한다.
 3. `a-labeling-batch`의 선택형 Qwen fallback을 Ollama 환경에서 timeout·실패·재처리까지 검증한다.
 4. A 파트 DB 직접 쓰기 배치와 멱등성·재처리 정책을 연결한다.

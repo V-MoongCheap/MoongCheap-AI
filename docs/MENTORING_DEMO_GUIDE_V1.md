@@ -68,7 +68,7 @@ PYTHONPATH=src .venv/bin/python scripts/demo/run_ai_mvp_demo.py --stage c
 ### 완료한 작업
 
 - 실제 건강기능식품 상품·성분 근거를 정리하고 Category별 Facet 후보를 생성했다.
-- Kanana 모델 결과와 Rule/Evidence를 결합해 Facet 후보를 정제했다.
+- 초기 Kanana 비교 결과와 Rule/Evidence를 분석한 뒤, 동일 조건에서 더 안정적인 Qwen3 4B를 현재 Model 1 보조 모델로 선정했다.
 - Facet 후보와 상품 Facet Mapping을 사람 검수 및 자동 정책으로 정리했다.
 - `ALL=0`, 결정론적 Value Code, `UNKNOWN/UNMAPPED` 정책을 적용했다.
 - 5,000건 Demand를 기준으로 A Labeling, B Clustering, C Matching/Analysis E2E를 실행했다.

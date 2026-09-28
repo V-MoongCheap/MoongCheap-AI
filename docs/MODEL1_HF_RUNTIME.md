@@ -30,7 +30,8 @@ Public models do not require a token. Model weights are downloaded on first use 
 
 ## Run a small comparison
 
-Kanana는 현재 Model 1의 선택된 후보 생성 보조 모델이다. 아래 다른 모델들은 비교·재현 실험용 후보이며 자동으로 운영 모델로 승격되지 않는다.
+Model 1의 현재 선택 모델은 Ollama의 `qwen3:4b`이다. Kanana는 Hugging Face
+Transformers 환경에서 비교·재현하는 legacy 후보이며, 운영 기본값으로 사용하지 않는다.
 
 ```powershell
 $env:PYTHONPATH = "src;."
@@ -90,7 +91,7 @@ TOKENIZERS_PARALLELISM=false .venv-model-lfm/bin/python \
 
 This environment is optional and must not replace the base project environment. The smoke script checks loading and bounded generation only; it does not establish model quality.
 
-## Kanana on Transformers 4
+## Kanana on Transformers 4 (legacy comparison)
 
 Kanana는 Transformers 5 환경에서 실행하지 않는다. 기존 Transformers 4 계열
 환경에서 별도 실행한다.

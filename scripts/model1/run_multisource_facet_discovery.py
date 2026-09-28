@@ -751,12 +751,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--models",
-        default="kakaocorp/kanana-nano-2.1b-instruct",
-        help="selected Model 1 assist model; use --models for offline comparisons",
+        default="qwen3:4b",
+        help="selected Model 1 assist model; use --models for comparisons",
     )
     parser.add_argument(
         "--provider",
-        default="transformers",
+        default="ollama",
         choices=[
             "ollama",
             "transformers",

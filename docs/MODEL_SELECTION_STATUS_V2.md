@@ -5,7 +5,7 @@
 현재 운영 구조와 기본 모델 사용 정책을 확정한다. LLM 후보의 탐색 결과를
 최종 Taxonomy나 Label의 자동 승인 근거로 사용하지 않는다.
 
-- Model 1: `kakaocorp/kanana-nano-2.1b-instruct`를 오프라인 후보 생성기로 사용한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다.
+- Model 1: `qwen3:4b`를 후보 생성 보조 모델로 사용한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다. Kanana는 비교·재현용 후보로 유지한다.
 - Model 2: `Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 명확한 행은 Rule/Alias가 처리하고, `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 `qwen2.5:7b-instruct` 모델 런타임으로 보조한다. 실제 배포 위치는 Cloud 설정에 따르며, 통신 기준은 Ollama API다.
 - LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
@@ -95,7 +95,7 @@ Model 2의 통신 기준은 현재 Ollama `/api/generate`다. vLLM/OpenAI 호환
 | 후보 | 양자화/크기 | 동일 Gold 및 샘플 측정 | 결론 |
 | --- | --- | --- | --- |
 | `qwen2.5:7b-instruct` | Q4_K_M / 4.7GB | Gold 단독 12/15 정상 응답, 1건 오판. 미확정 800건에서 223건 적용 | 제한적 fallback으로 선택. Model-only는 제외 |
-| `qwen3:4b` | Q4_K_M / Ollama 상주 약 2.9GB | Gold 15건 성공. 조건 포함 10건 중 비기본 결과 2건. 200건 303초 | 품질 부족으로 제외 |
+| `qwen3:4b` | Q4_K_M / Ollama 상주 약 2.9GB | Model 1 전체 30개 Category × 3회 고도화 실험 수행. 동일 smoke 4회 호출·4건 후보·실패 0건·33초 | Model 1 보조 모델로 확정 |
 | `llama3.2:3b` | Q4_K_M / 2.0GB | Gold 15건 중 6건 실패 및 Taxonomy 오류 | 제외 |
 | `exaone3.5:2.4b` | Q4_K_M / 1.6GB | Gold 15건 전건 HTTP 500 | 제외 |
 
@@ -114,7 +114,7 @@ Qwen 3 4B의 200건 결과는 Mac GPU 실행이라 Kubernetes CPU 처리량을 �
 
 ## 다음 실행 순서
 
-1. Model 1 후보 모델을 동일한 multisource 입력으로 실행
+1. Model 1 Qwen3 4B를 동일한 multisource 입력으로 실행
 2. Model 1 후보 결과를 Evidence gate와 Human Review queue로 평가
 3. Model 2 후보 모델을 동일한 Dev/Holdout/Challenge 입력으로 실행
 4. Rule-only와 Hybrid의 개선폭 비교
@@ -141,3 +141,17 @@ Backend/DB 완료 처리 대상에서 제외한다.
 오프라인 실험에서는 `--enable-llm-fallback`을 명시한다.
 
 실제 모델 가중치·Ollama/Hugging Face/API 환경이 없는 경우에는 모델을 실행한 것처럼 처리하지 않고, 해당 후보를 `NOT_RUN`으로 기록한다.
+
+### Model 1 최종 모델 확정 보충
+
+기존 Kanana 실행 결과와 동일 조건의 Qwen3 4B 결과를 비교했다.
+
+| 모델 | 호출 | 후보 | 실패 | 실행시간 | 판정 |
+|---|---:|---:|---:|---:|---|
+| Kanana 2.1B | 4 | 0 | 4(JSON 오류) | 180.27초 | 제외 |
+| Qwen3 4B | 4 | 4 | 0 | 33.00초 | 선정 |
+
+추가로 Qwen3 4B는 30개 Category × 3회 조합 실험에서
+`Few-shot + Category Summary + Evidence Gate`를 적용했을 때 평균 성공률 87.78%,
+값 근거율 100%를 기록했다. 따라서 Model 1의 MVP 구성은
+`Qwen3 4B + Few-shot + Category Summary + Evidence Gate`로 확정한다.
