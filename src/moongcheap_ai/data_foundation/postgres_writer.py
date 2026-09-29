@@ -15,8 +15,7 @@ from typing import Any, Protocol, Self
 UPDATE_LABEL_SQL = """
 UPDATE demand
 SET label = %(label)s,
-    processed_at = %(processed_at)s,
-    updated_at = NOW()
+    processed_at = %(processed_at)s
 WHERE id = %(demand_id)s
   AND status = 'UNASSIGNED'
   AND processed_at IS NULL

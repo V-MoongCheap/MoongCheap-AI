@@ -90,4 +90,7 @@ Backend API를 거치지 않고 직접 DB에 반영한다.
   `PASSTHROUGH`/`LABELED_WITH_REVIEW` 행만 LLM 후보로 보낸다.
 - LLM 결과는 Taxonomy에 존재하는 Facet/Value를 모두 반환하고, 비어 있지 않은 요구사항을 `ALL`로 만들지 않을 때만 적용한다.
 - 부정 표현은 Rule Parser가 담당하며 LLM은 부정 조건을 최종 확정하지 않는다.
+- Cloud ConfigMap이 기존 호환 변수만 사용하는 경우에는
+  `A_MODEL2_FALLBACK_ENABLED=true`도 함께 공급해야 한다. 해당 값이 `false`이면
+  fallback과 모델 preflight가 모두 비활성화되어 Rule-only로 실행된다.
 - `.env`, API Key, Raw Review, 생성 산출물은 Git에 올리지 않는다.

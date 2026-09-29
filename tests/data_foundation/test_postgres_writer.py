@@ -63,6 +63,10 @@ def test_writer_updates_only_completed_rows_and_commits() -> None:
     assert params == {"demand_id": "1", "label": "1-2", "processed_at": "2026-09-14T00:00:00+00:00"}
     assert "status = 'UNASSIGNED'" in query
     assert "processed_at IS NULL" in query
+    # Match the granted column-level UPDATE scope, not just the parameter names.
+    assignments = query.split("SET", 1)[1].split("WHERE", 1)[0]
+    columns = {assignment.split("=", 1)[0].strip() for assignment in assignments.split(",")}
+    assert columns == {"label", "processed_at"}
 
 
 def test_writer_rolls_back_when_a_write_fails() -> None:

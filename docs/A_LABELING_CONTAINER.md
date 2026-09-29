@@ -97,6 +97,13 @@ Cloud `develop`에는 기존 `A_MODEL2_*` 환경변수 이름이 남아 있을 �
 LLM workload를 `m6i.xlarge` CPU NodePool에 배치할 계획이며, 최종 Kubernetes label·
 taint·toleration과 Ollama Service 주소는 Cloud가 확정 후 GitOps에 반영한다.
 
+Cloud의 fallback 활성화 값이 `false`이면 A는 Rule/Alias만 실행하고 Ollama를 호출하지
+않는다. Model 2 fallback을 실제 배포에 사용할 때는 Cloud ConfigMap에서
+`A_LLM_ENABLED=true`, `A_LLM_MODEL=qwen2.5:7b-instruct`,
+`A_LLM_ENDPOINT=http://ollama:11434`를 공급하거나, 호환 설정으로
+`A_MODEL2_FALLBACK_ENABLED=true`를 공급해야 한다. 이 값이 적용되기 전에는
+`/api/tags` preflight도 실행되지 않는다.
+
 현재 A 이미지에는 모델 가중치나 Ollama를 포함하지 않는다. Ollama 서비스와 모델이
 준비된 뒤 다음 값을 배포 환경에 주입한다.
 
