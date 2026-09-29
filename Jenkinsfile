@@ -1334,7 +1334,7 @@ pipeline {
 
                             ASKPASS="$(pwd)/git-askpass.sh"
 
-                            printf '%s\n' \
+                            printf '%s\\n' \
                               '#!/bin/sh' \
                               'case "$1" in' \
                               '  *Username*)' \
