@@ -618,6 +618,16 @@ pipeline {
                     sh '''
                         set -eu
 
+                        export DEBIAN_FRONTEND=noninteractive
+
+                        apt-get update -qq
+                        apt-get install -y -qq \
+                          --no-install-recommends \
+                          ca-certificates \
+                          curl
+
+                        rm -rf /var/lib/apt/lists/*
+
                         TRIVY_VERSION=0.74.0
 
                         curl -fSL \
@@ -660,6 +670,16 @@ pipeline {
 
                     sh '''
                         set -eu
+
+                        export DEBIAN_FRONTEND=noninteractive
+
+                        apt-get update -qq
+                        apt-get install -y -qq \
+                          --no-install-recommends \
+                          ca-certificates \
+                          curl
+
+                        rm -rf /var/lib/apt/lists/*
 
                         GITLEAKS_VERSION=8.21.2
 
