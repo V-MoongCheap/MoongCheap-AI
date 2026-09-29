@@ -1698,7 +1698,8 @@ pipeline {
                                   "$PR_TITLE")"
 
 
-                                DIRECT_MERGE_RESPONSE="$(curl \
+                                if DIRECT_MERGE_RESPONSE="$(curl \
+                                  --fail-with-body \
                                   -sS \
                                   -X PUT \
                                   -H "Authorization: Bearer ${GIT_TOKEN}" \
@@ -1706,30 +1707,36 @@ pipeline {
                                   -H "Content-Type: application/json" \
                                   "https://api.github.com/repos/${GITOPS_API_REPO}/pulls/${PR_NUMBER}/merge" \
                                   -d "$DIRECT_MERGE_JSON")"
+                                then
+
+                                    DIRECT_MERGED="$(printf '%s' \
+                                      "$DIRECT_MERGE_RESPONSE" |
+                                      node -pe \
+                                      'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); String(x.merged === true)')"
 
 
-                                DIRECT_MERGED="$(printf '%s' \
-                                  "$DIRECT_MERGE_RESPONSE" |
-                                  node -pe \
-                                  'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); String(x.merged === true)')"
+                                    if [ "$DIRECT_MERGED" = "true" ]; then
 
+                                        MERGED=true
 
-                                if [ "$DIRECT_MERGED" = "true" ]; then
+                                        echo \
+                                          "GitOps PR 즉시 Merge 완료: #${PR_NUMBER}"
 
-                                    MERGED=true
+                                    else
 
-                                    echo \
-                                      "GitOps PR 즉시 Merge 완료: #${PR_NUMBER}"
+                                        DIRECT_MERGE_MESSAGE="$(printf '%s' \
+                                          "$DIRECT_MERGE_RESPONSE" |
+                                          node -pe \
+                                          'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.message || "unknown error"')"
+
+                                        echo \
+                                          "GitOps PR 즉시 Merge 불가 (${PR_MERGEABLE_STATE}): ${DIRECT_MERGE_MESSAGE}"
+                                    fi
 
                                 else
 
-                                    DIRECT_MERGE_MESSAGE="$(printf '%s' \
-                                      "$DIRECT_MERGE_RESPONSE" |
-                                      node -pe \
-                                      'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.message || "unknown error"')"
-
                                     echo \
-                                      "GitOps PR 즉시 Merge 불가 (${PR_MERGEABLE_STATE}): ${DIRECT_MERGE_MESSAGE}"
+                                      "GitOps PR 즉시 Merge API 요청 실패"
                                 fi
 
                             else
