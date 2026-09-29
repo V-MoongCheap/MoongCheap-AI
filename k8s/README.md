@@ -68,30 +68,31 @@ Pod 포트 `8080`이나 Pod IP를 넣지 않는다. 두 내부 API의 경로는 
 ([Backend values](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/values/services/backend.yaml),
 [Service 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/charts/moongcheap-service/templates/service.yaml))
 
-현재 B 매니페스트는 Backend의 Kubernetes Secret `backend-env`에서 필요한 네 항목만
-참조한다. Pod와 같은 Namespace에 Secret과 해당 key가 모두 있어야 한다.
+현재 B 매니페스트는 Cloud의 Part B 전용 Kubernetes Secret
+`ai-clustering-database`에서 DB 세 항목을 받고, `backend-env`에서는 내부 API 키
+한 항목만 참조한다. Pod와 같은 Namespace에 두 Secret과 해당 key가 모두 있어야 한다.
 B 전용 overlay는 Cloud와 같은 `moongcheap-develop`을 사용한다. 기존 공용
 `overlays/dev`를 사용하면 `moongcheap-ai-dev`에도 별도 Secret 공급이 필요하다.
 ([Kubernetes Secret](https://kubernetes.io/docs/concepts/configuration/secret/))
 
 | Pod 환경 변수 | Kubernetes Secret | key | 용도 |
 | --- | --- | --- | --- |
-| `DB_URL` | `backend-env` | `DB_URL` | Backend JDBC URL; 앱에서 `jdbc:` 제거 |
-| `DB_USERNAME` | `backend-env` | `DB_USERNAME` | Backend와 같은 DB 계정 |
-| `DB_PASSWORD` | `backend-env` | `DB_PASSWORD` | 해당 DB 계정 비밀번호 |
-| `BACKEND_INTERNAL_KEY` | `backend-env` | `MOONGCHEAP_INTERNAL_API_KEY` | Backend와 공유하는 `X-Internal-Api-Key` 값; Cloud 템플릿 매핑 완료, 실제 동기화 확인 필요 |
+| `DB_URL` | `ai-clustering-database` | `DB_URL` | Part B 전용 JDBC URL; 앱에서 `jdbc:` 제거 |
+| `DB_USERNAME` | `ai-clustering-database` | `DB_USERNAME` | Part B 전용 조회 계정 |
+| `DB_PASSWORD` | `ai-clustering-database` | `DB_PASSWORD` | 해당 DB 계정 비밀번호 |
+| `BACKEND_INTERNAL_KEY` | `backend-env` | `MOONGCHEAP_INTERNAL_API_KEY` | Backend와 공유하는 `X-Internal-Api-Key` 값 |
 
 앱은 DB 세 값을 읽어 PostgreSQL DSN을 조합한다. 계정·비밀번호는 공백을 보존하고
 URL 인코딩하며, IPv6 주소와 libpq 호환 query(`sslmode` 등)는 유지한다. `DB_URL`에
-별도 계정·비밀번호가 포함되면 설정 오류로 중단한다. `backend-env` 전체를 `envFrom`으로
-가져오지 않으므로 OAuth·암호화 키 등 다른 Backend 비밀 값은 AI에 전달하지 않는다.
+별도 계정·비밀번호가 포함되면 설정 오류로 중단한다. 두 Secret 전체를 `envFrom`으로
+가져오지 않고 필요한 key만 참조하므로 다른 비밀 값은 AI에 전달하지 않는다.
 기존 로컬 실행의 `SHARED_DATABASE_URL`도 지원하며, 비어 있지 않으면 DB 세 값보다
 우선한다. 이 직접 DSN에는 JDBC URL을 넣을 수 없다. 기본 매니페스트는 직접 DSN을
-주입하지 않으며, Cloud에 새 DB 환경변수나 AI 전용 DB Secret을 요구하지 않는다.
+주입하지 않는다.
 
-이 구성은 Backend DB 계정을 공유한다. AI의 PostgreSQL 연결은 기존대로
-`default_transaction_read_only=on`을 적용하지만, DB role 자체를 SELECT 전용으로
-바꾸지는 않는다.
+Cloud는 `moongcheap-develop-ai-clustering-db-secret`에서 같은 이름의 Kubernetes
+Secret을 동기화한다. AI의 PostgreSQL 연결도 추가로
+`default_transaction_read_only=on`을 적용한다.
 
 AI DB 계정에는 `demand`, `demand_board`, `reject_history`의 SELECT 권한이 필요하다.
 `reject_history`는 Backend가 배포·기록하며, 거절한 수요·보드 조합은 재제안에서
@@ -103,12 +104,14 @@ RDS 계정 저장 방식을 이 내부 키의 별도 합의에 그대로 적용�
 
 앱의 입력 계약은 `BACKEND_INTERNAL_KEY` 환경 변수다. 배포 환경이 Parameter Store를
 조회해 `backend-env`의 `MOONGCHEAP_INTERNAL_API_KEY` 항목을 공급해야 한다.
-2026-09-23 확인한 Cloud `develop` (`8fd7e20`)의 ExternalSecret 템플릿에는
-DB 세 항목과 내부 인증 키 항목이 모두 매핑돼 있다. 다만 실제 AWS 원본 값, 조회 권한과
-클러스터의 ExternalSecret 동기화 성공 여부는 별도 확인이 필요하다. 실제 DB·Backend
+2026-09-29 확인한 Cloud `develop` (`ea2a5c6`)에는 DB용
+`externalsecret-ai-clustering-database.yaml`과 내부 키용 `backend-env`가 분리되어 있다.
+다만 실제 AWS 원본 값, 조회 권한과 클러스터의 ExternalSecret 동기화 성공 여부는 별도
+확인이 필요하다. 실제 DB·Backend
 연동 검증을 완료하기 전까지 `suspend: true`를 유지한다. 앱은 SSM을 직접 호출하지 않으며,
 `secretKeyRef` 자체가 SSM을 조회하지도 않는다.
-([Cloud ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/8fd7e20/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
+([Cloud DB ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/ea2a5c6/gitops/platform/external-secrets/resources/externalsecret-ai-clustering-database.yaml),
+[Cloud Backend ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/ea2a5c6/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
 
 Secret 공급 주체의 AWS 권한과 ECR 이미지 pull 권한은 별도의 인프라 설정이다.
 실제 비밀 값과 `.env`는 Git·이미지·로그에 넣지 않는다. 키 교체 시 Backend와 AI의
@@ -268,7 +271,7 @@ Secret·노드·재시도·보안·이미지 내부 경로·PVC 미사용과 A �
 1. 실제 Namespace와 ECR 이미지 경로·Git SHA 태그.
 2. ConfigMap의 Backend Service 주소(개발 예시는 `http://backend` 반영 완료).
    v5 시드·taxonomy·모델 경로는 이미지 기본값을 유지한다.
-3. `backend-env`의 DB 세 항목과 Parameter Store 내부 키 항목 공급.
+3. `ai-clustering-database`의 DB 세 항목과 `backend-env`의 내부 키 항목 공급.
 4. BE·AI NodePool의 실제 라벨·taint 정책, 합산 CPU/메모리 여유와 DB·Backend 네트워크 연결.
 5. 테스트 데이터로 실제 연동 검증 후 스케줄·제한 시간을 확인하고 `suspend: false`로 전환.
 
