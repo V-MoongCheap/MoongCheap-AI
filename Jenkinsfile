@@ -5,6 +5,7 @@ pipeline {
     options {
         timeout(time: 90, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)
+        skipDefaultCheckout(true)
     }
 
     parameters {
@@ -26,16 +27,6 @@ pipeline {
 
         GITOPS_REPO_URL = 'https://github.com/V-MoongCheap/MoongCheap-Cloud.git'
 
-        BUILD_LABELING          = 'false'
-        BUILD_AWARDING          = 'false'
-        BUILD_DEMAND_CLUSTERING = 'false'
-        BUILD_SELLER_ANALYSIS   = 'false'
-
-        GITOPS_PR_NUMBER     = ''
-        GITOPS_PR_URL        = ''
-        GITOPS_PR_STATUS     = ''
-        GITOPS_BRANCH_STATUS = ''
-        GITOPS_PR_CREATED    = 'false'
     }
 
 
@@ -58,6 +49,21 @@ pipeline {
                 checkout scm
 
                 script {
+
+                    // Values declared in a Declarative environment block cannot
+                    // be overridden later with env.* assignments. Initialize
+                    // runtime state here so change detection and GitOps output
+                    // can update it for subsequent stages.
+                    env.BUILD_LABELING          = 'false'
+                    env.BUILD_AWARDING          = 'false'
+                    env.BUILD_DEMAND_CLUSTERING = 'false'
+                    env.BUILD_SELLER_ANALYSIS   = 'false'
+
+                    env.GITOPS_PR_NUMBER     = ''
+                    env.GITOPS_PR_URL        = ''
+                    env.GITOPS_PR_STATUS     = ''
+                    env.GITOPS_BRANCH_STATUS = ''
+                    env.GITOPS_PR_CREATED    = 'false'
 
                     // --------------------------------------------------
                     // Environment
@@ -371,6 +377,7 @@ pipeline {
                 stash(
                     name: 'source',
                     includes: '**/*',
+                    excludes: '.git/**',
                     useDefaultExcludes: false
                 )
             }
@@ -393,6 +400,7 @@ pipeline {
                 stage('A Labeling Test') {
 
                     when {
+                        beforeAgent true
                         expression {
                             env.BUILD_LABELING == 'true'
                         }
@@ -439,6 +447,7 @@ pipeline {
                 stage('Awarding Test') {
 
                     when {
+                        beforeAgent true
                         expression {
                             env.BUILD_AWARDING == 'true'
                         }
@@ -497,6 +506,7 @@ pipeline {
                 stage('Demand Clustering Test') {
 
                     when {
+                        beforeAgent true
                         expression {
                             env.BUILD_DEMAND_CLUSTERING == 'true'
                         }
@@ -545,6 +555,7 @@ pipeline {
                 stage('Seller Analysis Test') {
 
                     when {
+                        beforeAgent true
                         expression {
                             env.BUILD_SELLER_ANALYSIS == 'true'
                         }
@@ -682,6 +693,7 @@ pipeline {
                 stage('A Labeling Image') {
 
                     when {
+                        beforeAgent true
                         expression {
                             env.BUILD_LABELING == 'true'
                         }
@@ -817,6 +829,7 @@ pipeline {
                 stage('Awarding Image') {
 
                     when {
+                        beforeAgent true
                         expression {
                             env.BUILD_AWARDING == 'true'
                         }
@@ -952,6 +965,7 @@ pipeline {
                 stage('Demand Clustering Image') {
 
                     when {
+                        beforeAgent true
                         expression {
                             env.BUILD_DEMAND_CLUSTERING == 'true'
                         }
@@ -1087,6 +1101,7 @@ pipeline {
                 stage('Seller Analysis Image') {
 
                     when {
+                        beforeAgent true
                         expression {
                             env.BUILD_SELLER_ANALYSIS == 'true'
                         }
@@ -1228,6 +1243,7 @@ pipeline {
         stage('Update GitOps Repo (Image Tags)') {
 
             when {
+                beforeAgent true
 
                 expression {
 
