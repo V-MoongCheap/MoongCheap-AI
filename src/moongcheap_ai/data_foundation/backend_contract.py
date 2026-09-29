@@ -22,9 +22,11 @@ def build_label_result_payload(labeled: Any, *, processed_at: str) -> dict[str, 
         raise ValueError("labeled result missing columns: " + ", ".join(missing))
     rows = []
     for item in labeled.fillna("").to_dict(orient="records"):
-        # Review rows are diagnostic output only. Sending them would allow an
-        # unresolved input to be treated as a completed Backend update.
-        if str(item.get("label_status", "")).strip() == "REVIEW":
+        # Only completed rule labels or validated LLM fallback labels may be
+        # written. LABELED_WITH_REVIEW/REVIEW/CONFLICT/PASSTHROUGH are
+        # diagnostic output only; sending them would mark unresolved input as
+        # completed in Backend.
+        if str(item.get("label_status", "")).strip() not in {"LABELED", "PARSED"}:
             continue
         rows.append({
             "demandId": _identifier(item["demand_id"]),
@@ -60,7 +62,7 @@ def post_label_results(
         raise ValueError("Backend URL, internal key, and absolute endpoint are required")
     response = http_post(
         base_url.rstrip("/") + endpoint,
-        headers={"X-Internal-Key": internal_key, "Content-Type": "application/json", "Accept": "application/json"},
+        headers={"X-Internal-Api-Key": internal_key, "Content-Type": "application/json", "Accept": "application/json"},
         json=dict(payload),
         timeout=timeout_seconds,
         allow_redirects=False,

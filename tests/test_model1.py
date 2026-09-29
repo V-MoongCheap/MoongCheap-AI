@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 
 from moongcheap_ai.data_foundation.model1 import (
@@ -8,6 +10,7 @@ from moongcheap_ai.data_foundation.model1 import (
     create_model_adapter,
     parse_model_output,
     sample_products,
+    sample_products_by_category,
 )
 from moongcheap_ai.data_foundation.model1 import _build_compact_prompt
 from moongcheap_ai.data_foundation.model1_postprocess import (
@@ -15,6 +18,7 @@ from moongcheap_ai.data_foundation.model1_postprocess import (
     map_products,
     normalize_candidates,
 )
+from moongcheap_ai.data_foundation.category_v2_1 import classify_v2_1
 
 
 def test_composite_values_are_split_before_deduplication():
@@ -45,7 +49,9 @@ def test_compact_prompt_bounds_evidence_and_requires_contract_shape():
     )
     assert "at most 1 facet and 1 value" in prompt
     assert "source_text" in prompt
-    assert "long" not in prompt
+    assert "semantic stable key" in prompt
+    assert "evidence_text" in prompt
+    assert "long" * 100 not in prompt
 
 
 def _frame():
@@ -97,6 +103,32 @@ def test_sampling_handles_empty_or_partially_schematized_input():
         "sampling_reason",
     ]
     assert len(partial) == 1
+
+
+def test_generic_sampling_does_not_classify_non_health_products():
+    frame = pd.DataFrame([
+        {"source_product_id": "d1", "category_key": "kitchen:pan", "category_name": "프라이팬", "product_name": "스텐 프라이팬"},
+        {"source_product_id": "c1", "category_key": "cosmetics:cleanser", "category_name": "클렌징", "product_name": "클렌징폼"},
+    ])
+    result = sample_products_by_category(frame, max_per_category=5)
+    assert set(result["category_key"]) == {"kitchen:pan", "cosmetics:cleanser"}
+    assert not result["category_key"].str.startswith("health-functional-food:").any()
+
+
+def test_default_facet_prompt_is_domain_neutral():
+    prompt = (Path(__file__).parents[1] / "prompts" / "facet_discovery_v0.txt").read_text(encoding="utf-8")
+    assert "health-functional-food" not in prompt
+    assert "general e-commerce product catalog" in prompt
+
+
+def test_generic_protein_word_in_function_text_does_not_make_protein_category():
+    row = pd.Series({
+        "product_type": "비오틴",
+        "functional_ingredients": "비오틴",
+        "main_functionality": "단백질 대사와 에너지 생성에 필요",
+        "name": "활력충전 비오틴",
+    })
+    assert classify_v2_1(row)[0] != "PROTEIN"
 
 
 def test_mock_output_parser_accepts_input_evidence():

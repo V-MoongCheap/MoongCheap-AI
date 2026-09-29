@@ -17,6 +17,7 @@ import pandas as pd
 from ..demand_constraints import DemandConstraintParser
 from ..demand_clustering.part_a_integration import build_part_b_parser
 from .labeling import TaxonomyLoader
+from .part_a_input_policy import PartAConstraintInputPolicy
 
 RUNTIME_VERSION = "part-a-runtime.v2.2"
 STATUSES = {
@@ -118,22 +119,45 @@ def run_part_a_batch(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Parse a batch and return only Part A's typed contract output."""
 
-    taxonomy = (
-        TaxonomyLoader(dict(taxonomy_payload))
-        if taxonomy_payload is not None
-        else TaxonomyLoader.from_path(taxonomy_path)  # type: ignore[arg-type]
+    if taxonomy_payload is not None:
+        # Production Labeling reads category.facet from Backend and builds the
+        # taxonomy in memory. Do not require a local artifact in that mode.
+        taxonomy = TaxonomyLoader(dict(taxonomy_payload))
+    elif taxonomy_path is not None:
+        taxonomy = TaxonomyLoader.from_path(taxonomy_path)
+    else:
+        raise ValueError("taxonomy_path or taxonomy_payload is required")
+    payload = taxonomy.taxonomy
+    parser = DemandConstraintParser.from_taxonomy(
+        payload,
+        rules_path=rules_path,
+        aliases_path=alias_registry_path,
+        policy_cls=PartAConstraintInputPolicy,
     )
     payload = taxonomy.taxonomy
     if compatibility_alias_registry_path is not None:
-        parser, _ = build_part_b_parser(
+        # Keep the Part B integration helper backward-compatible: older B
+        # branches do not accept a Part A policy class, so apply the A policy
+        # after B has enriched the taxonomy aliases.
+        enriched_parser, _ = build_part_b_parser(
             payload,
             rules_path=rules_path,
             aliases_path=alias_registry_path,
             compatibility_aliases_path=compatibility_alias_registry_path,
         )
+        parser = DemandConstraintParser(
+            extractor=enriched_parser.extractor,
+            input_policy=PartAConstraintInputPolicy(
+                enriched_parser.input_policy.matcher,
+                enriched_parser.extractor,
+            ),
+        )
     else:
         parser = DemandConstraintParser.from_taxonomy(
-            payload, rules_path=rules_path, aliases_path=alias_registry_path
+            payload,
+            rules_path=rules_path,
+            aliases_path=alias_registry_path,
+            policy_cls=PartAConstraintInputPolicy,
         )
     source = demands.fillna("").copy()
     if skip_processed and "processed_at" in source.columns:
@@ -231,6 +255,7 @@ def run_part_a_batch(
             status = str(result["status"])
             if status not in STATUSES:
                 status = "REVIEW"
+            completed = status in {"PARSED", "NONE", "NOT_APPLICABLE"}
             constraints = _contract_constraints(taxonomy, category_id, result)
             label, facet_values = _label(taxonomy, category_id, constraints)
             reason_codes = list(result.get("warnings", []))
@@ -253,7 +278,7 @@ def run_part_a_batch(
                 "label": label,
                 "facet_values": json.dumps(facet_values, ensure_ascii=False, separators=(",", ":")),
                 "parserVersion": RUNTIME_VERSION,
-                "processed_at": now,
+                "processed_at": now if completed else "",
             })
         except (KeyError, TypeError, ValueError, IndexError) as error:
             row.update({

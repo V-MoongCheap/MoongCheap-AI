@@ -34,4 +34,4 @@ external_dependencies:
   # - Redis
   # - LLM API
 
-notes: "이번 PR은 PostgreSQL read-only 조회 어댑터까지만 포함하며, 실제 DB 연결 환경변수와 Secret은 후속 런타임 연동 시 확정합니다."
+notes: "서비스별 실행 계약을 작성합니다. Part A labeling은 PostgreSQL에서 미처리 demand를 조회하고 demand.label 및 demand.processed_at을 직접 UPDATE하는 CronJob입니다. 미해결 행의 Model 2 보조 호출은 Cloud Ollama API를 사용하며, 모델 노드풀의 최종 label·Secret 공급 방식은 Cloud GitOps 계약에 맞춰 기입합니다."

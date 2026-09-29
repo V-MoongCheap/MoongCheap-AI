@@ -6,6 +6,7 @@ import json
 import re
 import unicodedata
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
@@ -216,16 +217,21 @@ def taxonomy_from_category_facet_rows(frame: pd.DataFrame) -> dict[str, Any]:
 
 
 def build_product_facet_map(frame: pd.DataFrame) -> dict[str, list[dict[str, Any]]]:
-    """Index approved product facets by source ID and every supplied catalog ID."""
+    """Index mapped product facets by every available catalog identifier."""
     result: dict[str, list[dict[str, Any]]] = {}
     normalized = frame.fillna("")
     if "mapping_status" in normalized:
         normalized = normalized[normalized["mapping_status"].astype(str).str.upper().isin({"MAPPED"})]
     for payload in normalized.to_dict(orient="records"):
-        source_id = str(payload.get("source_product_id", "")).strip()
-        catalog_id = str(payload.get("catalog_id", "")).strip()
-        keys = [key for key in (source_id, catalog_id, f"catalog-seed-{source_id}") if key]
-        for key in dict.fromkeys(keys):
+        source_id = _text(payload.get("source_product_id"))
+        keys = {
+            _text(payload.get(column))
+            for column in ("catalog_id", "product_catalog_id", "id", "catalog_seed_id")
+            if _text(payload.get(column))
+        }
+        if source_id:
+            keys.update({source_id, f"catalog-seed-{source_id}"})
+        for key in sorted(keys):
             result.setdefault(key, []).append(payload)
     return result
 
@@ -240,14 +246,16 @@ def label_demand(demand_id: int | str, catalog_id: int | str, extra_requirement:
 
 def label_demands(frame: pd.DataFrame, loader: TaxonomyLoader,
                   catalog_category_map: dict[str, Any] | None = None,
-                  product_facet_map: dict[str, list[dict[str, Any]]] | None = None) -> pd.DataFrame:
+                  product_facet_map: dict[str, list[dict[str, Any]]] | None = None,
+                  requirement_interpreter: Callable[[str, str, bool], Any] | None = None) -> pd.DataFrame:
     """Batch label demands through ERD's catalog_id -> category_id path."""
     rows: list[dict[str, Any]] = []
     for _, demand in frame.iterrows():
-        category_id = str(demand.get("category_id", "") or demand.get("kan_code", "")).strip()
+        catalog_id = _text(demand.get("catalog_id", ""))
+        category_id = _text(demand.get("category_id", "")) or _text(demand.get("kan_code", ""))
         if not category_id and catalog_category_map:
-            category_id = str(catalog_category_map.get(str(demand.get("catalog_id", "")), "") or "").strip()
-        requirement = str(demand.get("extra_requirement", "") or "").strip()
+            category_id = _text(catalog_category_map.get(catalog_id, ""))
+        requirement = _text(demand.get("extra_requirement", ""))
         if not category_id:
             warnings = ["CATEGORY_MISSING"]
             facet_values = {}
@@ -261,18 +269,48 @@ def label_demands(frame: pd.DataFrame, loader: TaxonomyLoader,
             label_status = "REVIEW"
             label = ""
         else:
-            defaults, default_warnings = loader.product_defaults(category_id, (product_facet_map or {}).get(str(demand.get("catalog_id", "")), []))
-            requested, request_warnings = loader.resolve(category_id, requirement)
+            defaults, default_warnings = loader.product_defaults(category_id, (product_facet_map or {}).get(catalog_id, []))
             facet_values = defaults.copy()
-            for facet_name, value in requested.items():
-                if int(value.get("code", 0)) != 0:
-                    facet_values[facet_name] = value
-            warnings = default_warnings + request_warnings
+            warnings = list(default_warnings)
             unresolved_items = []
-            if requirement and any("did not match" in warning for warning in warnings):
-                unresolved_items.append(requirement)
-            label_status = "LABELED" if not warnings else "LABELED_WITH_REVIEW"
-            label = loader.encode(facet_values)
+            if requirement_interpreter is None:
+                requested, request_warnings = loader.resolve(category_id, requirement)
+                warnings.extend(request_warnings)
+                for facet_name, value in requested.items():
+                    if int(value.get("code", 0)) != 0:
+                        facet_values[facet_name] = value
+                if requirement and any("did not match" in warning for warning in warnings):
+                    unresolved_items.append(requirement)
+                label_status = "LABELED" if not warnings else "LABELED_WITH_REVIEW"
+                label = loader.encode(facet_values)
+            else:
+                consent = _text(demand.get("is_substitutable", "true")) or "true"
+                consent = consent.strip().casefold()
+                is_substitutable = consent not in {"false", "0", "0.0", "no", "n", "미동의"}
+                interpreted = requirement_interpreter(
+                    category_id,
+                    requirement,
+                    is_substitutable=is_substitutable,
+                )
+                warnings.extend(str(warning) for warning in interpreted.warnings)
+                status = str(interpreted.status)
+                for constraint in interpreted.constraints:
+                    constraint_type = str(constraint.constraint_type)
+                    if constraint_type not in {"MUST", "EXCLUDE"}:
+                        continue
+                    facet_values[constraint.facet_name] = {
+                        "code": int(constraint.value_code),
+                        "value": str(constraint.value),
+                        "matched_alias": None,
+                    }
+                if status in {"REVIEW", "CONFLICT", "TAXONOMY_AMBIGUOUS", "PASSTHROUGH"}:
+                    label_status = "REVIEW"
+                    label = ""
+                    if requirement:
+                        unresolved_items.append(requirement)
+                else:
+                    label_status = "LABELED" if not warnings else "LABELED_WITH_REVIEW"
+                    label = loader.encode(facet_values)
         row = demand.to_dict()
         row.update({
             "category_id": str(category_id or ""),

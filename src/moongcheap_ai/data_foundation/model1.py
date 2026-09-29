@@ -6,6 +6,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -97,7 +98,28 @@ def _build_prompt(
 ) -> str:
     product_text = json.dumps(products, ensure_ascii=False)
     prompt_template = prompt_path.read_text(encoding="utf-8")
-    return f"{prompt_template}\n\nPrompt version: {prompt_version}\nTarget category_key: {category}\nInput products (evidence only):\n{product_text}"
+    summary = _category_evidence_summary(products)
+    return f"{prompt_template}\n\nPrompt version: {prompt_version}\nTarget category_key: {category}\n{summary}Input products (evidence only):\n{product_text}"
+
+
+def _category_evidence_summary(products: list[dict[str, Any]]) -> str:
+    """Add an optional observed-value summary without creating new evidence."""
+    if os.getenv("MODEL1_CATEGORY_SUMMARY", "false").casefold() != "true":
+        return ""
+    counts: Counter[str] = Counter()
+    for product in products:
+        for field in ("product_form", "functional_ingredients", "evidence_text"):
+            value = str(product.get(field, "")).strip()
+            if value:
+                counts[value] += 1
+    if not counts:
+        return "Observed evidence frequency summary: no non-empty values.\n"
+    lines = [
+        "Observed evidence frequency summary (observed input only; not generated facts):",
+        *[f"- {value}: {count}" for value, count in counts.most_common(20)],
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def _build_compact_prompt(
@@ -111,6 +133,8 @@ def _build_compact_prompt(
         "product_form",
         "functional_ingredients",
         "intake_method",
+        "evidence_text",
+        "consumer_search_text",
     )
     for product in products:
         compact_rows.append({key: str(product.get(key, ""))[:120] for key in keep})
@@ -124,14 +148,23 @@ def _build_compact_prompt(
         '{"source_product_id":"...","source_field":"...",'
         '"source_text":"..."}]}]}. '
         "Use only observed product facts. Return at most 1 facet and 1 value. "
+        "facet_id_candidate must be a semantic stable key such as form, size, material, "
+        "color, capacity, compatibility, or usage; never use a number, rank, or database ID. "
+        "The facet name and value must be directly supported by the copied input field. "
+        "If no reliable facet is supported, return an empty facets array. "
         "Use exactly 1 evidence item per facet; source_text must be one short field value, "
         "not a sentence. Copy source_product_id exactly from the input and choose it only "
         f"from this allowed list: {json.dumps(allowed_ids, ensure_ascii=False)}. "
         "Copy source_text character-for-character from the matching input field; never "
         "translate, normalize, summarize, or invent evidence text. "
-        "Keep all strings under 60 characters. Never invent IDs, values, prices, or medical claims."
+        "Keep all strings under 60 characters. Never invent IDs, values, prices, or medical claims. "
+        "Do not infer an ingredient or amount that is not literally present in the input."
+        " Few-shot guidance: for evidence containing '스텐' or '스테인레스', a valid proposal is "
+        "facet name '재질' with value '스텐'; for evidence containing only a brand or category name, "
+        "return no facet. Do not copy this example unless the input literally supports it."
     )
-    return f"{instruction}\nPrompt version: {prompt_version}\nTarget category_key: {category}\nEvidence:\n{json.dumps(compact_rows, ensure_ascii=False)}"
+    summary = _category_evidence_summary(products)
+    return f"{instruction}\nPrompt version: {prompt_version}\nTarget category_key: {category}\n{summary}Evidence:\n{json.dumps(compact_rows, ensure_ascii=False)}"
 
 
 def _parse_json_response(raw_response: str, provider: str) -> dict[str, Any]:
@@ -176,6 +209,10 @@ class OllamaAdapter:
                 "format": "json",
                 "stream": False,
                 "think": False,
+                "options": {
+                    "temperature": float(os.getenv("MODEL1_TEMPERATURE", "0")),
+                    "num_predict": int(os.getenv("MODEL1_MAX_NEW_TOKENS", "512")),
+                },
             },
             ensure_ascii=False,
         ).encode("utf-8")
@@ -274,6 +311,7 @@ class TransformersAdapter:
     def _get_pipeline(self):
         if self._pipeline is None:
             try:
+                import torch
                 from transformers import AutoTokenizer, pipeline
 
                 tokenizer = AutoTokenizer.from_pretrained(
@@ -281,10 +319,27 @@ class TransformersAdapter:
                     use_fast=False,
                     trust_remote_code=self.trust_remote_code,
                 )
+                requested_device = os.getenv("MODEL1_DEVICE", "auto").strip().casefold()
+                if requested_device == "auto":
+                    if torch.backends.mps.is_available():
+                        device = torch.device("mps")
+                    elif torch.cuda.is_available():
+                        device = torch.device("cuda")
+                    else:
+                        device = -1
+                elif requested_device == "cpu":
+                    device = -1
+                elif requested_device in {"mps", "cuda"}:
+                    device = torch.device(requested_device)
+                else:
+                    raise ValueError(
+                        "MODEL1_DEVICE must be auto, cpu, mps, or cuda"
+                    )
                 self._pipeline = pipeline(
                     "text-generation",
                     model=self.model,
                     tokenizer=tokenizer,
+                    device=device,
                     trust_remote_code=self.trust_remote_code,
                 )
             except Exception as exc:
@@ -449,6 +504,41 @@ def sample_products(
         sampled.append(selected)
     result = pd.concat(sampled, ignore_index=True) if sampled else pd.DataFrame()
     return result.reindex(columns=MODEL_COLUMNS, fill_value="")
+
+
+def sample_products_by_category(
+    frame: pd.DataFrame,
+    category_column: str = "category_key",
+    category_name_column: str = "category_name",
+    max_per_category: int = 24,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """Sample arbitrary e-commerce products without health classification."""
+    if frame.empty:
+        return pd.DataFrame(columns=[*MODEL_COLUMNS, "category_name"])
+    data = frame.fillna("").copy()
+    for column in ("source_product_id", "product_name", category_column):
+        if column not in data.columns:
+            data[column] = ""
+    data["category_key"] = data[category_column].astype(str).str.strip()
+    data["category_name"] = (
+        data[category_name_column].astype(str).str.strip()
+        if category_name_column in data.columns
+        else data["category_key"]
+    )
+    data = data[data["category_key"] != ""].copy()
+    sampled = []
+    for _, group in data.groupby("category_key", sort=True):
+        sampled.append(
+            group.sort_values("source_product_id")
+            .sample(frac=1, random_state=seed)
+            .head(max_per_category)
+        )
+    result = pd.concat(sampled, ignore_index=True) if sampled else data.iloc[0:0]
+    for column in MODEL_COLUMNS:
+        if column not in result.columns:
+            result[column] = ""
+    return result[[*MODEL_COLUMNS, "category_name"]]
 
 
 def parse_model_output(

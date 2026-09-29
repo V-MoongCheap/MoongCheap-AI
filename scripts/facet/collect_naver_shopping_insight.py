@@ -26,7 +26,15 @@ def load_category_map(path: Path) -> dict[str, str]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("category map must be a JSON object")
-    return {str(key): str(value) for key, value in payload.items() if str(value).strip()}
+    categories = payload.get("categories", payload)
+    if not isinstance(categories, dict):
+        raise ValueError("category map categories must be a JSON object")
+    result: dict[str, str] = {}
+    for key, value in categories.items():
+        category_id = value.get("naver_cat_id", "") if isinstance(value, dict) else value
+        if str(category_id).strip():
+            result[str(key)] = str(category_id).strip()
+    return result
 
 
 def build_requests(

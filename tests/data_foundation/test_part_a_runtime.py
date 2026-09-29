@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pandas as pd
 
@@ -41,6 +42,7 @@ def test_part_a_returns_backend_contract_without_clustering(tmp_path):
     assert constraints[0]["facetKey"] == "product_form"
     assert constraints[0]["valueCode"] == 1
     assert result.loc[2, "effectiveRequirementMode"] == "SEMANTIC_TEXT"
+    assert result.loc[2, "processed_at"] == ""
     assert len(json.loads(result.loc[3, "preferenceGroups"])) == 1
     assert summary["externalLlmCalls"] == 0
     assert summary["clustering"] == "NOT_PERFORMED"
@@ -125,6 +127,45 @@ def test_part_a_prevalidates_category_before_parser_and_keeps_invalid_rows_pendi
     assert result.loc[0, "preferenceGroups"] == "[]"
     assert pd.isna(result.loc[0, "passthroughText"])
     assert summary["categoryPrevalidationFailureCount"] == 2
+
+
+def test_part_a_uses_backend_taxonomy_payload_without_local_file(tmp_path):
+    taxonomy = {
+        "version": "backend-category-facet",
+        "categories": [{
+            "category_id": "cat-1",
+            "facets": [{
+                "facet_id": 1,
+                "name": "sweetener_type",
+                "order": 1,
+                "values": [
+                    {"code": 0, "value": "ALL", "aliases": []},
+                    {"code": 1, "value": "sugar_free", "aliases": ["무설탕"]},
+                ],
+            }],
+        }],
+    }
+    demands = pd.DataFrame([{
+        "demand_id": "backend-1",
+        "catalog_id": "3901",
+        "category_id": "cat-1",
+        "extra_requirement": "무설탕",
+        "is_substitutable": False,
+    }])
+
+    result, summary = run_part_a_batch(
+        demands,
+        tmp_path / "taxonomy-does-not-exist.json",
+        Path("config/demand_constraint_rules.json"),
+        None,
+        taxonomy_payload=taxonomy,
+        compatibility_alias_registry_path=Path("config/demand_constraint_aliases.json"),
+        processed_at="2026-09-29T00:00:00+00:00",
+    )
+
+    assert summary["taxonomyVersion"] == "backend-category-facet"
+    assert result.loc[0, "status"] == "PARSED"
+    assert result.loc[0, "label"] == "1"
 
 
 def test_part_a_rejects_invalid_substitution_consent_before_parser(tmp_path, monkeypatch):

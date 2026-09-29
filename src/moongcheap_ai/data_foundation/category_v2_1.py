@@ -60,8 +60,19 @@ def classify_v2_1(row: pd.Series) -> tuple[str, str, float, str]:
     subgroup_rules = SUBGROUP_RULES["OTHER_FUNCTIONAL"][:6]
     for key, (_, keywords) in zip(SUBGROUP_KEY_ORDER, subgroup_rules):
         name = NEW_GROUPS[key][0]
+        subgroup_haystack = haystack
+        # Generic regulated wording such as "단백질 대사" describes a
+        # function of many vitamin products. It is not evidence that the
+        # product itself is a protein product.
+        if key == "PROTEIN":
+            subgroup_haystack = " ".join(
+                _text(row.get(column))
+                for column in ("product_type", "functional_ingredients", "name")
+            )
         matches = [
-            keyword for keyword in keywords if keyword.casefold() in haystack.casefold()
+            keyword
+            for keyword in keywords
+            if keyword.casefold() in subgroup_haystack.casefold()
         ]
         if matches:
             return (

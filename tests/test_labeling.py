@@ -85,6 +85,23 @@ def test_batch_can_resolve_category_through_catalog_id() -> None:
     assert result.iloc[0]["label"] == "2"
 
 
+def test_batch_treats_nan_identifiers_and_requirements_as_blank() -> None:
+    loader = TaxonomyLoader(
+        {"categories": [{"category_id": "C1", "facets": [{
+            "name": "form", "order": 1, "values": [{"code": 0, "value": "ALL"}],
+        }]}]}
+    )
+    result = label_demands(pd.DataFrame([{
+        "demand_id": "D1",
+        "catalog_id": float("nan"),
+        "category_id": float("nan"),
+        "extra_requirement": float("nan"),
+    }]), loader)
+    assert result.iloc[0]["category_id"] == ""
+    assert result.iloc[0]["label_status"] == "REVIEW"
+    assert result.iloc[0]["unresolved_items"] == "[]"
+
+
 def test_product_facets_are_defaults_and_extra_requirement_wins() -> None:
     loader = TaxonomyLoader({"categories": [{"category_id": "C1", "facets": [
         {"name": "form", "order": 1, "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "정제"}, {"code": 2, "value": "분말"}]},
@@ -99,6 +116,18 @@ def test_product_facets_are_defaults_and_extra_requirement_wins() -> None:
     }]), loader, product_facet_map=facets)
     assert '"form":{"code":2' in result.loc[0, "facet_values"]
     assert '"sugar":{"code":0' in result.loc[0, "facet_values"]
+
+
+def test_product_facets_can_be_indexed_by_backend_catalog_id() -> None:
+    mapping = build_product_facet_map(pd.DataFrame([{
+        "source_product_id": "source-1",
+        "catalog_id": "987",
+        "facet_name": "form",
+        "value": "정제",
+        "mapping_status": "MAPPED",
+    }]))
+    assert "987" in mapping
+    assert "source-1" in mapping
 
 
 def test_codebook_and_clustering_vector_keep_facet_identity(tmp_path) -> None:

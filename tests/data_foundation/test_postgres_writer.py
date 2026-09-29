@@ -63,6 +63,10 @@ def test_writer_updates_only_completed_rows_and_commits() -> None:
     assert params == {"demand_id": "1", "label": "1-2", "processed_at": "2026-09-14T00:00:00+00:00"}
     assert "status = 'UNASSIGNED'" in query
     assert "processed_at IS NULL" in query
+    # Match the granted column-level UPDATE scope, not just the parameter names.
+    assignments = query.split("SET", 1)[1].split("WHERE", 1)[0]
+    columns = {assignment.split("=", 1)[0].strip() for assignment in assignments.split(",")}
+    assert columns == {"label", "processed_at"}
 
 
 def test_writer_rolls_back_when_a_write_fails() -> None:
@@ -84,6 +88,33 @@ def test_writer_requires_demand_id() -> None:
         write_label_results(
             FakeConnection(),
             [{"label": "1", "label_status": "LABELED"}],
+            processed_at="2026-09-14T00:00:00+00:00",
+        )
+
+
+def test_writer_rejects_invalid_completed_rows() -> None:
+    for row, message in [
+        ({"demand_id": "1", "label": "", "label_status": "LABELED"}, "label is required"),
+        ({"demand_id": "1", "label": "1", "label_status": "UNKNOWN"}, "unsupported label_status"),
+        ({"demand_id": "1", "label": "1", "label_status": "LABELED_WITH_REVIEW"}, "unsupported label_status"),
+        ({"demand_id": float("nan"), "label": "1", "label_status": "LABELED"}, "demand_id"),
+    ]:
+        with pytest.raises(ValueError, match=message):
+            write_label_results(
+                FakeConnection(),
+                [row],
+                processed_at="2026-09-14T00:00:00+00:00",
+            )
+
+
+def test_writer_rejects_duplicate_demand_ids() -> None:
+    with pytest.raises(ValueError, match="duplicate demand_id"):
+        write_label_results(
+            FakeConnection(),
+            [
+                {"demand_id": "1", "label": "1", "label_status": "LABELED"},
+                {"demand_id": "1", "label": "2", "label_status": "LABELED"},
+            ],
             processed_at="2026-09-14T00:00:00+00:00",
         )
 

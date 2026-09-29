@@ -6,7 +6,7 @@
 
 | 대상 | MVP 적용 방식 | 역할 |
 | --- | --- | --- |
-| Model 1 Facet Discovery | Rule/통계 근거 + Kanana 보조 후보 + Evidence Gate + Human Review | 상품 근거가 있는 Facet 후보를 만들고 사람이 Taxonomy를 확정 |
+| Model 1 Facet Discovery | Rule/통계 근거 + Qwen3 4B 보조 후보 + Evidence Gate + Human Review | 상품 근거가 있는 Facet 후보를 만들고 사람이 Taxonomy를 확정 |
 | Model 2 Demand Labeling | Rule-first Hybrid + Qwen 2.5 7B fallback | 명확한 요청은 Rule/Alias로 처리하고 미해결 양성 요청만 Qwen에 위임 |
 | Model 2 Model-only | 사용하지 않음 | Taxonomy 밖 값·누락·오판 위험이 Rule-only보다 큼 |
 | Embedding | Model 2에는 사용하지 않음 | B/C의 Cluster·Seller Matching에서 별도 평가 |
@@ -15,7 +15,7 @@
 운영 흐름은 다음과 같다.
 
 ```text
-Model 1: Rule/통계 → Kanana 후보 보조 → Evidence 검증 → Human Review → Taxonomy
+Model 1: Rule/통계 → Qwen3 4B 후보 보조 → Evidence 검증 → Human Review → Taxonomy
 Model 2: Rule/Alias → 명확하면 즉시 Label
                   → 미해결 양성 요청만 Qwen 2.5 7B
                   → Taxonomy/typed constraint 검증
@@ -30,7 +30,11 @@ Qwen fallback은 `A_MODEL2_FALLBACK_ENABLED=false`가 기본값이다. Ollama가
 
 ### Model 1
 
-`kakaocorp/kanana-nano-2.1b-instruct`는 16개 Category, 210개 입력에서 후보를 생성하는 보조 모델로 평가했다. 원시 후보 105건, 실패 20건이 있었고 Rule 근거로 자동 승격된 후보는 0건이었다. 따라서 Kanana는 Facet을 결정하는 모델이 아니라 검토 후보를 넓히는 모델로 확정한다. 최종 Taxonomy는 상품 원문·반복 통계·Evidence 검증과 Human Review 없이 만들어지지 않는다.
+`qwen3:4b`는 Model 1 고도화 기법 비교에서 전체 30개 Category × 3회 실행을 수행했고,
+동일한 축소 smoke 입력에서도 4회 호출·4건 후보·실패 0건·33.00초를 기록했다.
+Kanana는 동일 smoke에서 4회 호출·후보 0건·JSON 실패 4건·180.27초였다.
+따라서 MVP 보조 모델은 Qwen3 4B로 확정한다. Kanana는 비교·재현용 후보로만 보존한다.
+최종 Taxonomy는 상품 원문·반복 통계·Evidence 검증과 Human Review 없이 만들어지지 않는다.
 
 ### Model 2
 
