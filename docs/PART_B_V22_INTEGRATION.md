@@ -43,6 +43,11 @@ Part B는 `constraints`의 `MUST`/`EXCLUDE`만 hard gate로 사용하고, `PREFE
   권한 오류는 DB 연결 전에 중단하며 파일 누락으로 취급하지 않는다.
 - B 파일 누락은 설정 오류다. A-only는 비교 평가에서만 사용한다.
 
+Taxonomy의 `status=DEPRECATED` 값은 독립 후보로 매칭하지 않는다. 이전 표기와
+코드는 같은 facet의 `canonical_code` 활성 값으로 정규화한다. 따라서 기존
+`프로바이오틱스 제품`, `홍삼제품`, `비타민D` 입력과 구 코드는 각각 현재
+표준 값으로 해석되며, 중복 코드 때문에 `TAXONOMY_AMBIGUOUS`로 빠지지 않는다.
+
 `part_a_integration.py`는 별칭을 메모리의 분류표 사본에 연결해 기존 파서를 구성한다.
 배치 결과 `partAIntegration`에는 분류표·별칭 버전과 해시, A 로드 상태, 적용 건수가 남는다.
 `aliasMode=A_AND_B/B_ONLY`, `primaryAliasLoadStatus=LOADED/NOT_CONFIGURED`로

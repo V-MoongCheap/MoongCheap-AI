@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 
+from .classifier import normalize
 from .extractor import (
     ConstraintExtractor,
     ConstraintProof,
@@ -10,7 +11,6 @@ from .extractor import (
     FacetConstraint,
     SpeakerScope,
 )
-from .classifier import normalize
 from .facet_matcher import KiwiFacetMatcher, MatchedFacet
 
 
@@ -83,12 +83,8 @@ class ConstraintInputPolicy:
         self._equivalence_by_surface: dict[
             tuple[str, str, str], TaxonomyEquivalence
         ] = {}
-        self._equivalence_by_code: dict[
-            tuple[str, str, int], TaxonomyEquivalence
-        ] = {}
-        self._canonical_facet: dict[
-            tuple[str, str, str], MatchedFacet
-        ] = {}
+        self._equivalence_by_code: dict[tuple[str, str, int], TaxonomyEquivalence] = {}
+        self._canonical_facet: dict[tuple[str, str, str], MatchedFacet] = {}
         for group in matcher.normalized_duplicate_groups:
             category_id = group["category_id"]
             facet_name = group["facet_name"]
@@ -127,6 +123,56 @@ class ConstraintInputPolicy:
                     (category_id, facet_name, candidate.value_code)
                 ] = equivalence
 
+        for group in getattr(matcher, "deprecated_value_groups", ()):
+            category_id = group["category_id"]
+            facet_name = group["facet_name"]
+            canonical_code = int(group["canonical_value_code"])
+            canonical = next(
+                candidate
+                for candidate in matcher.values[category_id][facet_name]
+                if candidate.value_code == canonical_code
+            )
+            deprecated = tuple(group["deprecated_codes_and_values"])
+            equivalence = TaxonomyEquivalence(
+                category_id=category_id,
+                facet_name=facet_name,
+                normalized_value=normalize(canonical.value),
+                canonical_value_code=canonical.value_code,
+                canonical_value=canonical.value,
+                equivalent_value_codes=tuple(
+                    sorted(
+                        {
+                            canonical.value_code,
+                            *(int(item["value_code"]) for item in deprecated),
+                        }
+                    )
+                ),
+                equivalent_values=tuple(
+                    dict.fromkeys(
+                        (
+                            canonical.value,
+                            *(str(item["value"]) for item in deprecated),
+                        )
+                    )
+                ),
+            )
+            self._equivalence_by_code[
+                (category_id, facet_name, canonical.value_code)
+            ] = equivalence
+            for item in deprecated:
+                deprecated_code = int(item["value_code"])
+                deprecated_value = str(item["value"])
+                self._equivalence_by_code[
+                    (category_id, facet_name, deprecated_code)
+                ] = equivalence
+                surface_key = (
+                    category_id,
+                    facet_name,
+                    normalize(deprecated_value),
+                )
+                self._equivalence_by_surface[surface_key] = equivalence
+                self._canonical_facet[surface_key] = canonical
+
     def _category_key(self, category_id: str) -> str:
         """Resolve taxonomy adapters that provide a root-category fallback."""
 
@@ -157,9 +203,7 @@ class ConstraintInputPolicy:
             for key in sorted(self._equivalence_by_surface)
         )
 
-    def exact_matches(
-        self, category_id: str, text: str
-    ) -> tuple[MatchedFacet, ...]:
+    def exact_matches(self, category_id: str, text: str) -> tuple[MatchedFacet, ...]:
         value = text.strip()
         if not value:
             return ()
@@ -189,7 +233,15 @@ class ConstraintInputPolicy:
     ) -> tuple[MatchedFacet | None, TaxonomyEquivalence | None]:
         exact = self.exact_matches(category_id, text)
         if len(exact) == 1:
-            return exact[0], None
+            facet = exact[0]
+            equivalence = self._equivalence_by_surface.get(
+                (
+                    self._category_key(category_id),
+                    facet.facet_name,
+                    normalize(text),
+                )
+            )
+            return facet, equivalence
         if not exact:
             return None, None
         facet_names = {item.facet_name for item in exact}
@@ -206,7 +258,7 @@ class ConstraintInputPolicy:
 
     @staticmethod
     def _dedupe_equivalences(
-        equivalences: tuple[TaxonomyEquivalence, ...]
+        equivalences: tuple[TaxonomyEquivalence, ...],
     ) -> tuple[TaxonomyEquivalence, ...]:
         by_key = {
             (item.category_id, item.facet_name, item.normalized_value): item
@@ -234,11 +286,13 @@ class ConstraintInputPolicy:
             if len(normalized_values) != 1:
                 continue
             candidate = next(iter(candidates))
-            equivalence = self._equivalence_by_surface.get((
-                category_key,
-                candidate.facet_name,
-                next(iter(normalized_values)),
-            ))
+            equivalence = self._equivalence_by_surface.get(
+                (
+                    category_key,
+                    candidate.facet_name,
+                    next(iter(normalized_values)),
+                )
+            )
             if equivalence is not None:
                 equivalences.append(equivalence)
         return self._dedupe_equivalences(tuple(equivalences))
@@ -297,9 +351,7 @@ class ConstraintInputPolicy:
         spans = []
         for facet in matched.facets:
             candidates = [
-                occurrence
-                for occurrence in occurrences
-                if occurrence.facet == facet
+                occurrence for occurrence in occurrences if occurrence.facet == facet
             ]
             if not candidates:
                 return ()
@@ -311,9 +363,7 @@ class ConstraintInputPolicy:
             for index in range(start, end):
                 explained[index] = True
         remainder = "".join(
-            character
-            for index, character in enumerate(value)
-            if not explained[index]
+            character for index, character in enumerate(value) if not explained[index]
         )
         remainder = re.sub(r"[\s,;/+·&]+", "", remainder)
         remainder = re.sub(r"(?:그리고|및|와|과)", "", remainder)
@@ -331,9 +381,13 @@ class ConstraintInputPolicy:
         if unsafe.search(value):
             return False
         patterns = (
-            re.compile(r"^가능하면\s+.+(?:인\s+)?제품으로\s+부탁(?:해요|드립니다|드려요)[.!?]?$"),
+            re.compile(
+                r"^가능하면\s+.+(?:인\s+)?제품으로\s+부탁(?:해요|드립니다|드려요)[.!?]?$"
+            ),
             re.compile(r"^.+\s+제품이면\s+좋겠(?:어요|습니다)[.!?]?$"),
-            re.compile(r"(?:^|[.!?]\s*).+\s+조건을?\s+만족하면\s+좋겠(?:어요|습니다)[.!?]?$"),
+            re.compile(
+                r"(?:^|[.!?]\s*).+\s+조건을?\s+만족하면\s+좋겠(?:어요|습니다)[.!?]?$"
+            ),
         )
         return any(pattern.search(value) for pattern in patterns)
 
@@ -386,9 +440,7 @@ class ConstraintInputPolicy:
             if exact is not None and exact not in facets:
                 facets.append(exact)
             if equivalence is not None:
-                equivalences = self._dedupe_equivalences(
-                    (*equivalences, equivalence)
-                )
+                equivalences = self._dedupe_equivalences((*equivalences, equivalence))
         return tuple(facets), equivalences
 
     def _preference_result(
@@ -431,14 +483,16 @@ class ConstraintInputPolicy:
                     tail_proof_source="OPTIONAL_SUBSTITUTE_CONDITION_FIELD",
                 ),
             )
-            constraints.append(FacetConstraint(
-                facet_name=facet.facet_name,
-                value_code=facet.value_code,
-                value=facet.value,
-                constraint_type="PREFER",
-                evidence_clause=text,
-                proof=proof,
-            ))
+            constraints.append(
+                FacetConstraint(
+                    facet_name=facet.facet_name,
+                    value_code=facet.value_code,
+                    value=facet.value,
+                    constraint_type="PREFER",
+                    evidence_clause=text,
+                    proof=proof,
+                )
+            )
         return ExtractionResult(
             status="PARSED",
             constraints=tuple(constraints),
@@ -484,19 +538,19 @@ class ConstraintInputPolicy:
         )
         if match is None:
             return None, ()
-        left, left_equivalence = self.resolved_exact_match(
-            category_id, match.group(1)
-        )
+        left, left_equivalence = self.resolved_exact_match(category_id, match.group(1))
         right, right_equivalence = self.resolved_exact_match(
             category_id, match.group(2)
         )
         if left is None or right is None or left == right:
             return None, ()
-        equivalences = self._dedupe_equivalences(tuple(
-            item
-            for item in (left_equivalence, right_equivalence)
-            if item is not None
-        ))
+        equivalences = self._dedupe_equivalences(
+            tuple(
+                item
+                for item in (left_equivalence, right_equivalence)
+                if item is not None
+            )
+        )
         members = self._preference_result(
             category_id,
             text,
@@ -511,9 +565,7 @@ class ConstraintInputPolicy:
             members=members,
         ), equivalences
 
-    def _branch_facets(
-        self, category_id: str, text: str
-    ) -> tuple[MatchedFacet, ...]:
+    def _branch_facets(self, category_id: str, text: str) -> tuple[MatchedFacet, ...]:
         exact = self.unique_exact_match(category_id, text)
         if exact is not None:
             return (exact,)
@@ -634,14 +686,16 @@ class ConstraintInputPolicy:
         )
         return ExtractionResult(
             status="PARSED",
-            constraints=(FacetConstraint(
-                facet_name=facet.facet_name,
-                value_code=facet.value_code,
-                value=facet.value,
-                constraint_type="EXCLUDE",
-                evidence_clause=text,
-                proof=proof,
-            ),),
+            constraints=(
+                FacetConstraint(
+                    facet_name=facet.facet_name,
+                    value_code=facet.value_code,
+                    value=facet.value,
+                    constraint_type="EXCLUDE",
+                    evidence_clause=text,
+                    proof=proof,
+                ),
+            ),
             warnings=(),
             clauses=(text,),
         )
@@ -655,9 +709,7 @@ class ConstraintInputPolicy:
         )
         if match is None:
             return None, ()
-        facet, equivalence = self.resolved_exact_match(
-            category_id, match.group(1)
-        )
+        facet, equivalence = self.resolved_exact_match(category_id, match.group(1))
         if facet is None:
             return None, ()
         predicate_start = text.find("피하고")
@@ -678,14 +730,16 @@ class ConstraintInputPolicy:
         )
         result = ExtractionResult(
             status="PARSED",
-            constraints=(FacetConstraint(
-                facet_name=facet.facet_name,
-                value_code=facet.value_code,
-                value=facet.value,
-                constraint_type="EXCLUDE",
-                evidence_clause=text,
-                proof=proof,
-            ),),
+            constraints=(
+                FacetConstraint(
+                    facet_name=facet.facet_name,
+                    value_code=facet.value_code,
+                    value=facet.value,
+                    constraint_type="EXCLUDE",
+                    evidence_clause=text,
+                    proof=proof,
+                ),
+            ),
             warnings=(),
             clauses=(text,),
         )
@@ -711,14 +765,16 @@ class ConstraintInputPolicy:
         )
         return ExtractionResult(
             status="PARSED",
-            constraints=(FacetConstraint(
-                facet_name=facet.facet_name,
-                value_code=facet.value_code,
-                value=facet.value,
-                constraint_type="PREFER",
-                evidence_clause=value,
-                proof=proof,
-            ),),
+            constraints=(
+                FacetConstraint(
+                    facet_name=facet.facet_name,
+                    value_code=facet.value_code,
+                    value=facet.value,
+                    constraint_type="PREFER",
+                    evidence_clause=value,
+                    proof=proof,
+                ),
+            ),
             warnings=(),
             clauses=(value,),
         )
@@ -767,10 +823,10 @@ class ConstraintInputPolicy:
             if exact is not None:
                 interpreted = self._channel_preference(value, exact)
                 method = "UI_DEFAULT_PREFER_EXACT_VALUE"
-        if method == "V042_LANGUAGE_PROOF" and (
-            self.classifier.input_channel_default_prefer_short_composite
-        ) and (
-            composite := self.short_composite_matches(category_id, value)
+        if (
+            method == "V042_LANGUAGE_PROOF"
+            and (self.classifier.input_channel_default_prefer_short_composite)
+            and (composite := self.short_composite_matches(category_id, value))
         ):
             interpreted = self._preference_result(
                 category_id,
@@ -784,8 +840,8 @@ class ConstraintInputPolicy:
             self.classifier.input_channel_soft_preference_frame
         ):
             if self.classifier.input_channel_equivalent_taxonomy_codes:
-                soft_facets, soft_equivalences = (
-                    self.resolved_soft_preference_matches(category_id, value)
+                soft_facets, soft_equivalences = self.resolved_soft_preference_matches(
+                    category_id, value
                 )
             else:
                 soft_facets = self.soft_preference_matches(category_id, value)
@@ -806,10 +862,13 @@ class ConstraintInputPolicy:
         preference_groups: tuple[PreferenceGroup, ...] = ()
         semantic_preferences: tuple[str, ...] = ()
         diagnostic_code = None
-        if interpreted.status == "REVIEW" and self.classifier.input_channel_lexical_aversion_frame:
+        if (
+            interpreted.status == "REVIEW"
+            and self.classifier.input_channel_lexical_aversion_frame
+        ):
             if self.classifier.input_channel_equivalent_taxonomy_codes:
-                aversion, aversion_equivalences = (
-                    self.resolved_lexical_aversion_result(category_id, value)
+                aversion, aversion_equivalences = self.resolved_lexical_aversion_result(
+                    category_id, value
                 )
             else:
                 aversion = self.lexical_aversion_result(category_id, value)
