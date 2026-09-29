@@ -38,7 +38,6 @@ from .postgres_reader import (
     PostgreSQLClusteringInputReader,
     PostgreSQLConnection,
 )
-from .substitute_proposal_planner import ClaimIndexedSubstituteProposalPlanner
 
 SHARED_DATABASE_URL_ENV = "SHARED_DATABASE_URL"
 DB_URL_ENV = "DB_URL"
@@ -47,7 +46,6 @@ DB_PASSWORD_ENV = "DB_PASSWORD"
 BACKEND_BASE_URL_ENV = "BACKEND_BASE_URL"
 BACKEND_INTERNAL_KEY_ENV = "BACKEND_INTERNAL_KEY"
 DEMAND_CATALOG_SEED_PATH_ENV = "DEMAND_CATALOG_SEED_PATH"
-MFDS_CATALOG_PROFILES_PATH_ENV = "MFDS_CATALOG_PROFILES_PATH"
 DEMAND_TAXONOMY_PATH_ENV = "DEMAND_TAXONOMY_PATH"
 DEMAND_CONSTRAINT_RULES_PATH_ENV = "DEMAND_CONSTRAINT_RULES_PATH"
 DEMAND_CONSTRAINT_ALIASES_PATH_ENV = "DEMAND_CONSTRAINT_ALIASES_PATH"
@@ -81,14 +79,13 @@ class DemandClusteringJobConfig:
     database_url: str
     backend_base_url: str
     backend_internal_key: str
-    catalog_seed_path: Path | None
+    catalog_seed_path: Path
     taxonomy_path: Path
     constraint_rules_path: Path
     constraint_aliases_path: Path | None
     e5: E5RuntimeScorerConfig
     min_participants: int
     constraint_compat_aliases_path: Path | None = None
-    catalog_profiles_path: Path | None = None
     backend_http_timeout_seconds: int = DEFAULT_BACKEND_HTTP_TIMEOUT_SECONDS
     postgres_connect_timeout_seconds: int = (
         DEFAULT_POSTGRES_CONNECT_TIMEOUT_SECONDS
@@ -157,16 +154,6 @@ def _required_value(source: Mapping[str, str], key: str) -> str:
 
 def _required_file(source: Mapping[str, str], key: str) -> Path:
     path = Path(_required_value(source, key)).expanduser()
-    if not path.is_file():
-        raise ConfigurationError(f"{key} must reference an existing file")
-    return path
-
-
-def _optional_file(source: Mapping[str, str], key: str) -> Path | None:
-    value = source.get(key, "").strip()
-    if not value:
-        return None
-    path = Path(value).expanduser()
     if not path.is_file():
         raise ConfigurationError(f"{key} must reference an existing file")
     return path
@@ -275,17 +262,6 @@ def load_job_config(
     except ValueError as error:
         raise ConfigurationError(str(error)) from error
 
-    catalog_profiles_path = _optional_file(
-        source,
-        MFDS_CATALOG_PROFILES_PATH_ENV,
-    )
-    catalog_seed_path = _optional_file(source, DEMAND_CATALOG_SEED_PATH_ENV)
-    if catalog_profiles_path is None and catalog_seed_path is None:
-        raise ConfigurationError(
-            f"{MFDS_CATALOG_PROFILES_PATH_ENV} must be set; "
-            f"{DEMAND_CATALOG_SEED_PATH_ENV} is supported only for legacy local runs"
-        )
-
     return DemandClusteringJobConfig(
         database_url=database_url,
         backend_base_url=_backend_base_url(
@@ -295,7 +271,10 @@ def load_job_config(
             source,
             BACKEND_INTERNAL_KEY_ENV,
         ),
-        catalog_seed_path=catalog_seed_path,
+        catalog_seed_path=_required_file(
+            source,
+            DEMAND_CATALOG_SEED_PATH_ENV,
+        ),
         taxonomy_path=_required_file(source, DEMAND_TAXONOMY_PATH_ENV),
         constraint_rules_path=_required_file(
             source,
@@ -309,7 +288,6 @@ def load_job_config(
         constraint_compat_aliases_path=_required_file(
             source, DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH_ENV,
         ),
-        catalog_profiles_path=catalog_profiles_path,
         e5=E5RuntimeScorerConfig(
             model_path=e5.model_path.expanduser(),
             model_revision=e5.model_revision,
@@ -396,6 +374,7 @@ def run_demand_clustering_job(
 
     if config.constraint_compat_aliases_path is None:
         raise ConfigurationError("B base aliases are required for the runtime")
+    catalog_seed = pd.read_csv(config.catalog_seed_path, dtype=str).fillna("")
     taxonomy = _load_taxonomy(config.taxonomy_path)
     parser, integration = build_part_b_parser(
         taxonomy,
@@ -404,32 +383,15 @@ def run_demand_clustering_job(
         compatibility_aliases_path=config.constraint_compat_aliases_path,
     )
     integration["taxonomySha256"] = file_digest(config.taxonomy_path)
+    integration["catalogSeedCount"] = len(catalog_seed)
+    integration["catalogBinding"] = "BACKEND_UNIQUE_NAME_EXACT"
     scorer = E5RuntimeTextSimilarityScorer(config.e5)
-    if config.catalog_profiles_path is not None:
-        catalog_profiles = pd.read_csv(
-            config.catalog_profiles_path,
-            dtype=str,
-        ).fillna("")
-        integration["catalogProfileCount"] = len(catalog_profiles)
-        integration["catalogBinding"] = "BACKEND_CATALOG_ID_PROFILE"
-        planner = ClaimIndexedSubstituteProposalPlanner(
-            catalog_profiles,
-            taxonomy,
-            parser,
-            text_similarity_scorer=scorer,
-        )
-    else:
-        if config.catalog_seed_path is None:
-            raise ConfigurationError("a catalog profile or legacy seed path is required")
-        catalog_seed = pd.read_csv(config.catalog_seed_path, dtype=str).fillna("")
-        integration["catalogSeedCount"] = len(catalog_seed)
-        integration["catalogBinding"] = "BACKEND_UNIQUE_NAME_EXACT_LEGACY"
-        planner = CatalogSeedSubstituteProposalPlanner(
-            catalog_seed,
-            taxonomy,
-            parser,
-            text_similarity_scorer=scorer,
-        )
+    planner = CatalogSeedSubstituteProposalPlanner(
+        catalog_seed,
+        taxonomy,
+        parser,
+        text_similarity_scorer=scorer,
+    )
     connection = connection_factory(
         config.database_url,
         config.postgres_connect_timeout_seconds,

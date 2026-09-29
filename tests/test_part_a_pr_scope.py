@@ -22,3 +22,9 @@ def test_shared_policy_change_requires_explicit_marker() -> None:
         ["src/moongcheap_ai/demand_constraints/input_policy.py"],
         pr_body="- [x] `shared-policy-approved`",
     ) == []
+
+
+def test_part_b_owned_runtime_change_is_rejected() -> None:
+    errors = validate_scope(["docker/Dockerfile.demand-clustering"])
+    assert errors
+    assert "Part B-owned" in errors[0]

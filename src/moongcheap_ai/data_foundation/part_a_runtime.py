@@ -136,12 +136,21 @@ def run_part_a_batch(
     )
     payload = taxonomy.taxonomy
     if compatibility_alias_registry_path is not None:
-        parser, _ = build_part_b_parser(
+        # Keep the Part B integration helper backward-compatible: older B
+        # branches do not accept a Part A policy class, so apply the A policy
+        # after B has enriched the taxonomy aliases.
+        enriched_parser, _ = build_part_b_parser(
             payload,
             rules_path=rules_path,
             aliases_path=alias_registry_path,
             compatibility_aliases_path=compatibility_alias_registry_path,
-            policy_cls=PartAConstraintInputPolicy,
+        )
+        parser = DemandConstraintParser(
+            extractor=enriched_parser.extractor,
+            input_policy=PartAConstraintInputPolicy(
+                enriched_parser.input_policy.matcher,
+                enriched_parser.extractor,
+            ),
         )
     else:
         parser = DemandConstraintParser.from_taxonomy(

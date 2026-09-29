@@ -8,8 +8,7 @@ GitOps에 반영하고, 이후 계약 변경도 함께 반영한다.
 이 문서와 B 전용 overlay의 범위는 수요 클러스터링 CronJob 하나다. 기존 공용
 `base`와 `overlays/dev`에는 A도 포함되므로 B만 전달할 때는 아래 전용 경로를 사용한다.
 B 전용 경로는 다른 AI 파트의 Deployment/CronJob, EKS Node Group, Namespace,
-Secret과 Secret 동기화 리소스를 생성하지 않는다. artifact와 E5 모델은 Cloud가
-준비한 읽기 전용 PVC를 사용하며, PVC 자체는 이 저장소에서 생성하지 않는다.
+Secret과 Secret 동기화 리소스를 생성하지 않는다. B는 PVC를 사용하지 않는다.
 이미지 빌드·실측 자료는 [컨테이너 안내](../docs/DEMAND_CLUSTERING_CONTAINER.md),
 전달 항목은 [B파트 인계서](../docs/ci-cd-demand-clustering-handoff.yml)를 참고한다.
 
@@ -69,20 +68,26 @@ Pod 포트 `8080`이나 Pod IP를 넣지 않는다. 두 내부 API의 경로는 
 ([Backend values](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/values/services/backend.yaml),
 [Service 템플릿](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/gitops/charts/moongcheap-service/templates/service.yaml))
 
-현재 B 매니페스트는 Pod와 같은 Namespace에 준비된 Kubernetes Secret에서 필요한
-값만 참조한다. Secret과 해당 key는 Cloud가 ExternalSecret 등으로 공급한다.
+현재 B 매니페스트는 Backend의 Kubernetes Secret `backend-env`에서 필요한 네 항목만
+참조한다. Pod와 같은 Namespace에 Secret과 해당 key가 모두 있어야 한다.
 B 전용 overlay는 Cloud와 같은 `moongcheap-develop`을 사용한다. 기존 공용
 `overlays/dev`를 사용하면 `moongcheap-ai-dev`에도 별도 Secret 공급이 필요하다.
 ([Kubernetes Secret](https://kubernetes.io/docs/concepts/configuration/secret/))
 
 | Pod 환경 변수 | Kubernetes Secret | key | 용도 |
 | --- | --- | --- | --- |
-| `SHARED_DATABASE_URL` | `ai-batch-reader-database` | `url` | AI 전용 SELECT 권한 PostgreSQL DSN |
-| `BACKEND_INTERNAL_KEY` | `ai-backend-internal-key` | `internal-key` | Backend와 공유하는 `X-Internal-Api-Key` 값 |
+| `DB_URL` | `backend-env` | `DB_URL` | Backend JDBC URL; 앱에서 `jdbc:` 제거 |
+| `DB_USERNAME` | `backend-env` | `DB_USERNAME` | Backend와 같은 DB 계정 |
+| `DB_PASSWORD` | `backend-env` | `DB_PASSWORD` | 해당 DB 계정 비밀번호 |
+| `BACKEND_INTERNAL_KEY` | `backend-env` | `MOONGCHEAP_INTERNAL_API_KEY` | Backend와 공유하는 `X-Internal-Api-Key` 값; Cloud 템플릿 매핑 완료, 실제 동기화 확인 필요 |
 
-앱은 `SHARED_DATABASE_URL`을 PostgreSQL driver DSN으로 직접 사용한다. JDBC URL이나
-자격증명이 들어간 Git 값은 허용하지 않는다. Secret 전체를 `envFrom`으로 가져오지
-않으므로 OAuth·암호화 키 등 다른 비밀 값은 AI에 전달하지 않는다.
+앱은 DB 세 값을 읽어 PostgreSQL DSN을 조합한다. 계정·비밀번호는 공백을 보존하고
+URL 인코딩하며, IPv6 주소와 libpq 호환 query(`sslmode` 등)는 유지한다. `DB_URL`에
+별도 계정·비밀번호가 포함되면 설정 오류로 중단한다. `backend-env` 전체를 `envFrom`으로
+가져오지 않으므로 OAuth·암호화 키 등 다른 Backend 비밀 값은 AI에 전달하지 않는다.
+기존 로컬 실행의 `SHARED_DATABASE_URL`도 지원하며, 비어 있지 않으면 DB 세 값보다
+우선한다. 이 직접 DSN에는 JDBC URL을 넣을 수 없다. 기본 매니페스트는 직접 DSN을
+주입하지 않으며, Cloud에 새 DB 환경변수나 AI 전용 DB Secret을 요구하지 않는다.
 
 이 구성은 Backend DB 계정을 공유한다. AI의 PostgreSQL 연결은 기존대로
 `default_transaction_read_only=on`을 적용하지만, DB role 자체를 SELECT 전용으로
@@ -92,43 +97,50 @@ AI DB 계정에는 `demand`, `demand_board`, `reject_history`의 SELECT 권한�
 `reject_history`는 Backend가 배포·기록하며, 거절한 수요·보드 조합은 재제안에서
 제외한다. 테이블 누락이나 권한 오류로 이력을 조회하지 못하면 배치가 실패한다.
 
-Backend와 합의한 내부 키의 원본은 Cloud가 정한 Secret/Parameter Store 관리 방식이며,
+Backend와 합의한 내부 키의 원본은 **AWS Parameter Store `SecureString`**이며,
 HTTP 헤더 이름은 Backend `InternalApiKeyFilter`와 같은 **`X-Internal-Api-Key`**다. Cloud의 일반 Secrets Manager 정책이나
 RDS 계정 저장 방식을 이 내부 키의 별도 합의에 그대로 적용하지 않는다.
 
-앱의 입력 계약은 `BACKEND_INTERNAL_KEY` 환경 변수다. 배포 환경은 이를
-`ai-backend-internal-key/internal-key`로 공급한다. 실제 AWS 원본, 조회 권한과
-클러스터 동기화 성공 여부는 Cloud에서 확인한다. 실제 DB·Backend 연동 검증 전까지
-`suspend: true`를 유지한다. 앱은 AWS API를 직접 호출하지 않으며, `secretKeyRef`
-자체도 AWS를 조회하지 않는다.
+앱의 입력 계약은 `BACKEND_INTERNAL_KEY` 환경 변수다. 배포 환경이 Parameter Store를
+조회해 `backend-env`의 `MOONGCHEAP_INTERNAL_API_KEY` 항목을 공급해야 한다.
+2026-09-23 확인한 Cloud `develop` (`8fd7e20`)의 ExternalSecret 템플릿에는
+DB 세 항목과 내부 인증 키 항목이 모두 매핑돼 있다. 다만 실제 AWS 원본 값, 조회 권한과
+클러스터의 ExternalSecret 동기화 성공 여부는 별도 확인이 필요하다. 실제 DB·Backend
+연동 검증을 완료하기 전까지 `suspend: true`를 유지한다. 앱은 SSM을 직접 호출하지 않으며,
+`secretKeyRef` 자체가 SSM을 조회하지도 않는다.
 ([Cloud ExternalSecret](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/8fd7e20/gitops/platform/external-secrets/resources/external-secret-backend.yaml))
 
 Secret 공급 주체의 AWS 권한과 ECR 이미지 pull 권한은 별도의 인프라 설정이다.
 실제 비밀 값과 `.env`는 Git·이미지·로그에 넣지 않는다. 키 교체 시 Backend와 AI의
 반영 시점을 맞추고, 이미 실행 중인 프로세스의 환경 변수가 자동 교체된다고 가정하지 않는다.
 
-## Backend ID 기반 profile과 모델 공급
+## 모델과 v5 상품 시드는 이미지에 포함
 
-운영 Dockerfile은 애플리케이션과 규칙/별칭만 이미지에 넣는다. Backend 실제
-`product_catalog.id`를 가진 `catalog_profiles.csv`, 일치하는 `taxonomy.json`,
-E5 모델 cache는 Cloud가 준비한 읽기 전용 PVC에서 공급한다. profile과 taxonomy는
-같은 release 디렉터리에서 함께 전환하고 manifest SHA256을 검증한다.
+B 담당자가 확정한 Backend v5 상품 시드·taxonomy와 E5 모델을 Dockerfile이 이미지에 넣는다.
+인프라는 이미지 빌드·배포를 수행하며 별도의 PVC 생성, 데이터 복사 Job이나 모델 선택이 필요 없다.
+`packaging/demand-clustering/runtime-assets/`에 v5 시드 압축본·분류표와 검증 manifest가 있다.
+모델은 `model.json`의 고정 revision을 빌드 때 다운로드하고 파일별 SHA256을 검사한다.
 
 | 이미지 내부 경로 | 내용 |
 | --- | --- |
-| `/artifacts/releases/current/catalog_profiles.csv` | Backend 실제 catalog ID 기반 profile |
-| `/artifacts/releases/current/taxonomy.json` | profile과 같은 버전의 taxonomy |
-| `/models/multilingual-e5-small/snapshots/<revision>` | E5 가중치·tokenizer·설정 |
+| `/artifacts/product_catalog_seed_v5.csv` | Backend에 적재하는 도매꾹 v5 상품 시드 |
+| `/artifacts/category_seed_v5.csv` | Backend category 시드와 상품 FK 검증 기준 |
+| `/artifacts/taxonomy.json` | 문장 구조화와 상품명 facet 추출에 사용하는 V2.2 분류표 |
+| `/models/multilingual-e5-small` | E5 가중치·tokenizer·SentenceTransformer 설정 |
 
-ConfigMap은 위 경로를 지정하고 `/artifacts`와 `/models`는 읽기 전용 PVC로 마운트한다.
-CronJob에는 `/tmp`용 `emptyDir`도 함께 둔다. 파일은 non-root UID 65534가 읽을 수
-있어야 하며 실행 중 다운로드하지 않는다. Backend 입력 ID가 profile에 없으면
-매핑 오류로 배치를 시작하지 않고, profile 근거 부족 상태는 대체상품 제안만 보수적으로
-제외한다. 과거 v5 seed 파일은 로컬 검증용으로만 [runtime-assets 안내](../packaging/demand-clustering/runtime-assets/README.md)에 둔다.
+ConfigMap은 위 경로를 그대로 지정한다. `/artifacts`와 `/models` 위에 볼륨을 마운트하면
+이미지에 들어 있는 파일을 가리므로 마운트하지 않는다. CronJob에는 `/tmp`용 `emptyDir`만 남긴다.
+파일은 non-root UID 65534가 읽을 수 있으며 실행 중 다운로드하지 않는다.
+자료 버전은 이미지 안의 `/artifacts/manifest.json`, 모델의 `image-model-manifest.json`에 기록된다.
+자료 갱신은 B 담당자가 [runtime-assets 갱신 절차](../packaging/demand-clustering/runtime-assets/README.md)에
+따라 커밋하고 이미지를 재빌드한다. DB가 생성한 `product_catalog.id`는
+이미지에 고정하지 않고, UNIQUE인 `product_catalog.name`을 v5 시드와 정확히
+일치시켜 런타임에 결합한다. 시드에 없는 사용자 추가 상품은 기본 보드
+처리는 계속하고 대체상품 제안만 건너뛴다.
 
-## 노드 배치
+## 공유 BE·AI Worker에 배치
 
-기본 B 배치는 `workload=backend-ai` 라벨을 가진 공유 노드를 선택한다. ArgoCD·Karpenter·Jenkins
+Cloud `be-ai` NodePool의 Backend·AI 공유 노드를 선택한다. ArgoCD·Karpenter·Jenkins
 Controller용 `workload=system` 고정 노드는 별도로 구성되어 있다.
 `nodeSelector`는 이미 존재하는 노드의 라벨을 검사하는 조건이며 Node Group을 생성하지 않는다.
 
@@ -154,11 +166,6 @@ tolerations: []
   낮추지 않고 실제 배치 전체 부하를 측정해 조정한다.
 - 특정 hostname이나 `nodeName`으로 고정하지 않는다. 노드 교체 시에도 같은 label을
   가진 노드에서 실행할 수 있도록 한다. 이 매니페스트는 노드 수를 정하지 않는다.
-
-Cloud에서 별도 LLM NodePool을 추가할 계획이며, 현재 전달받은 인스턴스 타입은
-`m6i.xlarge`(CPU)다. LLM을 사용하는 A/Model 2 경로의 최종 `nodeSelector`·taint·
-toleration 값은 Cloud가 확정한 Kubernetes 라벨을 받은 뒤 GitOps에 반영한다.
-이 저장소는 AWS 인스턴스 타입을 Kubernetes selector 값으로 임의 사용하지 않는다.
 
 ## Cloud Helm 차트로 옮길 때
 
@@ -207,8 +214,7 @@ Backend Service 주소를 넣는다. B 자체의 수신 Service를 만드는 흐
 Cloud Terraform은 FE·system Managed Node Group과 BE·AI용 Karpenter를 구성한다.
 GitOps에는 Karpenter controller 설정과 `be-ai` NodePool/EC2NodeClass 정의가 있다.
 NodePool의 `workload=backend-ai`, Linux amd64, taint 없음은 현재 B 설정과 일치한다.
-Cloud는 LLM workload용으로 `m6i.xlarge` CPU 인스턴스 NodePool을 추가할 계획이라고
-전달했다. 실제 Kubernetes label·taint·toleration 값은 Cloud 확정 후 반영한다.
+현재 인스턴스 유형은 `t3.large`, NodePool 전체 자원 상한은 CPU `8` / 메모리 `32Gi`다.
 이 상한은 한 Pod가 사용할 수 있는 자원을 뜻하지 않는다. 실제 노드에서 배치를 실행할
 CPU·메모리 여유는 Cloud가 확인해야 한다. 이 대조는 실제 EKS 상태 확인이 아니다.
 ([FE·system 노드](https://github.com/V-MoongCheap/MoongCheap-Cloud/blob/57cd52e/terraform/modules/eks/node_groups.tf),
@@ -229,15 +235,15 @@ Backend의 `MOONGCHEAP_INTERNAL_API_KEY`에는 같은 키 값을 각각 주입�
 ([Backend 인증 필터](https://github.com/V-MoongCheap/MoongCheap-Backend/blob/89a4935/src/main/java/com/moongcheap_backend/auth/infrastructure/InternalApiKeyFilter.java))
 
 Cloud의 ExternalSecret이 RDS Secret의 host/port/dbname/username/password를 Backend용
-`SHARED_DATABASE_URL`과 `BACKEND_INTERNAL_KEY` Secret 참조로 공급한다. 실제 DB 접속·SSL
-조건과 `demand`, `demand_board`, `reject_history` 조회 권한은 Cloud에서 검증하며,
-AI 연결은 읽기 전용 세션으로 유지한다.
+`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`로 바꾼다. B는 이 세 값을 재사용해 자체 DSN을
+만든다. 실제 DB 접속·SSL 조건과 `demand`, `demand_board`, `reject_history` 조회 권한은
+검증하지 않았으며, 공유 계정에서도 B의 읽기 전용 세션 설정은 유지한다.
 
 실제 배포 매니페스트는 Cloud GitOps에서 관리한다. 이 저장소의 Kustomize 예시와
 Cloud Helm으로 같은 CronJob을 각각 배포하지 않는다. 기존 공용 `overlays/dev`와
 B 전용 overlay도 동시에 배포하지 않는다. Namespace가 다르면 `Forbid`가 중복 실행을
 막지 못한다. 차트 작성 후에는 `helm lint`와
-`helm template`으로 렌더링하고 위 계약 및 Secret/PVC 참조를 확인한다.
+`helm template`으로 렌더링하고 위 계약 및 기존 Secret 참조, PVC 미사용을 확인한다.
 
 ## 로컬·CI 검증 및 배포 전 교체 항목
 
@@ -252,7 +258,7 @@ uv run --project packaging/demand-clustering --no-sync pytest -c packaging/deman
 ```
 
 검증 스크립트는 base, 기존 공용 dev, B 전용 dev의 렌더링 결과를 파싱해
-Secret·노드·재시도·보안·artifact/model PVC 경로와 A 비포함 경계를 검사한다.
+Secret·노드·재시도·보안·이미지 내부 경로·PVC 미사용과 A 비포함 경계를 검사한다.
 렌더링과 검증 스크립트는 클러스터에 접속하거나 리소스를 적용하지 않는다. 전체 pytest는
 `kubectl`이 없으면 배포 테스트를 건너뛰므로, CI에는 누락 시 실패하는 위 검증 스크립트도
 등록한다. 이는 API 서버의 스키마·admission 검증이나 실제 Pod 기동 시험을 대체하지 않는다.
@@ -260,13 +266,13 @@ Secret·노드·재시도·보안·artifact/model PVC 경로와 A 비포함 경�
 인프라의 환경별 GitOps 설정에서는 다음 값을 채운다.
 
 1. 실제 Namespace와 ECR 이미지 경로·Git SHA 태그.
-2. ConfigMap의 Backend Service 주소(개발 예시는 `http://backend` 반영 완료),
-   profile/taxonomy release와 E5 model cache 경로.
-3. `ai-batch-reader-database/url`과 `ai-backend-internal-key/internal-key` 공급.
+2. ConfigMap의 Backend Service 주소(개발 예시는 `http://backend` 반영 완료).
+   v5 시드·taxonomy·모델 경로는 이미지 기본값을 유지한다.
+3. `backend-env`의 DB 세 항목과 Parameter Store 내부 키 항목 공급.
 4. BE·AI NodePool의 실제 라벨·taint 정책, 합산 CPU/메모리 여유와 DB·Backend 네트워크 연결.
 5. 테스트 데이터로 실제 연동 검증 후 스케줄·제한 시간을 확인하고 `suspend: false`로 전환.
 
 현재의 `replace-with-git-sha`와 base·공용 dev의
 `https://backend.invalid`는 배포 값이 아닌 자리표시자다. B 전용 dev의 Backend 주소만
-채운 상태이며 Secret·PVC 공급·연동 검증은 필요하다. `suspend: true`는 정기 실행을 막지만 수동 Job 생성까지
+채운 상태이며 Secret 공급·연동 검증은 필요하다. 모델·상품 자료는 이미지에 포함한다. `suspend: true`는 정기 실행을 막지만 수동 Job 생성까지
 막지는 않으므로, 실제 DB 상태를 바꾸는 수동 실행은 별도 승인된 대상에서만 수행한다.

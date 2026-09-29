@@ -12,7 +12,6 @@ import pandas as pd
 
 from ..demand_constraints import DemandConstraintParser
 from ..demand_constraints.classifier import normalize
-from ..demand_constraints.input_policy import ConstraintInputPolicy
 
 
 def taxonomy_version(taxonomy: Mapping[str, Any]) -> str:
@@ -127,7 +126,6 @@ def build_part_b_parser(
     rules_path: Path,
     aliases_path: Path | None = None,
     compatibility_aliases_path: Path | None = None,
-    policy_cls: type[ConstraintInputPolicy] = ConstraintInputPolicy,
 ) -> tuple[DemandConstraintParser, dict[str, Any]]:
     """Use B expressions continuously, preferring valid A targets where available.
 
@@ -206,8 +204,4 @@ def build_part_b_parser(
                 value["aliases"] = aliases
     # All A bindings were validated and applied to their exact category/code.
     # B never invokes the shared matcher's permissive code-or-value fallback.
-    return DemandConstraintParser.from_taxonomy(
-        enriched,
-        rules_path=rules_path,
-        policy_cls=policy_cls,
-    ), summary
+    return DemandConstraintParser.from_taxonomy(enriched, rules_path=rules_path), summary
