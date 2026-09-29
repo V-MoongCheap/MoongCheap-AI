@@ -12,7 +12,9 @@ from moongcheap_ai.demand_clustering.catalog_seed_planner import (
 from moongcheap_ai.demand_clustering.e5_runtime_scorer import (
     E5RuntimeTextSimilarityScorer,
 )
-from moongcheap_ai.demand_clustering.part_a_integration import build_part_b_parser
+from moongcheap_ai.demand_clustering.part_a_integration import (
+    build_part_b_runtime_parser,
+)
 from moongcheap_ai.demand_clustering.runtime_job import load_job_config
 
 
@@ -42,7 +44,7 @@ def main():
     )
     assert len(seed) == manifest["catalogRowCount"]
     assert len(category_seed) == manifest["categorySeedRowCount"]
-    _parser, integration = build_part_b_parser(
+    _parser, integration = build_part_b_runtime_parser(
         taxonomy=taxonomy, rules_path=config.constraint_rules_path,
         aliases_path=config.constraint_aliases_path,
         compatibility_aliases_path=config.constraint_compat_aliases_path,

@@ -14,6 +14,9 @@ from moongcheap_ai.demand_clustering.input_models import (
     DemandBoardInput,
     DemandInput,
 )
+from moongcheap_ai.demand_clustering.part_a_integration import (
+    build_part_b_runtime_parser,
+)
 from moongcheap_ai.demand_clustering.postgres_reader import ClusteringInputBatch
 from moongcheap_ai.demand_constraints import DemandConstraintParser
 
@@ -130,10 +133,13 @@ def test_capsule_preference_outranks_a_larger_powder_board() -> None:
     taxonomy = json.loads(
         (ROOT / "config/facet_taxonomy_v2_2.json").read_text(encoding="utf-8")
     )
-    requirement_parser = DemandConstraintParser.from_taxonomy(
+    requirement_parser, integration = build_part_b_runtime_parser(
         taxonomy,
         rules_path=ROOT / "config/demand_constraint_rules.json",
         aliases_path=ROOT / "config/model1_aliases_reviewed_v2.json",
+        compatibility_aliases_path=(
+            ROOT / "config/demand_constraint_aliases.json"
+        ),
     )
     proposal_planner = CatalogSeedSubstituteProposalPlanner(
         seed,
@@ -146,6 +152,12 @@ def test_capsule_preference_outranks_a_larger_powder_board() -> None:
         "유산균 2000mgx30포 생유산균 유산균12종혼합분말 "
         "바이오틱스 하루한포 특판 사은품 선물용"
     )
+    profiles = build_runtime_seed_catalog(seed, taxonomy)
+
+    assert integration["primaryAliasLoadStatus"] == "LOADED"
+    assert integration["deprecatedTaxonomyCanonicalizationCount"] == 3
+    assert profiles[capsule_name].facet_values["product_form"] == 2
+    assert profiles[powder_name].facet_values["product_form"] == 1
 
     result = proposal_planner.plan(
         ClusteringInputBatch(

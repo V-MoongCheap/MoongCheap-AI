@@ -14,6 +14,7 @@ from moongcheap_ai.demand_constraints import (
     parse_demand_constraints,
 )
 
+
 ROOT = Path(__file__).parents[2]
 FIXTURES = Path(__file__).parent / "fixtures"
 RULES = ROOT / "config/demand_constraint_rules.json"
@@ -31,18 +32,6 @@ def taxonomy() -> dict:
 
 @pytest.fixture(scope="module")
 def parser(taxonomy: dict) -> DemandConstraintParser:
-    return DemandConstraintParser.from_taxonomy(
-        taxonomy,
-        rules_path=RULES,
-        aliases_path=ALIASES,
-    )
-
-
-@pytest.fixture(scope="module")
-def integrated_parser() -> DemandConstraintParser:
-    taxonomy = json.loads(
-        (ROOT / "config/facet_taxonomy_v2_2.json").read_text(encoding="utf-8")
-    )
     return DemandConstraintParser.from_taxonomy(
         taxonomy,
         rules_path=RULES,
@@ -93,16 +82,12 @@ def test_rules_are_a_standalone_frozen_configuration() -> None:
 def test_integrated_taxonomy_aliases_and_batch_contract(
     parser: DemandConstraintParser,
 ) -> None:
-    source = pd.DataFrame(
-        [
-            {
-                "demand_id": "D1",
-                "catalog_id": "P1",
-                "label": "legacy-label-remains-unchanged",
-                "extra_requirement": "비오틴은 절대 포함 금지이고, 분말은 꼭 포함해 주세요.",
-            }
-        ]
-    )
+    source = pd.DataFrame([{
+        "demand_id": "D1",
+        "catalog_id": "P1",
+        "label": "legacy-label-remains-unchanged",
+        "extra_requirement": "비오틴은 절대 포함 금지이고, 분말은 꼭 포함해 주세요.",
+    }])
 
     result = parse_demand_constraints(
         source,
@@ -114,77 +99,21 @@ def test_integrated_taxonomy_aliases_and_batch_contract(
     assert result.iloc[0]["constraint_status"] == "PARSED"
     assert result.iloc[0]["label"] == "legacy-label-remains-unchanged"
     constraints = json.loads(result.iloc[0]["constraints"])
-    assert {(item["value"], item["constraint_type"]) for item in constraints} == {
-        ("비오틴", "EXCLUDE"),
-        ("분말", "MUST"),
-    }
-
-
-@pytest.mark.parametrize(
-    ("category_id", "surface", "deprecated_code", "canonical_code", "canonical_value"),
-    [
-        (
-            "health-functional-food:probiotics",
-            "프로바이오틱스 제품",
-            3,
-            1,
-            "프로바이오틱스",
-        ),
-        ("health-functional-food:red_ginseng", "홍삼제품", 2, 1, "홍삼"),
-        (
-            "health-functional-food:vitamin_mineral",
-            "비타민D",
-            5,
-            2,
-            "비타민 D",
-        ),
-    ],
-)
-def test_deprecated_taxonomy_surfaces_resolve_to_canonical_values(
-    integrated_parser: DemandConstraintParser,
-    category_id: str,
-    surface: str,
-    deprecated_code: int,
-    canonical_code: int,
-    canonical_value: str,
-) -> None:
-    result = integrated_parser.interpret(
-        category_id,
-        surface,
-        is_substitutable=True,
-    )
-
-    assert result.status == "PARSED"
-    assert result.diagnostic_code is None
     assert {
-        (item.value_code, item.value, item.constraint_type)
-        for item in result.constraints
-    } == {(canonical_code, canonical_value, "PREFER")}
-
-    resolved_code, equivalence = integrated_parser.canonicalize_value_code(
-        category_id,
-        "functional_ingredients",
-        deprecated_code,
-    )
-    assert resolved_code == canonical_code
-    assert equivalence is not None
-    assert deprecated_code in equivalence.equivalent_value_codes
-    assert equivalence.canonical_value == canonical_value
+        (item["value"], item["constraint_type"])
+        for item in constraints
+    } == {("비오틴", "EXCLUDE"), ("분말", "MUST")}
 
 
 def test_root_taxonomy_falls_back_for_unknown_category() -> None:
-    root_taxonomy = {
-        "facets": [
-            {
-                "name": "product_form",
-                "order": 1,
-                "values": [
-                    {"code": 0, "value": "ALL", "aliases": []},
-                    {"code": 1, "value": "캡슐", "aliases": []},
-                ],
-            }
-        ]
-    }
+    root_taxonomy = {"facets": [{
+        "name": "product_form",
+        "order": 1,
+        "values": [
+            {"code": 0, "value": "ALL", "aliases": []},
+            {"code": 1, "value": "캡슐", "aliases": []},
+        ],
+    }]}
     parser = DemandConstraintParser.from_taxonomy(
         root_taxonomy,
         rules_path=RULES,
@@ -224,9 +153,7 @@ def test_frozen_independent_evaluation_is_reproduced(
 
     auto = [item for item in outcomes if item[1].status == "PARSED"]
     correct_auto = [item for item in auto if item[2]]
-    expected_review = [
-        item for item in outcomes if item[0]["expected_status"] == "REVIEW"
-    ]
+    expected_review = [item for item in outcomes if item[0]["expected_status"] == "REVIEW"]
     correct_review = [item for item in expected_review if item[2]]
     failures = [item[0]["sample_id"] for item in outcomes if not item[2]]
 

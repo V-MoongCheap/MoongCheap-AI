@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from moongcheap_ai.demand_clustering.part_a_integration import build_part_b_parser
+from moongcheap_ai.demand_clustering.part_a_integration import (
+    build_part_b_runtime_parser,
+)
 from moongcheap_ai.demand_constraints import DemandConstraintParser
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +24,7 @@ with CASES_PATH.open(encoding="utf-8", newline="") as handle:
 
 
 def build(primary=PRIMARY, taxonomy=TAXONOMY):
-    return build_part_b_parser(
+    return build_part_b_runtime_parser(
         taxonomy, rules_path=RULES, aliases_path=primary, compatibility_aliases_path=BASE,
     )
 
@@ -85,6 +87,47 @@ def test_deprecated_taxonomy_literals_keep_canonical_meaning(
     parsers, variant, category, text, expected
 ):
     assert interpreted(parsers[variant], text, category) == ("PARSED", {expected})
+
+
+@pytest.mark.parametrize(
+    "category,deprecated_code,canonical_code",
+    [
+        ("health-functional-food:probiotics", 3, 1),
+        ("health-functional-food:red_ginseng", 2, 1),
+        ("health-functional-food:vitamin_mineral", 5, 2),
+    ],
+)
+def test_deprecated_taxonomy_codes_are_canonicalized_only_by_part_b(
+    category, deprecated_code, canonical_code
+):
+    parser, summary = build()
+
+    actual, _ = parser.canonicalize_value_code(
+        category,
+        "functional_ingredients",
+        deprecated_code,
+    )
+
+    assert actual == canonical_code
+    assert summary["deprecatedTaxonomyCanonicalizationCount"] == 3
+
+
+def test_invalid_deprecated_taxonomy_redirect_fails_before_parser_build():
+    taxonomy = deepcopy(TAXONOMY)
+    category = next(
+        row
+        for row in taxonomy["categories"]
+        if row["category_id"] == "health-functional-food:probiotics"
+    )
+    facet = next(
+        row for row in category["facets"]
+        if row["name"] == "functional_ingredients"
+    )
+    deprecated = next(row for row in facet["values"] if row["code"] == 3)
+    deprecated["canonical_code"] = 999
+
+    with pytest.raises(ValueError, match="missing canonical code"):
+        build(None, taxonomy)
 
 
 @pytest.mark.parametrize("text,expected", [

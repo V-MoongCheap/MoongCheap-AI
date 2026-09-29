@@ -47,6 +47,9 @@ Taxonomy의 `status=DEPRECATED` 값은 독립 후보로 매칭하지 않는다. 
 코드는 같은 facet의 `canonical_code` 활성 값으로 정규화한다. 따라서 기존
 `프로바이오틱스 제품`, `홍삼제품`, `비타민D` 입력과 구 코드는 각각 현재
 표준 값으로 해석되며, 중복 코드 때문에 `TAXONOMY_AMBIGUOUS`로 빠지지 않는다.
+이 호환 처리는 `build_part_b_runtime_parser()`가 만드는 B 전용 taxonomy 사본과
+`PartBConstraintInputPolicy`에만 적용한다. Part A가 호환 별칭 결합에 사용하는
+기존 `build_part_b_parser()`와 공용 `ConstraintInputPolicy`, `TaxonomyFacetMatcher`는 변경하지 않는다.
 
 `part_a_integration.py`는 별칭을 메모리의 분류표 사본에 연결해 기존 파서를 구성한다.
 배치 결과 `partAIntegration`에는 분류표·별칭 버전과 해시, A 로드 상태, 적용 건수가 남는다.

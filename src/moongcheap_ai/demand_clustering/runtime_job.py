@@ -33,7 +33,7 @@ from .e5_runtime_scorer import (
     E5RuntimeScorerConfig,
     E5RuntimeTextSimilarityScorer,
 )
-from .part_a_integration import build_part_b_parser, file_digest
+from .part_a_integration import build_part_b_runtime_parser, file_digest
 from .postgres_reader import (
     PostgreSQLClusteringInputReader,
     PostgreSQLConnection,
@@ -376,7 +376,7 @@ def run_demand_clustering_job(
         raise ConfigurationError("B base aliases are required for the runtime")
     catalog_seed = pd.read_csv(config.catalog_seed_path, dtype=str).fillna("")
     taxonomy = _load_taxonomy(config.taxonomy_path)
-    parser, integration = build_part_b_parser(
+    parser, integration = build_part_b_runtime_parser(
         taxonomy,
         rules_path=config.constraint_rules_path,
         aliases_path=config.constraint_aliases_path,
