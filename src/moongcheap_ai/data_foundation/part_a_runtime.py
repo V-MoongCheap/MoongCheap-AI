@@ -7,15 +7,17 @@ clusters, embeddings, seller matches, or call an LLM.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import pandas as pd
 
 from ..demand_constraints import DemandConstraintParser
+from ..demand_clustering.part_a_integration import build_part_b_parser
 from .labeling import TaxonomyLoader
-
+from .part_a_input_policy import PartAConstraintInputPolicy
 
 RUNTIME_VERSION = "part-a-runtime.v2.2"
 STATUSES = {
@@ -85,38 +87,84 @@ def _label(loader: TaxonomyLoader, category_id: str, constraints: list[dict[str,
     for name, facet in facets.items():
         all_value = next((item for item in facet.get("values", []) if int(item.get("code", -1)) == 0), {"value": "ALL"})
         values[name] = {"code": 0, "value": all_value.get("value", "ALL")}
+    grouped: dict[str, set[tuple[int, str]]] = {}
     for item in constraints:
-        # A single label cannot represent ANY_OF or repeated values reliably.
-        # Keep ALL in that case and leave the typed constraints to downstream code.
-        if item["facetKey"] in values and item["constraintType"] in {"MUST", "EXCLUDE"}:
-            values[item["facetKey"]] = {"code": item["valueCode"], "value": item["canonicalValue"]}
+        facet_key = item["facetKey"]
+        if facet_key in values:
+            grouped.setdefault(facet_key, set()).add(
+                (int(item["valueCode"]), str(item["canonicalValue"]))
+            )
+    for facet_key, candidates in grouped.items():
+        # A fixed-width label can represent one selected value per Facet. An
+        # alternative group or contradictory values remains in constraints and
+        # keeps ALL here for B's compatibility logic to handle explicitly.
+        if len(candidates) == 1:
+            code, value = next(iter(candidates))
+            values[facet_key] = {"code": code, "value": value}
     ordered = sorted(facets.items(), key=lambda pair: int(pair[1].get("order", 0)))
     return "-".join(str(values[name]["code"]) for name, _ in ordered), values
 
 
 def run_part_a_batch(
     demands: pd.DataFrame,
-    taxonomy_path: Path,
+    taxonomy_path: Path | None,
     rules_path: Path,
-    alias_registry_path: Path,
+    alias_registry_path: Path | None,
     *,
+    taxonomy_payload: Mapping[str, Any] | None = None,
+    compatibility_alias_registry_path: Path | None = None,
     processed_at: str | None = None,
     skip_processed: bool = True,
     catalog: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Parse a batch and return only Part A's typed contract output."""
 
-    taxonomy = TaxonomyLoader.from_path(taxonomy_path)
+    if taxonomy_payload is not None:
+        # Production Labeling reads category.facet from Backend and builds the
+        # taxonomy in memory. Do not require a local artifact in that mode.
+        taxonomy = TaxonomyLoader(dict(taxonomy_payload))
+    elif taxonomy_path is not None:
+        taxonomy = TaxonomyLoader.from_path(taxonomy_path)
+    else:
+        raise ValueError("taxonomy_path or taxonomy_payload is required")
     payload = taxonomy.taxonomy
     parser = DemandConstraintParser.from_taxonomy(
-        payload, rules_path=rules_path, aliases_path=alias_registry_path
+        payload,
+        rules_path=rules_path,
+        aliases_path=alias_registry_path,
+        policy_cls=PartAConstraintInputPolicy,
     )
+    payload = taxonomy.taxonomy
+    if compatibility_alias_registry_path is not None:
+        # Keep the Part B integration helper backward-compatible: older B
+        # branches do not accept a Part A policy class, so apply the A policy
+        # after B has enriched the taxonomy aliases.
+        enriched_parser, _ = build_part_b_parser(
+            payload,
+            rules_path=rules_path,
+            aliases_path=alias_registry_path,
+            compatibility_aliases_path=compatibility_alias_registry_path,
+        )
+        parser = DemandConstraintParser(
+            extractor=enriched_parser.extractor,
+            input_policy=PartAConstraintInputPolicy(
+                enriched_parser.input_policy.matcher,
+                enriched_parser.extractor,
+            ),
+        )
+    else:
+        parser = DemandConstraintParser.from_taxonomy(
+            payload,
+            rules_path=rules_path,
+            aliases_path=alias_registry_path,
+            policy_cls=PartAConstraintInputPolicy,
+        )
     source = demands.fillna("").copy()
     if skip_processed and "processed_at" in source.columns:
         source = source[source["processed_at"].astype(str).str.strip().eq("")].copy()
     catalog_map = _category_map(catalog) if catalog is not None else None
     rows: list[dict[str, Any]] = []
-    now = processed_at or datetime.now(timezone.utc).isoformat()
+    now = processed_at or datetime.now(UTC).isoformat()
     for raw in source.to_dict(orient="records"):
         row = dict(raw)
         try:
@@ -194,14 +242,20 @@ def run_part_a_batch(
                 rows.append(row)
                 continue
             requirement = str(raw.get("extra_requirement", "") or "").strip()
+            # Labeling is required for the original-catalog clustering path as
+            # well.  ``is_substitutable`` gates B's cross-catalog substitute
+            # path; it must not discard the demand's own Facet requirement.
+            # Keep the validated consent value in the handoff row, but parse
+            # the requirement independently of that routing decision.
             result = parser.interpret(
                 category_id,
                 requirement,
-                is_substitutable=is_substitutable,
+                is_substitutable=True,
             ).to_dict()
             status = str(result["status"])
             if status not in STATUSES:
                 status = "REVIEW"
+            completed = status in {"PARSED", "NONE", "NOT_APPLICABLE"}
             constraints = _contract_constraints(taxonomy, category_id, result)
             label, facet_values = _label(taxonomy, category_id, constraints)
             reason_codes = list(result.get("warnings", []))
@@ -224,9 +278,9 @@ def run_part_a_batch(
                 "label": label,
                 "facet_values": json.dumps(facet_values, ensure_ascii=False, separators=(",", ":")),
                 "parserVersion": RUNTIME_VERSION,
-                "processed_at": now,
+                "processed_at": now if completed else "",
             })
-        except Exception as error:  # isolate one malformed demand from the batch
+        except (KeyError, TypeError, ValueError, IndexError) as error:
             row.update({
                 "taxonomyVersion": str(payload.get("version", "v2.2")),
                 "status": "REVIEW",

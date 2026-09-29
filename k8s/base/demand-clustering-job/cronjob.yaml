@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/part-of: moongcheap-ai
 spec:
   # Initial handoff values; infrastructure confirms the final schedule/deadlines.
-  schedule: "15 * * * *"
+  schedule: "45 * * * *"
   timeZone: Asia/Seoul
   suspend: true
   concurrencyPolicy: Forbid
@@ -27,18 +27,15 @@ spec:
             app.kubernetes.io/component: batch
             app.kubernetes.io/part-of: moongcheap-ai
         spec:
-          # This selects the AI node pool, not one particular hostname.
+          # Infrastructure must label the shared BE/AI nodes; this creates no node group.
           nodeSelector:
-            workload: ai
+            workload: backend-ai
             kubernetes.io/os: linux
             kubernetes.io/arch: amd64
-          tolerations:
-            - key: workload
-              operator: Equal
-              value: ai
-              effect: NoSchedule
+          # No dedicated AI taint is assumed in the shared worker design.
+          tolerations: []
           restartPolicy: Never
-          serviceAccountName: demand-clustering-job
+          serviceAccountName: demand-clustering-sa
           automountServiceAccountToken: false
           securityContext:
             runAsNonRoot: true
@@ -55,16 +52,28 @@ spec:
                 - configMapRef:
                     name: demand-clustering-config
               env:
-                - name: SHARED_DATABASE_URL
+                - name: DB_URL
                   valueFrom:
                     secretKeyRef:
-                      name: ai-batch-reader-database
-                      key: url
+                      name: backend-env
+                      key: DB_URL
+                - name: DB_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: backend-env
+                      key: DB_USERNAME
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: backend-env
+                      key: DB_PASSWORD
                 - name: BACKEND_INTERNAL_KEY
+                  # Cloud must supply this missing backend-env key from the
+                  # agreed SSM Parameter Store SecureString before unsuspending.
                   valueFrom:
                     secretKeyRef:
-                      name: ai-backend-internal-key
-                      key: internal-key
+                      name: backend-env
+                      key: MOONGCHEAP_INTERNAL_API_KEY
               resources:
                 requests:
                   cpu: "1"
@@ -78,24 +87,10 @@ spec:
                 capabilities:
                   drop: [ALL]
               volumeMounts:
-                - name: artifacts
-                  mountPath: /artifacts
-                  readOnly: true
-                - name: e5-model
-                  mountPath: /models/multilingual-e5-small
-                  readOnly: true
                 - name: tmp
                   mountPath: /tmp
           volumes:
-            # Existing, populated claims in the same namespace; not provisioned here.
-            - name: artifacts
-              persistentVolumeClaim:
-                claimName: demand-clustering-artifacts
-                readOnly: true
-            - name: e5-model
-              persistentVolumeClaim:
-                claimName: demand-clustering-e5-model
-                readOnly: true
+            # Catalog, taxonomy and E5 are baked into the image. No PVCs required.
             - name: tmp
               emptyDir:
                 sizeLimit: 256Mi

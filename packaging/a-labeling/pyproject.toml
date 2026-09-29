@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "moongcheap-ai-labeling"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.32,<3",
+    "pandas>=2.2,<3",
+    "python-dotenv>=1.0,<2",
+    "kiwipiepy==0.23.2",
+    "psycopg[binary]>=3.2,<4",
+]
+
+[project.scripts]
+a-labeling-batch = "moongcheap_ai.data_foundation.runtime_job:main"
+
+[project.optional-dependencies]
+data = ["pyarrow>=15,<22", "openpyxl>=3.1,<4"]
+dev = [
+    "pytest>=8,<9",
+    "jsonschema>=4,<5",
+    "PyYAML>=6,<7",
+    "ruff>=0.11,<1",
+]
+
+[tool.hatch.build]
+dev-mode-dirs = ["../../src"]
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.build.targets.wheel.force-include]
+"../../src/moongcheap_ai" = "moongcheap_ai"
+
+[tool.uv]
+reinstall-package = ["moongcheap-ai-labeling"]
+
+[tool.pytest.ini_options]
+pythonpath = ["../../src", "../.."]
+testpaths = ["../../tests"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

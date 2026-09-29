@@ -1,0 +1,26 @@
+name: Part A PR scope
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  shared-policy-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Reject unapproved shared policy changes
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: >-
+          python scripts/ci/check_part_a_pr_scope.py
+          --base origin/${{ github.event.pull_request.base.ref }}
+          --head HEAD

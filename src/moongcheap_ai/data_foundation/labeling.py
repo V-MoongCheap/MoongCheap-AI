@@ -6,6 +6,7 @@ import json
 import re
 import unicodedata
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
@@ -15,8 +16,21 @@ class TaxonomyValidationError(ValueError):
     pass
 
 
+def _text(value: Any) -> str:
+    """Convert scalar input safely, including pandas missing scalars."""
+    if value is None:
+        return ""
+    try:
+        missing = pd.isna(value)
+    except (TypeError, ValueError):
+        missing = False
+    if isinstance(missing, bool) and missing:
+        return ""
+    return str(value)
+
+
 def _normalise(value: Any) -> str:
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or "")).casefold()).strip()
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", _text(value)).casefold()).strip()
 
 
 NO_REQUIREMENT_PHRASES = {"조건 없음", "조건없음", "상관 없음", "상관없음", "아무 조건 없음", "무관"}
@@ -24,13 +38,20 @@ NO_REQUIREMENT_PHRASES = {"조건 없음", "조건없음", "상관 없음", "상
 
 class TaxonomyLoader:
     def __init__(self, taxonomy: dict[str, Any]) -> None:
+        if not isinstance(taxonomy, dict):
+            raise TaxonomyValidationError("taxonomy root must be an object")
         self.taxonomy = taxonomy
         self.categories: dict[str, dict[str, Any]] = {}
         self.root_category: dict[str, Any] | None = None
         if taxonomy.get("facets"):
             self._validate_category({"category_id": "__root__", "facets": taxonomy["facets"]})
             self.root_category = {"category_id": "__root__", "facets": taxonomy["facets"]}
-        for category in taxonomy.get("categories", []):
+        categories = taxonomy.get("categories", [])
+        if not isinstance(categories, list):
+            raise TaxonomyValidationError("taxonomy categories must be a list")
+        for category in categories:
+            if not isinstance(category, dict):
+                raise TaxonomyValidationError("taxonomy category must be an object")
             category_id = str(category.get("category_id", "")).strip()
             if not category_id:
                 continue
@@ -40,7 +61,7 @@ class TaxonomyLoader:
             self.categories[category_id] = category
 
     @classmethod
-    def from_path(cls, path: Path) -> "TaxonomyLoader":
+    def from_path(cls, path: Path) -> TaxonomyLoader:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -56,6 +77,8 @@ class TaxonomyLoader:
         if not isinstance(facets, list):
             raise TaxonomyValidationError("category facets must be a list")
         for index, facet in enumerate(facets, 1):
+            if not isinstance(facet, dict):
+                raise TaxonomyValidationError("taxonomy facet must be an object")
             name = str(facet.get("name", "")).strip()
             if not name or name in seen_facets:
                 raise TaxonomyValidationError(f"invalid or duplicate facet: {name}")
@@ -73,6 +96,8 @@ class TaxonomyLoader:
             if not isinstance(values, list) or not values:
                 raise TaxonomyValidationError(f"facet has no values: {name}")
             for value in values:
+                if not isinstance(value, dict):
+                    raise TaxonomyValidationError(f"taxonomy value must be an object: {name}")
                 try:
                     code = int(value["code"])
                 except (KeyError, TypeError, ValueError) as exc:
@@ -87,7 +112,7 @@ class TaxonomyLoader:
             raise TaxonomyValidationError("facet orders must be contiguous from 1")
 
     def category(self, category_id: Any) -> dict[str, Any] | None:
-        return self.categories.get(str(category_id or "").strip()) or self.root_category
+        return self.categories.get(_text(category_id).strip()) or self.root_category
 
     def resolve(self, category_id: Any, extra_requirement: Any) -> tuple[dict[str, dict[str, Any]], list[str]]:
         category = self.category(category_id)
@@ -101,7 +126,7 @@ class TaxonomyLoader:
             candidates: list[tuple[int, int, dict[str, Any], str]] = []
             for value in facet.get("values", []):
                 code = int(value["code"])
-                if code == 0:
+                if code == 0 or str(value.get("status", "")).upper() == "DEPRECATED":
                     continue
                 aliases = [value.get("value", ""), *(value.get("aliases") or [])]
                 for alias in aliases:
@@ -158,15 +183,55 @@ def load_taxonomy(path: Path) -> TaxonomyLoader:
     return TaxonomyLoader.from_path(path)
 
 
+def taxonomy_from_category_facet_rows(frame: pd.DataFrame) -> dict[str, Any]:
+    """Build a taxonomy payload from Backend ``category.facet`` text rows."""
+    categories: dict[str, dict[str, Any]] = {}
+    if "category_facet" not in frame.columns:
+        raise TaxonomyValidationError("database rows do not contain category_facet")
+    for _, row in frame.iterrows():
+        raw = str(row.get("category_facet", "") or "").strip()
+        if not raw:
+            continue
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise TaxonomyValidationError("category.facet contains invalid JSON") from exc
+        category_id = str(row.get("category_id", "") or "").strip()
+        if isinstance(parsed, dict):
+            category_id = str(parsed.get("category_id", category_id)).strip()
+            facets = parsed.get("facets", [])
+        elif isinstance(parsed, list):
+            facets = parsed
+        else:
+            raise TaxonomyValidationError("category.facet must be an object or list")
+        if not category_id:
+            raise TaxonomyValidationError("category.facet row has no category key")
+        candidate = {"category_id": category_id, "facets": facets}
+        previous = categories.get(category_id)
+        if previous is not None and previous != candidate:
+            raise TaxonomyValidationError(f"conflicting category.facet rows: {category_id}")
+        categories[category_id] = candidate
+    if not categories:
+        raise TaxonomyValidationError("no usable category.facet rows")
+    return {"version": "backend-category-facet", "categories": list(categories.values())}
+
+
 def build_product_facet_map(frame: pd.DataFrame) -> dict[str, list[dict[str, Any]]]:
-    """Index mapped product facets by source ID and local catalog-seed ID."""
+    """Index mapped product facets by every available catalog identifier."""
     result: dict[str, list[dict[str, Any]]] = {}
     normalized = frame.fillna("")
     if "mapping_status" in normalized:
-        normalized = normalized[normalized["mapping_status"].astype(str).str.upper().eq("MAPPED")]
+        normalized = normalized[normalized["mapping_status"].astype(str).str.upper().isin({"MAPPED"})]
     for payload in normalized.to_dict(orient="records"):
-        source_id = str(payload.get("source_product_id", "")).strip()
-        for key in ([source_id, f"catalog-seed-{source_id}"] if source_id else []):
+        source_id = _text(payload.get("source_product_id"))
+        keys = {
+            _text(payload.get(column))
+            for column in ("catalog_id", "product_catalog_id", "id", "catalog_seed_id")
+            if _text(payload.get(column))
+        }
+        if source_id:
+            keys.update({source_id, f"catalog-seed-{source_id}"})
+        for key in sorted(keys):
             result.setdefault(key, []).append(payload)
     return result
 
@@ -181,14 +246,16 @@ def label_demand(demand_id: int | str, catalog_id: int | str, extra_requirement:
 
 def label_demands(frame: pd.DataFrame, loader: TaxonomyLoader,
                   catalog_category_map: dict[str, Any] | None = None,
-                  product_facet_map: dict[str, list[dict[str, Any]]] | None = None) -> pd.DataFrame:
+                  product_facet_map: dict[str, list[dict[str, Any]]] | None = None,
+                  requirement_interpreter: Callable[[str, str, bool], Any] | None = None) -> pd.DataFrame:
     """Batch label demands through ERD's catalog_id -> category_id path."""
     rows: list[dict[str, Any]] = []
     for _, demand in frame.iterrows():
-        category_id = str(demand.get("category_id", "") or demand.get("kan_code", "")).strip()
+        catalog_id = _text(demand.get("catalog_id", ""))
+        category_id = _text(demand.get("category_id", "")) or _text(demand.get("kan_code", ""))
         if not category_id and catalog_category_map:
-            category_id = str(catalog_category_map.get(str(demand.get("catalog_id", "")), "") or "").strip()
-        requirement = str(demand.get("extra_requirement", "") or "").strip()
+            category_id = _text(catalog_category_map.get(catalog_id, ""))
+        requirement = _text(demand.get("extra_requirement", ""))
         if not category_id:
             warnings = ["CATEGORY_MISSING"]
             facet_values = {}
@@ -202,18 +269,48 @@ def label_demands(frame: pd.DataFrame, loader: TaxonomyLoader,
             label_status = "REVIEW"
             label = ""
         else:
-            defaults, default_warnings = loader.product_defaults(category_id, (product_facet_map or {}).get(str(demand.get("catalog_id", "")), []))
-            requested, request_warnings = loader.resolve(category_id, requirement)
+            defaults, default_warnings = loader.product_defaults(category_id, (product_facet_map or {}).get(catalog_id, []))
             facet_values = defaults.copy()
-            for facet_name, value in requested.items():
-                if int(value.get("code", 0)) != 0:
-                    facet_values[facet_name] = value
-            warnings = default_warnings + request_warnings
+            warnings = list(default_warnings)
             unresolved_items = []
-            if requirement and any("did not match" in warning for warning in warnings):
-                unresolved_items.append(requirement)
-            label_status = "LABELED" if not warnings else "LABELED_WITH_REVIEW"
-            label = loader.encode(facet_values)
+            if requirement_interpreter is None:
+                requested, request_warnings = loader.resolve(category_id, requirement)
+                warnings.extend(request_warnings)
+                for facet_name, value in requested.items():
+                    if int(value.get("code", 0)) != 0:
+                        facet_values[facet_name] = value
+                if requirement and any("did not match" in warning for warning in warnings):
+                    unresolved_items.append(requirement)
+                label_status = "LABELED" if not warnings else "LABELED_WITH_REVIEW"
+                label = loader.encode(facet_values)
+            else:
+                consent = _text(demand.get("is_substitutable", "true")) or "true"
+                consent = consent.strip().casefold()
+                is_substitutable = consent not in {"false", "0", "0.0", "no", "n", "미동의"}
+                interpreted = requirement_interpreter(
+                    category_id,
+                    requirement,
+                    is_substitutable=is_substitutable,
+                )
+                warnings.extend(str(warning) for warning in interpreted.warnings)
+                status = str(interpreted.status)
+                for constraint in interpreted.constraints:
+                    constraint_type = str(constraint.constraint_type)
+                    if constraint_type not in {"MUST", "EXCLUDE"}:
+                        continue
+                    facet_values[constraint.facet_name] = {
+                        "code": int(constraint.value_code),
+                        "value": str(constraint.value),
+                        "matched_alias": None,
+                    }
+                if status in {"REVIEW", "CONFLICT", "TAXONOMY_AMBIGUOUS", "PASSTHROUGH"}:
+                    label_status = "REVIEW"
+                    label = ""
+                    if requirement:
+                        unresolved_items.append(requirement)
+                else:
+                    label_status = "LABELED" if not warnings else "LABELED_WITH_REVIEW"
+                    label = loader.encode(facet_values)
         row = demand.to_dict()
         row.update({
             "category_id": str(category_id or ""),

@@ -1,0 +1,14 @@
+[
+  {"key": "cosmetics_skincare", "name": "스킨케어", "code": "07_09_00_00_00"},
+  {"key": "cosmetics_cleansing", "name": "클렌징", "code": "07_10_00_00_00"},
+  {"key": "cosmetics_suncare", "name": "선케어", "code": "07_08_00_00_00"},
+  {"key": "cosmetics_haircare", "name": "헤어케어", "code": "07_13_00_00_00"},
+  {"key": "kitchen_pots", "name": "냄비/솥", "code": "12_08_02_00_00"},
+  {"key": "kitchen_storage", "name": "보관/밀폐용기", "code": "12_08_04_00_00"},
+  {"key": "kitchen_tableware", "name": "식기", "code": "12_08_05_00_00"},
+  {"key": "kitchen_tools", "name": "조리기구", "code": "12_08_10_00_00"},
+  {"key": "sports_golf", "name": "골프", "code": "14_02_00_00_00"},
+  {"key": "sports_fishing", "name": "낚시", "code": "14_04_00_00_00"},
+  {"key": "sports_camping", "name": "캠핑", "code": "14_21_00_00_00"},
+  {"key": "sports_fitness", "name": "헬스", "code": "14_24_00_00_00"}
+]

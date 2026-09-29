@@ -8,12 +8,43 @@ from typing import Any
 
 import pandas as pd
 
-
 FACET_FIELDS = {
     "product_form": "제품 형태",
     "functional_ingredients": "기능성 원료",
     "intake_method": "섭취 방법",
 }
+
+
+def _deterministic_taxonomy(category_key: str, category_name: str, group: pd.DataFrame) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Build a reviewable taxonomy with stable facet/value codes."""
+    facets: list[dict[str, Any]] = []
+    review_rows: list[dict[str, Any]] = []
+    for facet_id, (field, definition) in enumerate(FACET_FIELDS.items(), 1):
+        values = group[field].map(_text)
+        counts = values[values != ""].value_counts()
+        if counts.empty:
+            continue
+        ordered = sorted(((str(value), int(support)) for value, support in counts.items()), key=lambda item: (-item[1], item[0]))
+        facet_values = [{"code": 0, "value": "ALL", "aliases": []}]
+        for code, (value, support) in enumerate(ordered, 1):
+            facet_values.append({"code": code, "value": value, "aliases": []})
+            example = group.loc[values == value].iloc[0]
+            review_rows.append({
+                "category_id": category_key,
+                "category_name": category_name,
+                "facet_candidate": field,
+                "value_candidate": value,
+                "aliases": "",
+                "support_count": support,
+                "document_ratio": support / len(group) if len(group) else 0,
+                "source_fields": field,
+                "evidence_terms": value,
+                "source_product_id": _text(example["source_product_id"]),
+                "review_decision": "",
+                "review_note": "Draft candidate; human review required",
+            })
+        facets.append({"facet_id": facet_id, "name": field, "order": facet_id, "values": facet_values})
+    return {"category_id": category_key, "category_name": category_name, "facets": facets, "status": "DRAFT_PENDING_HUMAN_REVIEW"}, review_rows
 
 
 def _text(value: Any) -> str:
@@ -79,6 +110,7 @@ def build_health_artifacts(frame: pd.DataFrame, output_dir: Path) -> dict[str, A
     pd.DataFrame(source_mapping_rows).to_csv(output_dir / "catalog_source_mapping.csv", index=False, encoding="utf-8-sig")
 
     review_rows = []
+    contract_review_rows = []
     taxonomy_categories: list[dict[str, Any]] = []
     for category, group in categorized.groupby("product_type", sort=True):
         facets = []
@@ -105,8 +137,15 @@ def build_health_artifacts(frame: pd.DataFrame, output_dir: Path) -> dict[str, A
                 })
                 facet_values.append({"value": value, "support_count": int(support), "aliases": [], "review_status": "NEEDS_REVIEW"})
             facets.append({"facet_id": facet_id, "name": field, "definition": definition, "values": facet_values, "review_status": "NEEDS_REVIEW"})
-        taxonomy_categories.append({"category_key": f"health-functional-food:{category}", "source_category": category, "facets": facets, "status": "DRAFT_PENDING_HUMAN_REVIEW"})
+        category_key = f"health-functional-food:{category}"
+        taxonomy, category_review_rows = _deterministic_taxonomy(category_key, category, group)
+        contract_review_rows.extend(category_review_rows)
+        taxonomy_categories.append({"category_key": category_key, "source_category": category, "facets": taxonomy["facets"], "status": taxonomy["status"]})
     pd.DataFrame(review_rows).to_csv(output_dir / "taxonomy_review_v0.csv", index=False, encoding="utf-8-sig")
-    (output_dir / "taxonomy_candidate_v0.json").write_text(json.dumps({"status": "DRAFT_PENDING_HUMAN_REVIEW", "categories": taxonomy_categories}, ensure_ascii=False, indent=2), encoding="utf-8")
+    pd.DataFrame(contract_review_rows).to_csv(output_dir / "facet_review_queue.csv", index=False, encoding="utf-8-sig")
+    taxonomy_payload = {"status": "DRAFT_PENDING_HUMAN_REVIEW", "categories": taxonomy_categories}
+    serialized = json.dumps(taxonomy_payload, ensure_ascii=False, indent=2)
+    (output_dir / "taxonomy_candidate_v0.json").write_text(serialized, encoding="utf-8")
+    (output_dir / "facet_taxonomy_v0.json").write_text(serialized, encoding="utf-8")
 
     return {"product_rows": len(data), "source_category_count": len(category_analysis), "facet_candidate_rows": len(review_rows), "status": "DRAFT_PENDING_HUMAN_REVIEW"}

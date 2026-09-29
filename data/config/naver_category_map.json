@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "version": "v1",
+    "purpose": "Naver Shopping Insight category-id mapping input",
+    "status": "PENDING_CATEGORY_ID_INPUT",
+    "rule": "Do not invent IDs. Fill naver_cat_id only after checking the category URL cat_id.",
+    "source": "Naver Shopping Insight API",
+    "source_type": "CONSUMER_SEARCH_TREND",
+    "note": "Shopping Insight returns relative click trends, not product lists, sales counts, or raw search volume."
+  },
+  "categories": {
+    "health-functional-food:blood_sugar_metabolic": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:dietary_fiber": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:eye_health": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:heart_blood": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:joint_health": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:liver_health": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:male_health": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:omega_fatty_acid": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:other_functional": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:probiotics": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:propolis": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:protein": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:red_ginseng": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:skin_collagen": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:theanine_sleep": {"naver_cat_id": "", "status": "PENDING"},
+    "health-functional-food:vitamin_mineral": {"naver_cat_id": "", "status": "PENDING"},
+    "non-health:cosmetics": {"naver_cat_id": "", "status": "PENDING"},
+    "non-health:kitchen_living": {"naver_cat_id": "", "status": "PENDING"},
+    "non-health:sports_leisure": {"naver_cat_id": "", "status": "PENDING"},
+    "non-health:pet_supplies": {"naver_cat_id": "", "status": "PENDING"},
+    "non-health:fashion_accessories": {"naver_cat_id": "", "status": "PENDING"},
+    "non-health:agriculture": {
+      "naver_cat_id": "50000160",
+      "status": "VERIFIED",
+      "category_url": "https://datalab.naver.com/shoppingInsight/getCategory.naver?cid=50000160"
+    }
+  }
+}

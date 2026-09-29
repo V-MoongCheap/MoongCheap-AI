@@ -1,10 +1,20 @@
 import pandas as pd
 import pytest
 
-from moongcheap_ai.data_foundation.labeling import TaxonomyLoader, TaxonomyValidationError, build_product_facet_map, label_demands
-from moongcheap_ai.data_foundation.facet_codebook import build_clustering_input, load_codebook
-from moongcheap_ai.data_foundation.demand_label_comparison import _apply_model_result, _normalise_model_facet_values
-
+from moongcheap_ai.data_foundation.demand_label_comparison import (
+    _apply_model_result,
+    _normalise_model_facet_values,
+)
+from moongcheap_ai.data_foundation.facet_codebook import (
+    build_clustering_input,
+    load_codebook,
+)
+from moongcheap_ai.data_foundation.labeling import (
+    TaxonomyLoader,
+    TaxonomyValidationError,
+    build_product_facet_map,
+    label_demands,
+)
 
 TAXONOMY = {"categories": [{"category_id": "C1", "facets": [{"name": "sugar_type", "order": 1, "values": [
     {"code": 0, "value": "ALL", "aliases": []}, {"code": 2, "value": "sugar_free", "aliases": ["무설탕"]}
@@ -32,6 +42,12 @@ def test_duplicate_value_codes_are_rejected() -> None:
     invalid = {"categories": [{"category_id": "C1", "facets": [{"name": "f", "values": [{"code": 0}, {"code": 0}]}]}]}
     with pytest.raises(TaxonomyValidationError):
         TaxonomyLoader(invalid)
+
+
+def test_malformed_taxonomy_types_raise_domain_validation_error() -> None:
+    for invalid in [None, [], {"categories": [None]}, {"categories": [{"category_id": "C1", "facets": [None]}]}]:
+        with pytest.raises(TaxonomyValidationError):
+            TaxonomyLoader(invalid)
 
 
 def test_non_contiguous_facet_orders_are_rejected() -> None:
@@ -69,6 +85,23 @@ def test_batch_can_resolve_category_through_catalog_id() -> None:
     assert result.iloc[0]["label"] == "2"
 
 
+def test_batch_treats_nan_identifiers_and_requirements_as_blank() -> None:
+    loader = TaxonomyLoader(
+        {"categories": [{"category_id": "C1", "facets": [{
+            "name": "form", "order": 1, "values": [{"code": 0, "value": "ALL"}],
+        }]}]}
+    )
+    result = label_demands(pd.DataFrame([{
+        "demand_id": "D1",
+        "catalog_id": float("nan"),
+        "category_id": float("nan"),
+        "extra_requirement": float("nan"),
+    }]), loader)
+    assert result.iloc[0]["category_id"] == ""
+    assert result.iloc[0]["label_status"] == "REVIEW"
+    assert result.iloc[0]["unresolved_items"] == "[]"
+
+
 def test_product_facets_are_defaults_and_extra_requirement_wins() -> None:
     loader = TaxonomyLoader({"categories": [{"category_id": "C1", "facets": [
         {"name": "form", "order": 1, "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "정제"}, {"code": 2, "value": "분말"}]},
@@ -83,6 +116,18 @@ def test_product_facets_are_defaults_and_extra_requirement_wins() -> None:
     }]), loader, product_facet_map=facets)
     assert '"form":{"code":2' in result.loc[0, "facet_values"]
     assert '"sugar":{"code":0' in result.loc[0, "facet_values"]
+
+
+def test_product_facets_can_be_indexed_by_backend_catalog_id() -> None:
+    mapping = build_product_facet_map(pd.DataFrame([{
+        "source_product_id": "source-1",
+        "catalog_id": "987",
+        "facet_name": "form",
+        "value": "정제",
+        "mapping_status": "MAPPED",
+    }]))
+    assert "987" in mapping
+    assert "source-1" in mapping
 
 
 def test_codebook_and_clustering_vector_keep_facet_identity(tmp_path) -> None:
@@ -107,6 +152,22 @@ def test_llm_result_is_limited_to_taxonomy_codes() -> None:
     ]}]})
     row = pd.Series({"category_id": "C1"})
     values, warnings = _apply_model_result(row, {"form": 99}, loader)
+    assert values["form"]["code"] == 0
+    assert warnings
+
+
+def test_llm_result_cannot_reintroduce_deprecated_taxonomy_value() -> None:
+    loader = TaxonomyLoader({"categories": [{"category_id": "C1", "facets": [
+        {"name": "form", "order": 1, "values": [
+            {"code": 0, "value": "ALL"},
+            {"code": 1, "value": "정제"},
+            {"code": 2, "value": "옛정제", "status": "DEPRECATED", "canonical_code": 1},
+        ]},
+    ]}]})
+    row = pd.Series({"category_id": "C1"})
+
+    values, warnings = _apply_model_result(row, {"form": 2}, loader)
+
     assert values["form"]["code"] == 0
     assert warnings
 
@@ -146,3 +207,10 @@ def test_hybrid_model_override_keeps_unmentioned_product_defaults() -> None:
     assert values["form"]["code"] == 1
     assert values["sugar"]["code"] == 1
     assert not warnings
+
+
+def test_pandas_missing_requirement_is_treated_as_empty() -> None:
+    loader = TaxonomyLoader(TAXONOMY)
+    values, warnings = loader.resolve("C1", pd.NA)
+    assert all(value["code"] == 0 for value in values.values())
+    assert warnings == []

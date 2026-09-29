@@ -1,0 +1,6 @@
+# 낙찰 HTTP 클라이언트 전용. 기존 검증 환경의 버전으로 직접/전이 의존성을 고정한다.
+requests==2.34.2
+urllib3==2.7.0
+certifi==2026.7.22
+charset-normalizer==3.5.1
+idna==3.19

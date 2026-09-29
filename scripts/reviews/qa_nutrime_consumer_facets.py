@@ -244,10 +244,10 @@ def run(args: argparse.Namespace) -> dict[str, object]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--raw", type=Path, default=Path("data/raw/reviews/nutrime/nutrime_reviews_500_20260909.jsonl"))
-    parser.add_argument("--discovery", type=Path, default=Path("data/processed/reviews/nutrime/nutrime_consumer_facet_discovery.csv"))
-    parser.add_argument("--human-review", type=Path, default=Path("data/review/model1_new_facet_human_review.csv"))
+    parser.add_argument("--discovery", type=Path, required=True, help="local-only generated discovery CSV")
+    parser.add_argument("--human-review", type=Path, required=True, help="local-only human review CSV")
     parser.add_argument("--product-fields", type=Path, default=Path("../data/processed/health_foundation_v1/intake_method_structured_v1.csv"))
-    parser.add_argument("--mixability-details", type=Path, default=Path("data/review/model1_mixability_review_details.csv"))
+    parser.add_argument("--mixability-details", type=Path, required=True, help="local-only review detail CSV")
     parser.add_argument("--report", type=Path, default=Path("reports/nutrime_consumer_facet_discovery.md"))
     parser.add_argument("--index", type=Path, default=Path("reports/model1_human_review_index.md"))
     args = parser.parse_args()

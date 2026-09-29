@@ -1,0 +1,159 @@
+{
+  "schemaVersion": "awarding-pending.v0.1",
+  "fetchedAt": "2026-09-17T14:05:00",
+  "boards": [
+    {
+      "boardId": 1001,
+      "catalogId": 2002,
+      "priceMin": 10000,
+      "priceMax": 20000,
+      "saleEndAt": "2026-09-15T12:00:00",
+      "calculationStartedAt": "2026-09-15T12:05:00",
+      "participantCount": 12,
+      "totalQuantity": 34,
+      "maxDemandQuantityPerMember": 5,
+      "products": [
+        {
+          "productId": 5001,
+          "sellerId": 7001,
+          "price": 15000,
+          "quantity": 40,
+          "shippingFee": 3000,
+          "minQuantity": 30,
+          "minParticipantCount": 10,
+          "maxQuantityPerMember": 5
+        },
+        {
+          "productId": 5002,
+          "sellerId": 7002,
+          "price": 14800,
+          "quantity": 50,
+          "shippingFee": 12000,
+          "minQuantity": 30,
+          "minParticipantCount": 10,
+          "maxQuantityPerMember": null
+        },
+        {
+          "productId": 5003,
+          "sellerId": 7003,
+          "price": 13000,
+          "quantity": 30,
+          "shippingFee": 0,
+          "minQuantity": 20,
+          "minParticipantCount": 5,
+          "maxQuantityPerMember": 10
+        },
+        {
+          "productId": 5004,
+          "sellerId": 7004,
+          "price": 21000,
+          "quantity": 100,
+          "shippingFee": 0,
+          "minQuantity": 10,
+          "minParticipantCount": 5,
+          "maxQuantityPerMember": null
+        }
+      ]
+    },
+    {
+      "boardId": 1002,
+      "catalogId": 2003,
+      "priceMin": 5001,
+      "priceMax": 10000,
+      "saleEndAt": "2026-09-15T12:00:00",
+      "calculationStartedAt": "2026-09-15T12:05:00",
+      "participantCount": 5,
+      "totalQuantity": 8,
+      "maxDemandQuantityPerMember": 3,
+      "products": [
+        {
+          "productId": 5101,
+          "sellerId": 7001,
+          "price": 11000,
+          "quantity": 20,
+          "shippingFee": 2500,
+          "minQuantity": 5,
+          "minParticipantCount": 3,
+          "maxQuantityPerMember": null
+        },
+        {
+          "productId": 5102,
+          "sellerId": 7005,
+          "price": 9000,
+          "quantity": 6,
+          "shippingFee": 0,
+          "minQuantity": 5,
+          "minParticipantCount": 3,
+          "maxQuantityPerMember": null
+        }
+      ]
+    },
+    {
+      "boardId": 1003,
+      "catalogId": 2004,
+      "priceMin": 20001,
+      "priceMax": 30000,
+      "saleEndAt": "2026-09-15T12:00:00",
+      "calculationStartedAt": "2026-09-15T12:05:00",
+      "participantCount": 7,
+      "totalQuantity": 10,
+      "maxDemandQuantityPerMember": 2,
+      "products": [
+        {
+          "productId": 5202,
+          "sellerId": 7006,
+          "price": 25000,
+          "quantity": 10,
+          "shippingFee": 5000,
+          "minQuantity": 10,
+          "minParticipantCount": 5,
+          "maxQuantityPerMember": null
+        },
+        {
+          "productId": 5201,
+          "sellerId": 7007,
+          "price": 25000,
+          "quantity": 15,
+          "shippingFee": 5000,
+          "minQuantity": 10,
+          "minParticipantCount": 5,
+          "maxQuantityPerMember": null
+        },
+        {
+          "productId": 5203,
+          "sellerId": 7008,
+          "price": 24000,
+          "quantity": 20,
+          "shippingFee": 0,
+          "minQuantity": 10,
+          "minParticipantCount": 5,
+          "maxQuantityPerMember": null
+        }
+      ]
+    },
+    {
+      "boardId": 1004,
+      "catalogId": 2005,
+      "priceMin": 0,
+      "priceMax": 5000,
+      "saleEndAt": "2026-09-15T12:00:00",
+      "calculationStartedAt": "2026-09-15T12:05:00",
+      "participantCount": 4,
+      "totalQuantity": 12,
+      "maxDemandQuantityPerMember": 4,
+      "products": [
+        {
+          "productId": 5301,
+          "sellerId": 7009,
+          "price": 4500,
+          "quantity": 30,
+          "minQuantity": 10,
+          "minParticipantCount": 3,
+          "maxQuantityPerMember": null
+        }
+      ]
+    }
+  ],
+  "size": 4,
+  "hasNext": false
+}

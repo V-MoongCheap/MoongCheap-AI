@@ -83,7 +83,7 @@ class BackendState:
     def post(self, url, *, json, headers, **kwargs):
         stage = "formation" if url.endswith("/formation-plans") else "substitution"
         assert "batchId" not in json
-        assert headers["X-Internal-Key"] == "test-internal-key"
+        assert headers["X-Internal-Api-Key"] == "test-internal-key"
         assert "Authorization" not in headers
         assert kwargs["allow_redirects"] is False
         self.requests[stage].append(deepcopy(json))

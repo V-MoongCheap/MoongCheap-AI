@@ -31,7 +31,7 @@ V2.1은 `product_type + functional_ingredients + main_functionality + name`을 �
 
 ## Facet 도출
 
-Model 1은 MFDS 전처리 상품을 Category별로 샘플링해 Facet·Value·Alias 후보와 근거 상품을 만든다. 현재 실행 Category는 비타민·미네랄, 유산균·프로바이오틱스, 피부·콜라겐이다. 결과는 최종 Taxonomy가 아니며, 근거 ID와 원문이 입력에 존재하는지 검증한다.
+Model 1은 MFDS 상품·판매자 공고를 주 근거로 사용하고, 명시적으로 건강기능식품 Category에 연결된 소비자 검색·리뷰·집계 Evidence를 보조 근거로 사용해 관측 Category별 Facet·Value·Alias 후보를 만든다. 기본 실행은 입력에 존재하는 모든 관측 Category를 대상으로 하며, `--smoke-only`일 때만 제한된 Smoke Category를 사용한다. 결과는 최종 Taxonomy가 아니며, 근거 ID와 원문이 입력에 존재하는지 검증한다.
 
 후처리에서는 영어·한글 Facet 이름, 제품 형태, 복합 원료, 별칭, 인정번호, 규제 기능 문구를 정규화한다. 기능성 원료는 다중 값으로 유지하고, 규제 기능은 장 건강·피부 보습·자외선 피부 보호 같은 의미 그룹으로 기록한다. 원문은 source text로 보존한다.
 
@@ -44,6 +44,6 @@ Model 1은 MFDS 전처리 상품을 Category별로 샘플링해 Facet·Value·Al
 | AI-Hub staging | `product_staging_v0` | 원천 보존·후보 |
 | Product Catalog | `product_catalog_v1` | 후보 |
 | Service Category | `category_v2_1` | 검토 필요 |
-| Model 1 입력·원본 | `facet_discovery_model_input_v0` / `facet_discovery_model_raw_v0` | 실행 기록 |
-| Facet 후보·상품 매핑 | `facet_candidates_normalized_v0` / `product_facet_mapping_v0` | 검토 필요 |
+| Model 1 입력·원본 | `multisource_model_input_v1` / `multisource_model_raw_v1` | 실행 기록 |
+| Facet 후보·상품 매핑 | `facet_candidates_normalized_v1` / `product_facet_mapping_v0` | 검토 필요 |
 | Synthetic Demand | `synthetic_demands_v0` | 테스트 전용 |

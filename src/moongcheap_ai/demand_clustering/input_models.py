@@ -6,9 +6,10 @@ They are not Backend DTOs and intentionally contain no assignment policy.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any
 
 
 def _parse_timestamptz(value: Any, field_name: str) -> datetime:
@@ -49,6 +50,7 @@ class DemandInput:
     label: str | None = None
     desire_end_at: datetime | None = None
     processed_at: datetime | None = None
+    catalog_name: str | None = None
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> DemandInput:
@@ -71,6 +73,7 @@ class DemandInput:
             processed_at=_parse_optional_timestamptz(
                 value.get("processed_at"), "processed_at"
             ),
+            catalog_name=value.get("catalog_name"),
         )
 
 
@@ -84,6 +87,7 @@ class DemandBoardInput:
     price_min: int | None = None
     price_max: int | None = None
     status: str = "GB_GATHERING"
+    catalog_name: str | None = None
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> DemandBoardInput:
@@ -98,4 +102,5 @@ class DemandBoardInput:
             price_min=value.get("price_min"),
             price_max=value.get("price_max"),
             status=value.get("status", "GB_GATHERING"),
+            catalog_name=value.get("catalog_name"),
         )

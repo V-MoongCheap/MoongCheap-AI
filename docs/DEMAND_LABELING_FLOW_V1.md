@@ -30,6 +30,6 @@ flowchart TD
 
 ## B 전달 경계
 
-`clustering_input_grounded_5000_v1.csv`에는 Clustering에 필요한 Feature와 상태만 둡니다.
+`clustering_input_grounded_5000_v1.csv`에는 Clustering에 필요한 Feature와 상태만 둡니다. 실제 현재 배포 기준 Taxonomy는 V2.2이며, 위 V2.1 표기는 서비스 Category 규칙의 계보를 의미합니다.
 
 `profile_id`, `expected_facet_profile`, `generation_parent_id` 같은 생성·평가용 값은 `clustering_ground_truth_metadata_5000_v1.csv`에 분리합니다. 이 Metadata를 Cluster Feature로 사용하면 데이터 생성 조건이 결과에 새어 들어가므로 금지합니다.

@@ -106,7 +106,7 @@ def build_exploratory_facets(
         candidates = sorted(candidates, key=lambda item: (-item["support_count"], item["facet_candidate"], item["value_candidate"]))
         values_by_facet: dict[str, list[dict[str, Any]]] = {}
         for candidate in candidates:
-            queue.append({**{"category_id": category_id, "category_name": category_name, "aliases": "", "review_decision": "", "review_note": ""}, **candidate})
+            queue.append({"category_id": category_id, "category_name": category_name, "aliases": "", "review_decision": "", "review_note": "", **candidate})
             values_by_facet.setdefault(candidate["facet_candidate"], []).append(candidate)
         facets = []
         for order, (facet_name, values) in enumerate(sorted(values_by_facet.items()), 1):

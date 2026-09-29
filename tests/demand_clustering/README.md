@@ -6,7 +6,7 @@ Consumer Demand clustering 기능의 테스트를 둔다.
 모드가 기존 대체 catalog Board 후보에 적용되는 방식과 사용자 확인 전후의
 상태·참가자 수 계약을 검증한다.
 
-`test_backend_http.py`는 `X-Internal-Key` 인증, `batchId` 없는 DTO,
+`test_backend_http.py`는 `X-Internal-Api-Key` 인증, `batchId` 없는 DTO,
 HTTP 재전송·리다이렉트 차단과 현재 상태 기준의 응답 집계를 검증한다.
 `test_batch_recovery.py`는 요청 전 실패와 처리 후 응답 미수신을 구분하여,
 다음 실행에서 DB를 새로 읽고 원상품 경로부터 다시 계획하는지 검증한다.

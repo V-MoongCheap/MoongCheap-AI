@@ -159,7 +159,7 @@ def test_posts_formation_plan_and_validates_backend_result() -> None:
     )
 
     assert captured["url"] == "http://backend:8080" + BOARD_PLAN_ENDPOINT_PROPOSAL
-    assert captured["headers"]["X-Internal-Key"] == "secret"
+    assert captured["headers"]["X-Internal-Api-Key"] == "secret"
     assert "Authorization" not in captured["headers"]
     assert captured["json"] == formation_plan()
     assert result.status == "APPLIED"

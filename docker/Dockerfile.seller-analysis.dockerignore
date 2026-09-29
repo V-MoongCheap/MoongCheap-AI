@@ -1,0 +1,9 @@
+*
+!requirements-api.txt
+!src/
+!docs/
+docs/*
+!docs/contracts/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/

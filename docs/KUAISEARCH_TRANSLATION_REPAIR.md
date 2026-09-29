@@ -3,14 +3,12 @@
 기존 한국어 번역에는 원문 복사, 기호뿐인 응답, 상품 종류 오역이 포함되어 있습니다.
 `repair_kuaisearch_translation.py`는 이 항목들을 실제 로컬 모델로 재번역합니다.
 
-프로젝트 루트의 가상환경에서 실행합니다. 코드가 `.git_upload_workspace`에 있는
-현재 로컬 배치에서는 아래 경로를 사용합니다.
+프로젝트 루트의 가상환경에서 실행합니다. 저장소 체크아웃에서는 아래 경로를 사용합니다.
 
 ```powershell
-.\.venv\Scripts\python.exe .git_upload_workspace/scripts/facet/repair_kuaisearch_translation.py --model qwen3:4b --passes 1
+.\.venv\Scripts\python.exe scripts/facet/repair_kuaisearch_translation.py --model qwen3:4b --passes 1
 ```
 
-일반 저장소 체크아웃에서는 `scripts/facet/repair_kuaisearch_translation.py` 경로를 사용합니다.
 모델은 설치된 모델명을 지정하며, 기본값은 `qwen3:4b`입니다.
 
 - 입력: `data/interim/facet_evidence/kuaiseach_health_queries_ko.parquet`

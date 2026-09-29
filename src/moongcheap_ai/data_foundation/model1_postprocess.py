@@ -1,23 +1,39 @@
 """Normalize Model 1 candidates and apply evidence-backed product mapping."""
+
 from __future__ import annotations
+
 import re
 import unicodedata
 from typing import Any
+
 import pandas as pd
+
 from .category_v2_1 import classify_v2_1
 
 CANONICAL_FACETS = {"form": ("product_form", "제품 형태"), "product form": ("product_form", "제품 형태"), "제품 형태": ("product_form", "제품 형태"), "functional ingredients": ("functional_ingredients", "기능성 성분"), "기능성 성분": ("functional_ingredients", "기능성 성분"), "probiotic strain": ("probiotic_strain", "프로바이오틱스 균주"), "프로바이오틱스 균주": ("probiotic_strain", "프로바이오틱스 균주"), "regulated function": ("regulated_function", "규제 기능"), "규제 기능": ("regulated_function", "규제 기능")}
 FORM_VALUES = {"powder": "분말", "분말": "분말", "capsule": "캡슐", "캡슐": "캡슐", "tablet": "정", "정": "정", "liquid": "액상", "액상": "액상"}
 REGULATED_GROUPS = ((r"배변\s*활동|장\s*건강|장건강", "장 건강"), (r"유산균\s*증식.*유해균\s*억제", "유산균 증식 및 유해균 억제"), (r"혈중\s*콜레스테롤", "혈중 콜레스테롤 개선"), (r"자외선.*피부.*손상.*피부.*건강|피부.*손상.*자외선", "자외선에 의한 피부 손상으로부터 피부 건강 유지"), (r"피부\s*보습", "피부 보습"), (r"뼈\s*건강", "뼈 건강"))
 
+def _text(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        missing = pd.isna(value)
+    except (TypeError, ValueError):
+        missing = False
+    if isinstance(missing, bool) and missing:
+        return ""
+    return str(value)
+
+
 def normalize_text(value: Any) -> str:
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or ""))).strip().casefold()
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", _text(value))).strip().casefold()
 
 def canonical_facet(facet_id: Any, name: Any) -> tuple[str, str]:
     return CANONICAL_FACETS.get(normalize_text(facet_id), CANONICAL_FACETS.get(normalize_text(name), (normalize_text(facet_id) or "unknown", str(name or facet_id).strip())))
 
 def canonical_value(facet_id: str, value: Any) -> str:
-    value = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value or ""))).strip()
+    value = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", _text(value))).strip()
     if facet_id == "product_form":
         return FORM_VALUES.get(value.casefold(), value)
     if facet_id == "functional_ingredients":
@@ -61,7 +77,13 @@ def normalize_candidates(review: pd.DataFrame) -> pd.DataFrame:
 
 def map_products(products: pd.DataFrame, candidates: pd.DataFrame) -> pd.DataFrame:
     columns = ["source_product_id", "product_name", "category_key", "category_name", "facet_id", "facet_name", "value", "source_field", "mapping_status", "mapping_method"]
+    required_candidate_columns = {"category_key", "facet_id", "facet_name", "value"}
+    if products.empty or candidates.empty or not required_candidate_columns.issubset(candidates.columns):
+        return pd.DataFrame(columns=columns)
     data = products.fillna("").copy()
+    for column in ("source_product_id", "name", "product_type"):
+        if column not in data.columns:
+            data[column] = ""
     classified = data.apply(classify_v2_1, axis=1, result_type="expand")
     data["category_key"] = [f"health-functional-food:{key.lower()}" if row["product_type"] else "UNMAPPED" for (_, row), key in zip(data.iterrows(), classified[0])]
     data["category_name"] = classified[1].values

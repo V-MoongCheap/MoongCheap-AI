@@ -23,10 +23,10 @@ Part A의 Labeling 완료를 기다리지 않고 필요한 자연어 조건을 �
 Backend mutation 요청에는 전송하지 않는다.
 
 대체상품 경로는 원상품 계획에 포함되지 않은 미편입 수요에 대해 실행한다.
-현재 CLI는 활성 보드 catalog의 동일 서비스 카테고리와 claim ID 포함관계를
-`IdentityClaimContainmentIndex`로 검사한다. 원상품의 모든 claim이 후보에 있어야
-통과하며, E5 Top-K 검색이나 방향성 relation 확장은 이 운영 경로에 연결하지 않는다.
-상품명·수출표식·record type으로 판매 가능 여부를 판단하지 않는다. 이후
+현재 CLI는 Backend의 UNIQUE 상품명으로 도매꾹 v5 seed를 결합하고, 동일한 v5
+말단 카테고리에 속한 활성 보드만 대체상품 후보로 사용한다. 상품명에 taxonomy의
+제형·원료 값이 명시된 경우에만 해당 facet을 사용하며 MFDS claim ID는 운영 경로에
+사용하지 않는다. 이후
 MUST/EXCLUDE는 board hard gate, PREFER는 순위,
 PASSTHROUGH는 주입형 text scorer에 사용하고, CONFLICT/NONE은 자연어 조건으로
 보드를 차단하지 않는다. 선택 결과는 `SUBSTITUTE_OFFERED` 후보 한 건이며 확정
@@ -61,12 +61,12 @@ import하지 않는다. 공통 profile 상태와 relation fingerprint 계약은 
 원상품 계획을 세우고 API 1을 적용한 뒤 PostgreSQL을 다시 읽는다. 이번 API 1의
 처리 대상과 두 조회 사이에 새로 들어온 수요는 같은 실행의 대체상품 후보에서
 제외한다. Backend가 생성했다고 응답한 보드가 재조회에서 보이지 않으면 API 2를
-호출하지 않는다. 자연어 parser, 상품 profile, claim 인덱스와 선호 점수기를
+호출하지 않는다. 자연어 parser, v5 시드 인덱스와 선호 점수기를
 결합하는 proposal planner를 주입한다. DB 연결과 1회 실행 CLI, 전용 Dockerfile은
 구현되어 있으며, 이미지 배포와 시간별 스케줄 등록은 인프라 측 작업이다.
 빌드·실행 방법은 [컨테이너 안내](../../../docs/DEMAND_CLUSTERING_CONTAINER.md)를 참고한다.
 
-Backend 호출 인증은 `X-Internal-Key: {internal-key}`를 사용한다. 공유 키는
+Backend 호출 인증은 `X-Internal-Api-Key: {internal-key}`를 사용한다. 공유 키는
 AWS Parameter Store의 `SecureString`으로 관리하고 배포 환경에서
 `BACKEND_INTERNAL_KEY` 환경 변수로 주입한다. 애플리케이션이 요청마다 AWS에
 조회하지 않으며 AWS 자격 증명을 직접 요구하지 않는다. 키 조회 권한, 주입과
@@ -75,8 +75,8 @@ AWS Parameter Store의 `SecureString`으로 관리하고 배포 환경에서
 `BACKEND_BASE_URL`은 일반 설정으로 주입한다. 기존 `BACKEND_SERVICE_TOKEN`은
 사용하지 않는다. 운영 최소 참가자 수 `CLUSTER_MIN_PARTICIPANTS`는 5 이상이어야 한다.
 
-`ClaimIndexedSubstituteProposalPlanner`는 재조회된 활성 보드 catalog만 대상으로
-같은 서비스 카테고리와 claim ID 포함관계를 먼저 검사한다. 통과한 보드는 기존
+`CatalogSeedSubstituteProposalPlanner`는 재조회된 활성 보드 catalog만 대상으로
+같은 v5 말단 카테고리와 명시적으로 확인된 상품명 facet을 먼저 검사한다. 통과한 보드는 기존
 가격·MUST·EXCLUDE gate와 PREFER·PASSTHROUGH 순위 계산을 거쳐 API 2 제안 행이
 된다. PASSTHROUGH 의미 점수기는 `E5RuntimeTextSimilarityScorer`로 주입한다.
 이 점수기는 PASSTHROUGH 수요와 후보가 있는 배치에서만 CPU 모델을 지연 로드하고,
@@ -89,35 +89,41 @@ AWS Parameter Store의 `SecureString`으로 관리하고 배포 환경에서
 uv sync --project packaging/demand-clustering --locked --extra embeddings
 ```
 
-planner에 로드하는 profile의 `catalog_id`는 PostgreSQL 입력의
-`product_catalog.id`와 같아야 한다. 상품도감과 ID는 Part A를 기준으로 하며,
-Part B가 별도 ID를 만들지 않는다. 현재 Part A 산출물로 profile을 검증하고 후속
-산출물은 버전 갱신으로 반영한다. 실제 DB 연동 시에는 입력 수요·보드가 같은
-상품도감 ID를 사용하는지 확인한다.
+planner는 v5 seed의 상품명과 PostgreSQL `product_catalog.name`을 정확히 결합한다.
+숫자 `product_catalog.id`는 Backend가 소유하며 이미지에 고정하지 않는다. v5에
+없는 사용자 추가 상품과 이름이 변경된 상품은 기본 클러스터링에는 참여하지만
+대체상품 제안에서는 제외한다.
 
 ## 1회 배치 실행
 
 로컬과 컨테이너의 운영 진입점은 `demand-clustering-batch`이다. 실행 시 최초
 PostgreSQL 조회, API 1 호출, PostgreSQL 재조회, 대체상품 계획, API 2 호출 순서를
 한 번 수행하고 요약 JSON을 표준 출력에 남긴 뒤 종료한다. DB 연결에는
-`default_transaction_read_only=on`과 autocommit을 함께 적용한다. DB role 자체의
-SELECT 전용 권한도 별도로 유지해야 한다.
+`default_transaction_read_only=on`과 autocommit을 함께 적용한다. 기본 K8s 설정은
+Backend DB 계정을 공유하며, 이 세션 설정이 DB role의 권한을 변경하지는 않는다.
 
 필수 운영 설정은 다음과 같다.
 
-- 비밀 설정: `SHARED_DATABASE_URL`, `BACKEND_INTERNAL_KEY`
-- 일반 설정: `BACKEND_BASE_URL`, `MFDS_CATALOG_PROFILES_PATH`,
+- 비밀 설정: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `BACKEND_INTERNAL_KEY`
+- 기존 직접 DSN 입력: `SHARED_DATABASE_URL` (비어 있지 않으면 DB 세 변수보다 우선)
+- 일반 설정: `BACKEND_BASE_URL`, `DEMAND_CATALOG_SEED_PATH`,
   `DEMAND_TAXONOMY_PATH`, `DEMAND_CONSTRAINT_RULES_PATH`,
-  `DEMAND_CONSTRAINT_ALIASES_PATH`, `E5_MODEL_PATH`
-- 선택 설정: `CLUSTER_MIN_PARTICIPANTS`, `E5_MODEL_REVISION`,
+  `DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH` (B 기본 별칭), `E5_MODEL_PATH`
+- 선택 설정: `DEMAND_CONSTRAINT_ALIASES_PATH` (A 승인 별칭; 없으면 B만 사용),
+  `CLUSTER_MIN_PARTICIPANTS`, `E5_MODEL_REVISION`,
   `E5_BATCH_SIZE`, `BACKEND_HTTP_TIMEOUT_SECONDS`,
   `POSTGRES_CONNECT_TIMEOUT_SECONDS`
 
-`SHARED_DATABASE_URL`은 Python PostgreSQL driver가 읽을 수 있는 DSN이어야 하며
-Spring의 `jdbc:postgresql://...` 형식을 사용하지 않는다. `BACKEND_BASE_URL`에는
+기본 K8s 설정은 `backend-env`의 DB 세 항목을 같은 이름으로 받고,
+`MOONGCHEAP_INTERNAL_API_KEY`를 `BACKEND_INTERNAL_KEY`로 매핑한다. 내부 키 항목은
+Cloud에서 추가 공급해야 하며, 참조를 바꾸는 것만으로 생성되지 않는다.
+`DB_URL`의 `jdbc:` 접두사를 제거하고 URL 인코딩한 계정·비밀번호를 넣어 PostgreSQL
+DSN을 만든다. IPv6 주소와 libpq 호환 query를 보존하며, JDBC 전용 query는 지원하지 않는다.
+기존 `SHARED_DATABASE_URL` 직접 입력은 PostgreSQL DSN이어야 하며 JDBC 형식을
+사용하지 않는다. `BACKEND_BASE_URL`에는
 경로가 아닌 Backend 서비스의 HTTP(S) base URL을 넣는다. artifact와 모델 경로가
-존재하지 않거나 PostgreSQL 입력의 catalog ID가 profile에 없으면 Backend mutation
-전에 실패한다.
+존재하지 않으면 시작하지 않는다. 개별 DB 상품이 seed에 없어도 기본 보드 계획은
+중단하지 않고 해당 상품의 대체상품 제안만 건너뛴다.
 
 로컬에서는 환경 파일을 명시해 실행할 수 있다.
 
@@ -131,10 +137,33 @@ uv run --project packaging/demand-clustering --no-sync demand-clustering-batch -
 `clientBoardKey`는 `new-board:1`처럼 한 요청 안에서 신규 보드 항목과 응답을
 연결하는 키일 뿐, 배치 식별자나 중복 처리 방지 키가 아니다.
 
+## Backend 요청 크기 제한
+
+Backend에서 전달한 요청당 object 개수 제한을 적용한다.
+
+- API 1 `/api/demand-boards/internal/formation-plans`:
+  `existingBoardAssignments`와 `newBoards` 각각 최대 50개
+- API 2 `/api/demand-boards/internal/substitute-offer-plans`:
+  `proposals` 최대 50개
+
+전체 계획을 먼저 검증한 뒤 각 배열을 독립적으로 잘라 순차 전송한다.
+보드 내부의 `demandIds`는 나누지 않으며, `plannedAt`, `ruleVersion`과
+원래 `clientBoardKey`를 유지한다. 제한 이하 또는 빈 계획은 기존처럼 한 번 전송한다.
+각 응답은 해당 요청과 대조하여 검증하고, 처리 건수와 신규 보드별 결과를 합산한다.
+API 1의 모든 요청이 완료된 후 PostgreSQL을 재조회하고 API 2를 실행한다.
+
+계획 생성·검증 함수는 분할 전 전체 계획을 다룬다. 위 JSON Schema의 `maxItems`는
+실제로 전송할 요청에 적용하며, 오프라인 `evaluation.backend_requests` 요청 묶음도
+동일하게 분할한다. 운영 합의로 제한을 변경할 때는 `backend_board_plan.py`의
+`MAX_EXISTING_BOARD_ASSIGNMENTS`·`MAX_NEW_BOARDS`, `backend_plan_client.py`의
+`MAX_SUBSTITUTE_PROPOSALS`와 대응하는 Schema의 `maxItems`를 함께 갱신한다.
+
 ## 실패 후 다음 배치 처리
 
-API는 한 번씩만 호출한다. 오류가 발생하면 해당 실행을 실패로 종료하며,
-이전 요청을 파일에 보존하거나 자동 재전송하지 않는다. 다음 정기 배치는
+분할한 요청은 각각 한 번씩만 호출한다. 중간 요청에서 오류가 발생하면 남은 요청을
+보내지 않고 해당 실행을 실패로 종료한다. 앞선 요청에서 Backend가 이미 반영한
+변경은 되돌리지 않으며, 이전 요청을 파일에 보존하거나 자동 재전송하지 않는다.
+다음 정기 배치는
 PostgreSQL의 최신 상태를 조회하여 유효한 `UNASSIGNED` 수요를 다시 계산한다.
 
 - API 1에서 실패하거나 응답을 확인하지 못하면 같은 실행에서 API 2를 호출하지 않는다.
@@ -171,8 +200,10 @@ Backend가 담당하며 AI는 조회 결과에 따라 다음 배치 대상을 �
 운영 CronJob은 `concurrencyPolicy: Forbid`, Job은 `backoffLimit: 0`,
 Pod는 `restartPolicy: Never`로 설정한다. 실패한 실행을 즉시 재시도하지 않고
 다음 정기 실행에 맡기며, 외부 워크플로의 자동 재시도도 비활성화한다.
-이 저장소는 `k8s/base`의 기본 CronJob과 `k8s/overlays/dev`의 중지된 개발 환경 예시를
-제공한다. 실제 환경별 설정과 배포는 인프라 GitOps에서 관리한다.
+이 저장소는 `k8s/base/demand-clustering-job`의 기본 CronJob과
+`k8s/overlays/demand-clustering-dev`의 중지된 B 전용 개발 예시를 제공한다.
+B 전용 예시는 Cloud 기준 `moongcheap-develop`을 사용하며 기존 공용
+`k8s/overlays/dev`와 중복 배포하지 않는다. 실제 환경별 설정과 배포는 인프라 GitOps에서 관리한다.
 [Kubernetes 안내](../../../k8s/README.md)에 AI 노드 선택, Secret·artifact 공급과
 오프라인 검증 방법을 정리했다.
 

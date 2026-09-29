@@ -11,13 +11,17 @@ from typing import Any
 
 from ..backend_board_plan import (
     BOARD_PLAN_SCHEMA_VERSION,
+    iter_board_assignment_requests,
     validate_board_assignment_plan_contract,
 )
 from ..backend_http import (
     aware_datetime as _aware_datetime,
     positive_int as _positive_int,
 )
-from ..backend_plan_client import build_substitute_offer_plan_request
+from ..backend_plan_client import (
+    build_substitute_offer_plan_request,
+    iter_substitute_offer_requests,
+)
 
 
 SOURCE_PLAN_SCHEMA_VERSION = "substitute-board-admission-plan.v0.1"
@@ -138,7 +142,7 @@ def build_board_plan_request_bundle_from_simulation(
         actual_count = sum(len(item["demandIds"]) for item in new_boards)
         if expected_count != actual_count:
             raise ValueError("new-board assigned count differs from batch timeline")
-        requests_payload.append(request)
+        requests_payload.extend(iter_board_assignment_requests(request))
 
     if seen_board_ids != set(board_by_id):
         raise ValueError("not every simulated board is linked to a creation batch")
@@ -168,7 +172,7 @@ def build_board_plan_request_bundle_from_simulation(
 def build_backend_plan_request_bundle(
     simulation: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Convert an aggregate simulation into one-shot hourly API requests.
+    """Convert an aggregate simulation into bounded requests per hourly batch.
 
     Aggregate final diagnostics have no mutation and cannot be attributed to a
     single hourly request, so they remain counts in the bundle manifest. Only
@@ -223,7 +227,7 @@ def build_backend_plan_request_bundle(
             planned_at=planned_at_by_batch[batch_id],
             rule_version=rule_version,
         )
-        requests_payload.append(request)
+        requests_payload.extend(iter_substitute_offer_requests(request))
 
     return {
         "schemaVersion": REQUEST_BUNDLE_SCHEMA_VERSION,

@@ -9,6 +9,7 @@ import pytest
 
 from moongcheap_ai.data_foundation.labeling import TaxonomyLoader
 from moongcheap_ai.demand_constraints import (
+    ConstraintInputPolicy,
     DemandConstraintParser,
     parse_demand_constraints,
 )
@@ -36,6 +37,36 @@ def parser(taxonomy: dict) -> DemandConstraintParser:
         rules_path=RULES,
         aliases_path=ALIASES,
     )
+
+
+def test_from_taxonomy_accepts_a_specialized_input_policy(
+    taxonomy: dict,
+) -> None:
+    class CustomConstraintInputPolicy(ConstraintInputPolicy):
+        interpret_called = False
+
+        def interpret(self, *args, **kwargs):
+            self.interpret_called = True
+            return super().interpret(*args, **kwargs)
+
+    parser = DemandConstraintParser.from_taxonomy(
+        taxonomy,
+        rules_path=RULES,
+        aliases_path=ALIASES,
+        input_policy_factory=CustomConstraintInputPolicy,
+    )
+
+    assert isinstance(parser.input_policy, CustomConstraintInputPolicy)
+    assert parser.input_policy.extractor is parser.extractor
+
+    result = parser.interpret(
+        "health-functional-food:protein",
+        "분말",
+        is_substitutable=True,
+    )
+
+    assert parser.input_policy.interpret_called is True
+    assert result.status == "PARSED"
 
 
 def test_rules_are_a_standalone_frozen_configuration() -> None:

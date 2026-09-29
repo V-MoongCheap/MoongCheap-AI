@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import re
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
-
 
 RECOGNITION_RE = re.compile(r"\(\s*제\s*(\d{4})\s*-\s*(\d+)\s*호\s*\)")
 FORM_MAP = {"분말": "분말", "캡슐": "캡슐", "정": "정", "정제": "정", "액상": "액상", "젤리": "젤리", "환": "환", "과립": "과립", "겔": "겔", "바": "바"}
@@ -207,7 +204,6 @@ def build_v1_artifacts(frame: pd.DataFrame, output_dir: Path) -> dict[str, Any]:
         counts = parsed.groupby("canonical_value_candidate").size().to_dict()
         categories = data.set_index("source_product_id")["product_type"].to_dict()
         for value, group in parsed.groupby("canonical_value_candidate", sort=True):
-            example_id = group.iloc[0]["source_product_id"]
             ingredient_rows.append({"raw_value": group.iloc[0]["raw_value"], "parsed_value_candidate": value, "canonical_value_candidate": value, "recognition_number": group.iloc[0]["recognition_number"], "support_count": counts[value], "category_count": len({categories.get(x, "") for x in group["source_product_id"]}), "example_product_ids": "|".join(group["source_product_id"].head(5)), "parse_status": group.iloc[0]["parse_status"], "review_status": "NEEDS_REVIEW", "review_note": "multi-value ingredient candidate; not a final Facet Value"})
     pd.DataFrame(ingredient_rows).to_csv(output_dir / "functional_ingredient_value_review_v1.csv", index=False, encoding="utf-8-sig")
     pd.DataFrame(ingredient_failures, columns=["source_product_id", "raw_value", "parse_status", "note"]).to_csv(output_dir / "ingredient_parse_failures_v1.csv", index=False, encoding="utf-8-sig")
@@ -236,7 +232,7 @@ def build_v1_artifacts(frame: pd.DataFrame, output_dir: Path) -> dict[str, Any]:
     facets.to_csv(output_dir / "taxonomy_review_v1.csv", index=False, encoding="utf-8-sig")
     summary = facets.groupby(["service_category_key", "facet_name_candidate"], dropna=False).agg(product_count=("support_count", "sum"), facet_coverage=("support_ratio", "max"), distinct_raw_values=("candidate_value", "nunique"), distinct_normalized_values=("normalized_value", "nunique"), top_values=("candidate_value", lambda values: "|".join(values.head(5))), long_tail_value_count=("candidate_value", lambda values: max(0, len(values) - 5))).reset_index() if not facets.empty else pd.DataFrame()
     summary.to_csv(output_dir / "taxonomy_review_summary_v1.csv", index=False, encoding="utf-8-sig")
-    facets.assign(alias_candidate=facets["candidate_value"], canonical_value_candidate=facets["normalized_value"], normalization_type="observed_normalization", conflict_candidate=False, review_status="NEEDS_REVIEW")["facet_name_candidate canonical_value_candidate alias_candidate normalization_type support_count conflict_candidate review_status".split()].to_csv(output_dir / "alias_review_v1.csv", index=False, encoding="utf-8-sig")
+    facets.assign(alias_candidate=facets["candidate_value"], canonical_value_candidate=facets["normalized_value"], normalization_type="observed_normalization", conflict_candidate=False, review_status="NEEDS_REVIEW")[["facet_name_candidate", "canonical_value_candidate", "alias_candidate", "normalization_type", "support_count", "conflict_candidate", "review_status"]].to_csv(output_dir / "alias_review_v1.csv", index=False, encoding="utf-8-sig")
     pd.DataFrame(columns=["normalized_alias", "value_candidates", "conflict_type", "review_status"]).to_csv(output_dir / "alias_conflict_report_v1.csv", index=False, encoding="utf-8-sig")
     support_rows = []
     for (category, facet_name), group in facets.groupby(["service_category_key", "facet_name_candidate"]):

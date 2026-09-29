@@ -84,7 +84,7 @@ def test_post_uses_internal_contract_and_validates_result() -> None:
     )
 
     assert captured["url"] == "http://backend:8080" + PLAN_ENDPOINT
-    assert captured["headers"]["X-Internal-Key"] == "secret"
+    assert captured["headers"]["X-Internal-Api-Key"] == "secret"
     assert "Authorization" not in captured["headers"]
     assert result.applied_count == 1
 

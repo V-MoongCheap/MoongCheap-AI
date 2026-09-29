@@ -1,0 +1,4110 @@
+{
+  "entityData": [
+    {
+      "_id": "36xcuJEBjEo7w5nJS",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 4050,
+        "y": 2780
+      },
+      "name": "자동결제수단",
+      "pName": "BrandpayPayMethod",
+      "fields": [
+        {
+          "_id": "enr7yKKa7MQHhf9fc",
+          "name": "회원 ID",
+          "pName": "member_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "iKqd3yiiveh7bzswF",
+          "relFieldId": "ra5w5eyriqPSdtYyt",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "H9GqvWv4Sknfm2r4D"
+        },
+        {
+          "_id": "wrsKKpE5aTbsr9odW",
+          "name": "자동결제키",
+          "pName": "method_key",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "r86ZY7GdGbHqRtHrL",
+          "name": "은행/카드사코드",
+          "pName": "provider_code",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "m4bYQ3SedBrdeqYWw",
+          "name": "계좌/카드번호",
+          "pName": "masked_number",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "저장할때 앞에서 4자리만 저장",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "S7CJ2QJph79JNvMQg",
+          "name": "결제수단 타입",
+          "pName": "type",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "카드, 계좌",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "oMfAEGbPRPkyeEog4",
+          "name": "기본결제수단여부",
+          "pName": "is_default",
+          "domain": "",
+          "type": "BOOL",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "rThJHcvDWMgSnvt75",
+          "name": "결제수단상태",
+          "pName": "status",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "nzGcGZjRcpsHFiSma",
+          "name": "등록시간",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [
+          {
+            "_id": "6otTMyR2PikvkLmaf",
+            "name": "자동결제수단 ID",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null,
+            "relGroupId": null
+          }
+        ],
+        "fks": []
+      },
+      "color": "rgba(123, 0, 178, 0.5)"
+    },
+    {
+      "_id": "5CFiCjkrRRm8Aip9w",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3450,
+        "y": 2340
+      },
+      "name": "판매자 식별키",
+      "pName": "SellerKey",
+      "fields": [
+        {
+          "_id": "xQadscKLCXwizRFH6",
+          "name": "판매자 식별키",
+          "pName": "seller_key",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [],
+        "fks": [
+          {
+            "_id": "utq6x4AJgTyvZyH2M",
+            "name": "판매자 ID",
+            "pName": "seller_id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": "qmWErRYwDjkn7HjsM",
+            "relFieldId": "2a3TENNmyTmmHMCn5",
+            "relType": "ZERO_OR_ONE",
+            "relGroupId": "nYGYJnCw8J6KjC6uX"
+          }
+        ]
+      },
+      "color": "rgba(123, 0, 178, 0.5)"
+    },
+    {
+      "_id": "72KKqx3brK6yXek7B",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "notification_opt_out",
+      "name": "notification_opt_out",
+      "position": {
+        "x": 3410,
+        "y": 1690
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "KrrupPaMsuDaLoAaa",
+            "name": "type",
+            "pName": "type",
+            "domain": "",
+            "type": "VARCHAR(40)",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": [
+          {
+            "_id": "WsonHwTPKzFDzAcdK",
+            "name": "member_id",
+            "pName": "member_id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": "iKqd3yiiveh7bzswF",
+            "relFieldId": "ra5w5eyriqPSdtYyt",
+            "relType": "ZERO_OR_ONE_OR_MANY"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "_id": "WcqtFi6K9AQhTcrhy",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(178, 27, 0, 0.5)"
+    },
+    {
+      "_id": "7kkMjtXTsnWjEYB7t",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "product_catalog",
+      "name": "product_catalog",
+      "position": {
+        "x": 1770,
+        "y": 1880
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "NDWkCv5dvGeSRraRt",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "mMMctcCSApEBb5gib",
+          "name": "name",
+          "pName": "name",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "EdSDYAEHgWe7oNP2g",
+          "name": "category_id",
+          "pName": "category_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "fjrp9uLjjP4wqBZ4Q",
+          "relFieldId": "nBy5Zc8pbf6BLqiCS",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "PD2k6iuzrRfqbP3FM"
+        },
+        {
+          "_id": "gooEJMrimYevKcyou",
+          "name": "spec_summary",
+          "pName": "spec_summary",
+          "domain": "",
+          "type": "VARCHAR(500)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "ekJpcNs4bP6bKenaG",
+          "name": "list_price",
+          "pName": "list_price",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "LdWMyW7fvELTuZ4Dw",
+          "name": "이미지 url",
+          "pName": "thumbnail_url",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "AuY2jrwNX9HjEyuFy",
+          "name": "description",
+          "pName": "description",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "w32PrChXpFZMDciRE",
+          "name": "status",
+          "pName": "status",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "'ACTIVE'",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "J7M2FCX9BoedpTWyx",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "uqAriSWk7sijzink5",
+          "name": "updated_at",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(0, 178, 100, 0.5)"
+    },
+    {
+      "_id": "7qcNztCnKn9cda42Y",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 1700,
+        "y": 3230
+      },
+      "name": "판매자 정산 관련 정보",
+      "pName": "SellerPayoutAccount",
+      "fields": [
+        {
+          "_id": "m4hafnvWbxTfMpMZ3",
+          "name": "판매자 ID",
+          "pName": "seller_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "qmWErRYwDjkn7HjsM",
+          "relFieldId": "2a3TENNmyTmmHMCn5",
+          "relType": "ZERO_OR_ONE",
+          "relGroupId": "D2kbQFZGDddtZk9g7"
+        },
+        {
+          "_id": "fpMa6q9X2AwopJocF",
+          "name": "PG사 판매자 식별자",
+          "pName": "pg_seller_key",
+          "domain": "",
+          "type": "VARCHAR(35)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "PG사에 판매자를 등록하면 PG사가 발급",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "NfK37gxuMc5dcG4Kr",
+          "name": "사업자 유형",
+          "pName": "businessType",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "INDIVIDUAL(개인), INDIVIDUAL_BUSINESS (개인사업자), CORPORATE(법인사업자)",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "oqmXqMcQDJHzNANJ5",
+          "name": "정산 허가 상태",
+          "pName": "status",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "- APPROVAL_REQUIRED: 지급대행이 불가능한 상태입니다. 개인 및 개인사업자 셀러 등록 직후의 상태이며, 본인인증이 필요합니다.\n\n- PARTIALLY_APPROVED: 일주일 동안 1천만원까지 지급대행이 가능한 상태입니다. 등록 직후의 법인사업자 셀러 또는 본인인증을 완료한 개인 및 개인사업자 셀러의 상태입니다.\n\n- KYC_REQUIRED: 지급대행이 불가능한 상태입니다. 일주일 동안 1천만원을 초과하는 금액을 지급 요청하면 셀러는 해당 상태로 변경됩니다. 셀러가 KYC 심사를 완료해야 합니다.\n\n- APPROVED: 금액 제한 없이 지급대행이 가능한 상태입니다. KYC 심사가 정상적으로 완료된 셀러의 상태입니다.",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "ye63bbhnMXt6sYPs8",
+          "name": "은행 코드",
+          "pName": "bankCode",
+          "domain": "",
+          "type": "VARCHAR(10)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "2C5zHuS3k2PbAFQN7",
+          "name": "은행 계좌",
+          "pName": "bank_account",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "jFqcQSi8WPX2ZLwqY",
+          "name": "예금주",
+          "pName": "depositor_name",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [
+          {
+            "_id": "2yigJCJRjFh4B3x3P",
+            "name": "판매자 정보 ID",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null,
+            "relGroupId": null
+          }
+        ],
+        "fks": []
+      },
+      "color": "rgba(178, 0, 120, 0.5)"
+    },
+    {
+      "_id": "86mCYas6qevpkwAKk",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "demand_board",
+      "name": "demand_board",
+      "position": {
+        "x": 1210,
+        "y": 1840
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "4injCiypns7noMKsg",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "gqHFz9YFaugkTj6em",
+          "name": "catalog_id",
+          "pName": "catalog_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "7kkMjtXTsnWjEYB7t",
+          "relFieldId": "NDWkCv5dvGeSRraRt",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "wTuJR3j9r5DTMbwsK"
+        },
+        {
+          "_id": "ByZ4mgcjcYhiAhqdZ",
+          "name": "participant_count",
+          "pName": "participant_count",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "0",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "xDyPCW6Lb2qqpmA7s",
+          "name": "price_min",
+          "pName": "price_min",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "h5ZrQ4HL5vEuWDAqb",
+          "name": "price_max",
+          "pName": "price_max",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "3TWyQtjEnH5jpbspr",
+          "name": "status",
+          "pName": "status",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "'OPEN'",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "xF73QLF2QKnEABFy4",
+          "name": "낙찰 일",
+          "pName": "judged_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "sMQHG3t2wvznXmXE6",
+          "name": "마감시간",
+          "pName": "sale_end_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "bTzTz4aNfzpRExKqc",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "hu4fcqAG7atkAq3MD",
+          "name": "updated_at",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(0, 178, 100, 0.5)"
+    },
+    {
+      "_id": "AYNXRyXHei4JAs7tk",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 4080,
+        "y": 3100
+      },
+      "name": "웹훅",
+      "pName": "PaymentsWebhock",
+      "fields": [
+        {
+          "_id": "dGhk73d22bRDoBzBn",
+          "name": "웹훅 전송 ID",
+          "pName": "transmission_id",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "A7L5CCoaRTk9z2vXs",
+          "name": "이벤트 유형",
+          "pName": "event_type",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "dSFx3wXA4LAPQQ9Tp",
+          "name": "이벤트 생성 일시",
+          "pName": "toss_created_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "nSjoPikFmK9bdgiev",
+          "name": "고객 키",
+          "pName": "customer_key",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "fSLBX58fFwmajXXSJ",
+          "name": "결제수단 키",
+          "pName": "method_key",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "3uKTHMhjvE9YjQYY5",
+          "name": "결제키",
+          "pName": "payment_key",
+          "domain": "",
+          "type": "VARCHAR(200)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "tN8qcypk9qi2NKLaz",
+          "name": "주문번호",
+          "pName": "order_id",
+          "domain": "",
+          "type": "VARCHAR(64)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "zgg68ERiY8br6CsFg",
+          "name": "웹훅 원본 데이터",
+          "pName": "payload",
+          "domain": "",
+          "type": "JSON",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "gRK5bGQ23APXKDCD8",
+          "name": "수신 일시",
+          "pName": "received_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "QrF7h4BmkfQGnAxcJ",
+          "name": "처리일시",
+          "pName": "processed_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [
+          {
+            "_id": "w4QbgDXDXbDxEBDvZ",
+            "name": "웹훅 ID",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null,
+            "relGroupId": null
+          }
+        ],
+        "fks": []
+      },
+      "color": "rgba(123, 0, 178, 0.5)"
+    },
+    {
+      "_id": "GcgfexxaJ7gzRbJFg",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "product_award_evaluation",
+      "name": "product_award_evaluation",
+      "position": {
+        "x": 1240,
+        "y": 2530
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "qFzMoZXSDmFBKtMTo",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "rafQr5XHTmEBZW9EX",
+          "name": "product_id",
+          "pName": "product_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "YZjcsB76tKBbNg6B2",
+          "relFieldId": "brJAGpmfu3uTtE5dJ",
+          "relType": "ZERO_OR_ONE",
+          "relGroupId": "MrbHZegAzwbhziCek"
+        },
+        {
+          "_id": "pCdWGiycpouTyMBYe",
+          "name": "demand_board_id",
+          "pName": "demand_board_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "86mCYas6qevpkwAKk",
+          "relFieldId": "4injCiypns7noMKsg",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "gHDPEBHXRmsEHoy7o"
+        },
+        {
+          "_id": "wwpjmDGDZWzibMARn",
+          "name": "적합도",
+          "pName": "score",
+          "domain": "",
+          "type": "NUMERIC(5,4)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "ZJnbiDbtRPNxSA6SK",
+          "name": "AI 판단 사유",
+          "pName": "reason",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "AdGhsvzHLLGtobCjK",
+          "name": "최종 편입 여부",
+          "pName": "is_awarded",
+          "domain": "",
+          "type": "BOOLEAN",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "YLvhxRf9T7EdxSsT9",
+          "name": "judged_at",
+          "pName": "judged_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(0, 178, 100, 0.5)"
+    },
+    {
+      "_id": "H4bNNLBRL4famqzaY",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 4190,
+        "y": 2340
+      },
+      "name": "브랜드 페이 Access Token",
+      "pName": "BrandPayToken",
+      "fields": [
+        {
+          "_id": "gj5SKsoGwJv4bDK9M",
+          "name": "AccessToken",
+          "pName": "access_token",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "zyQYeuDERzscBCTSF",
+          "name": "RefreshToken",
+          "pName": "refresh_token",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "KGyqN3ePmgh7EGsse",
+          "name": "토큰 만료시",
+          "pName": "access_token_expires_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [],
+        "fks": [
+          {
+            "_id": "tED68QkvDqpfMtJYv",
+            "name": "회원 ID",
+            "pName": "member_id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": "iKqd3yiiveh7bzswF",
+            "relFieldId": "ra5w5eyriqPSdtYyt",
+            "relType": "ZERO_OR_ONE",
+            "relGroupId": "KuqSbd7xReoqEzw3J"
+          }
+        ]
+      },
+      "color": "rgba(123, 0, 178, 0.5)"
+    },
+    {
+      "_id": "HM5NMQmHyqDAd5EMx",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3810,
+        "y": 2340
+      },
+      "name": "소비자 키",
+      "pName": "CustomerKey",
+      "fields": [
+        {
+          "_id": "Xaki4L7YXQfwrFkDy",
+          "name": "소비자 식별 키",
+          "pName": "customer_key",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [],
+        "fks": [
+          {
+            "_id": "bPn2Yh73QDNaTcbDm",
+            "name": "회원 ID",
+            "pName": "member_id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": "iKqd3yiiveh7bzswF",
+            "relFieldId": "ra5w5eyriqPSdtYyt",
+            "relType": "ZERO_OR_ONE",
+            "relGroupId": "Go4RqhTht9f8uq9gj"
+          }
+        ]
+      },
+      "color": "rgba(123, 0, 178, 0.5)"
+    },
+    {
+      "_id": "LkCwNbEP5ByheMEwj",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "notification",
+      "name": "notification",
+      "position": {
+        "x": 3410,
+        "y": 1890
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "wP4dFRnNYCzC62E5C",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "SkWj7pD9mA9Y3aHz5",
+          "name": "notification_event_id",
+          "pName": "notification_event_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "dYsWZJppJKcHNBzK4",
+          "relFieldId": "bE8zzyZ8xoDrNBx8g",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "JhzfNdmeXzqP3onh9",
+          "name": "member_id",
+          "pName": "member_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "iKqd3yiiveh7bzswF",
+          "relFieldId": "ra5w5eyriqPSdtYyt",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "TqPCsNBv9SL9EsNn9"
+        },
+        {
+          "_id": "9LggDaLzoyrG59SaJ",
+          "name": "is_read",
+          "pName": "is_read",
+          "domain": "",
+          "type": "BOOLEAN",
+          "defaultValue": "FALSE",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "jr8H3KaZ58vq6FSec",
+          "name": "read_at",
+          "pName": "read_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "kcfx29CiD7nKBActo",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(178, 27, 0, 0.5)"
+    },
+    {
+      "_id": "MwctW7XDCttAbT8QW",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "demand",
+      "name": "demand",
+      "position": {
+        "x": 1570,
+        "y": 1410
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "XFCaEmpb6Zoug5b9D",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "vHvzkmyvk24fRg3aS",
+          "name": "demand_board_id",
+          "pName": "demand_board_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": "86mCYas6qevpkwAKk",
+          "relFieldId": "4injCiypns7noMKsg",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "2ZmcJJFEo7sYHKhDC",
+          "name": "member_id",
+          "pName": "member_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "iKqd3yiiveh7bzswF",
+          "relFieldId": "ra5w5eyriqPSdtYyt",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "9D7CNdNjGWaTwJfvj"
+        },
+        {
+          "_id": "5H7rJqSK82LkJnKct",
+          "name": "catalog_id",
+          "pName": "catalog_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "7kkMjtXTsnWjEYB7t",
+          "relFieldId": "NDWkCv5dvGeSRraRt",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "KXSmZJCba9tRorkKa"
+        },
+        {
+          "_id": "etX7hNHWmsDEdyGtw",
+          "name": "자동결제수단 ID",
+          "pName": "pay_method_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "36xcuJEBjEo7w5nJS",
+          "relFieldId": "6otTMyR2PikvkLmaf",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "3v9QZrCA4pCKwntRn"
+        },
+        {
+          "_id": "GJubqzxDktjQPjqZp",
+          "name": "요구 최대 가격",
+          "pName": "desired_price_max",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "iWYpCy8zd29ZGyBQe",
+          "name": "요구 최소 가격",
+          "pName": "desired_price_min",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "9yc8hFCxaMsfTCRB4",
+          "name": "요구 종료일",
+          "pName": "desire_end_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "3q7mCAk2QBY7mL6pw",
+          "name": "quantity",
+          "pName": "quantity",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "WvStSt5J7joRKaDCn",
+          "name": "extra_requirement",
+          "pName": "extra_requirement",
+          "domain": "",
+          "type": "VARCHAR(200)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "yXCXTFRiXeQsee7iQ",
+          "name": "대체 상품 가능 여부",
+          "pName": "is_substitutable",
+          "domain": "",
+          "type": "BOOLEAN",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "G8h2TdQBYzQWuBefj",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "5xgpGFv8YfLGZeiGd",
+          "name": "updated_at",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "LviNwLSsYe344Ec3M",
+          "name": "status",
+          "pName": "status",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "KaTnYkLojrXrfiHmi",
+          "name": "label",
+          "pName": "label",
+          "domain": "",
+          "type": "VARCHAR(200)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "MbtMHABivR8JktFJr",
+          "name": "label 생성 시각",
+          "pName": "processed_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "color": "rgba(0, 178, 100, 0.5)"
+    },
+    {
+      "_id": "P7rjwDwFPFtZehKzz",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2990,
+        "y": 2760
+      },
+      "name": "주문",
+      "pName": "Orders",
+      "fields": [
+        {
+          "_id": "Znj83stk6CJLm7BvC",
+          "name": "자동결제수단 ID",
+          "pName": "brandpay_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "36xcuJEBjEo7w5nJS",
+          "relFieldId": "6otTMyR2PikvkLmaf",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "yRgF2ndG8ZkvmkaF2"
+        },
+        {
+          "_id": "qd4bvqkFnJeGPjnGe",
+          "name": "구매자 ID",
+          "pName": "customer_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "iKqd3yiiveh7bzswF",
+          "relFieldId": "ra5w5eyriqPSdtYyt",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "d5xdCBzSWnA4ftkR3"
+        },
+        {
+          "_id": "7NP8C6944FgpgaxdS",
+          "name": "공동구매 ID",
+          "pName": "group_buy_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "hBYP395oyxtZyo9Pr",
+          "relFieldId": "2grv7sRspH2PhY7F4",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "jZCbgf84GykJ55e8X"
+        },
+        {
+          "_id": "hT7M2bEqXKCFrQX88",
+          "name": "주문 번호",
+          "pName": "order_no",
+          "domain": "",
+          "type": "VARCHAR(64)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "영문 대소문자, 숫자, 특수문자 -, _로 이루어진 6자 이상 64자 이하의 문자열",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "fAY8LBodQrctkRAfs",
+          "name": "총 금액",
+          "pName": "total_amount",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "KQnwGKa6PtBgSbE3n",
+          "name": "상품 ID",
+          "pName": "product_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "sXDfGEASjXem4egBi",
+          "name": "상품명",
+          "pName": "product_name",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "PhbEhAP6h7mKYjQAk",
+          "name": "상품 수량",
+          "pName": "sum",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "구매하는 상품의 수량",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "D45oibFq8b6wFt8hs",
+          "name": "상품 가격",
+          "pName": "price",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "상품의 개당 가격",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "8EkrHmJCJrEQF5yBX",
+          "name": "수령인 이름",
+          "pName": "shipping_name",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "ZDjdxEZ4vWuaBtPnE",
+          "name": "수령인 전화번호",
+          "pName": "phone_number",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "dqWLCm2fegpjxaFmT",
+          "name": "택배송장번호",
+          "pName": "shipping_number",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "3Sv4PuYE2XvDZKbPK",
+          "name": "주문 상태",
+          "pName": "order_status",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "xZDqTnx25azgdmnoE",
+          "name": "판매자 ID",
+          "pName": "seller_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "rHZgqzyHzJz83hewQ",
+          "name": "판매자 상호명",
+          "pName": "business_name",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "BfJtddKpBRtzXEi8v",
+          "name": "우편번호",
+          "pName": "zipcode",
+          "domain": "",
+          "type": "VARCHAR(5)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "wiXMR7b3KuYmxbfcQ",
+          "name": "기본주소",
+          "pName": "address",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "pnLS7ziEm6Q7gM9GL",
+          "name": "상세주소",
+          "pName": "address_detail",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "ZQtvb8yehGCs6byGN",
+          "name": "상품 이미지 url",
+          "pName": "image_url",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "r2c962pBT7R2QxCtv",
+          "name": "주문 수정 시간",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "tenDzgJANkEqsdN8z",
+          "name": "주문 생성 시간",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "nr5RMGYreSTepmw6u",
+          "name": "배송메모",
+          "pName": "shipping_memo",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "MaT3vAKotPGJ4Xv3C",
+          "name": "수요 ID",
+          "pName": "demand_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [
+          {
+            "_id": "niTHL5fMP2EhFSRg5",
+            "name": "주문 ID",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null,
+            "relGroupId": null
+          }
+        ],
+        "fks": []
+      },
+      "color": "rgba(177, 178, 0, 0.5)"
+    },
+    {
+      "_id": "X8SBtT33nhqYrNFn2",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3120,
+        "y": 3470
+      },
+      "name": "OutboxEvent",
+      "pName": "outbox_event",
+      "fields": [
+        {
+          "_id": "Tii24zzxS3pHgHC72",
+          "name": "이벤트 타입",
+          "pName": "event_type",
+          "domain": "",
+          "type": "ENUM",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "GROUP_BUY_JUDGMENT_SCHEDULED (공구 판정을 에약)",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "pHKcfkwBfgjK3FqJE",
+          "name": "공구 ID",
+          "pName": "aggregate_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "C9Ydn8tJzDFsCnR4u",
+          "name": "판정 예정 시간",
+          "pName": "scheduled_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "eHCAoY6FGPeYXKorZ",
+          "name": "이벤트 상태",
+          "pName": "status",
+          "domain": "",
+          "type": "ENUM",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "PENDING, // 외부 저장소 발행 대기 또는 실패 후 재시도 대기\n    PUBLISHED // 외부 저장소 발행 완료",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "DxJmmp2WKWgTnbZrk",
+          "name": "재시도 횟수",
+          "pName": "retry_count",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "재시도 시간",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "tAXYocxtW7eQGkXHj",
+          "name": "다음 재시도 시간",
+          "pName": "next_attempt_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "q3RYDFLGjsocqXLC6",
+          "name": "이벤트 발행 시간",
+          "pName": "published_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [
+          {
+            "_id": "Yyp5eFCX5cYSF4bpy",
+            "name": "아웃박스 ID",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null,
+            "relGroupId": null
+          }
+        ],
+        "fks": []
+      },
+      "color": "rgba(178, 117, 0, 0.5)"
+    },
+    {
+      "_id": "YZjcsB76tKBbNg6B2",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "product",
+      "name": "product",
+      "position": {
+        "x": 1700,
+        "y": 2320
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "brJAGpmfu3uTtE5dJ",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "YNG7LMYpBPpt5Pcnd",
+          "name": "catalog_id",
+          "pName": "catalog_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "7kkMjtXTsnWjEYB7t",
+          "relFieldId": "NDWkCv5dvGeSRraRt",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "v9HmL2osPfjYMSLi7"
+        },
+        {
+          "_id": "bCEDdLbYYkomk2ekw",
+          "name": "demand_board_id",
+          "pName": "demand_board_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "86mCYas6qevpkwAKk",
+          "relFieldId": "4injCiypns7noMKsg",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "DAr3BJwCN3q4KP63x",
+          "name": "seller_id",
+          "pName": "seller_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "qmWErRYwDjkn7HjsM",
+          "relFieldId": "2a3TENNmyTmmHMCn5",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "5fWLubSspPb6Qd5uQ"
+        },
+        {
+          "_id": "ThBd6ckjkbn4MTqfD",
+          "name": "이미지 url",
+          "pName": "thumbnail_url",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "oeuJvdW42nqPMsNSZ",
+          "name": "단가",
+          "pName": "unit_price",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "zzofzsQLdSAPHdgiD",
+          "name": "배송비",
+          "pName": "shipping_fee",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "0",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "SLKprcsYvvhHqf2o7",
+          "name": "delivery_date",
+          "pName": "delivery_date",
+          "domain": "",
+          "type": "DATE",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "cm6dzz63GA7ZYrRab",
+          "name": "만료일",
+          "pName": "sale_end_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "n6xGNfFt5eXWjRGpP",
+          "name": "수량",
+          "pName": "total_quantity",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "ZmMazb4M5KQwA565T",
+          "name": "최소 참여자 수",
+          "pName": "min_participant_count",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "gwe5STsnvdinE6v8N",
+          "name": "최소 주문 수량",
+          "pName": "min_quantity",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "KwKANxn53RTM4yTJY",
+          "name": "사람 당 최대 주문 수",
+          "pName": "max_quantity_per_member",
+          "domain": "",
+          "type": "INTEGER",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "qf7JDW9FvrByt4SZb",
+          "name": "description",
+          "pName": "description",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "BL4TMs336BBGBPCQo",
+          "name": "환불정책",
+          "pName": "return_policy",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "PuhuxSEDE7CpCCjtw",
+          "name": "status",
+          "pName": "status",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "'BIDDING'",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "66NMee2nv3TKJda6w",
+          "name": "낙찰일",
+          "pName": "awarded_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "84WD7E7m9E2Jh7gLG",
+          "name": "종료일",
+          "pName": "closed_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "TAbq88d76NN6x8Au5",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "PH8zxy5wR9ttHPDCE",
+          "name": "updated_at",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(0, 178, 100, 0.5)"
+    },
+    {
+      "_id": "dYsWZJppJKcHNBzK4",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "notification_event",
+      "name": "notification_event",
+      "position": {
+        "x": 3910,
+        "y": 1870
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "bE8zzyZ8xoDrNBx8g",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "2YPgReFFfvFKfQAG5",
+          "name": "type",
+          "pName": "type",
+          "domain": "",
+          "type": "VARCHAR(40)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "ScqqswxuXkMCku8m3",
+          "name": "title",
+          "pName": "title",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "Qqq2PJyg3rYNWxLfE",
+          "name": "body",
+          "pName": "body",
+          "domain": "",
+          "type": "VARCHAR(500)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "x7CY4EpwPJjgd3Dvn",
+          "name": "link_url",
+          "pName": "link_url",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "w6fTaGRX7RkArjTB6",
+          "name": "is_mandatory",
+          "pName": "is_mandatory",
+          "domain": "",
+          "type": "BOOLEAN",
+          "defaultValue": "FALSE",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "pByoum672sJcYJ2MX",
+          "name": "event_key",
+          "pName": "event_key",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "vutgTPMiiusGqwwNW",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "y8EmCEWh4e9b5SynQ",
+          "name": "updated_at",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(178, 27, 0, 0.5)"
+    },
+    {
+      "_id": "dhTT4iAshXnZAmypw",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3640,
+        "y": 3100
+      },
+      "name": "결제",
+      "pName": "Payments",
+      "fields": [
+        {
+          "_id": "fWQpqGx9CFymRQxNC",
+          "name": "주문 ID",
+          "pName": "order_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "P7rjwDwFPFtZehKzz",
+          "relFieldId": "niTHL5fMP2EhFSRg5",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "fgb8g7mcnD3WpLSQx"
+        },
+        {
+          "_id": "oqgX2tqiMLHweMdY6",
+          "name": "PG사 결제 식별자",
+          "pName": "payment_key",
+          "domain": "",
+          "type": "VARCHAR(200)",
+          "defaultValue": "NULL",
+          "isAllowNull": true,
+          "comment": "200자 이하",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "zQFRar2DufDyETY9D",
+          "name": "주문번호",
+          "pName": "order_no",
+          "domain": "",
+          "type": "VARCHAR(64)",
+          "defaultValue": "NULL",
+          "isAllowNull": true,
+          "comment": "영문 대소문자, 숫자, 특수문자 -, _로 이루어진 6자 이상 64자 이하의 문자열",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "MP2432geLMrnabftE",
+          "name": "구매상품",
+          "pName": "order_name",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "NULL",
+          "isAllowNull": true,
+          "comment": "구매 상품",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "bKZgTEs4MY92pRd8j",
+          "name": "총 결제금액",
+          "pName": "total_amount",
+          "domain": "",
+          "type": "INT",
+          "defaultValue": "NULL",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "GwhggrsdroJiCPXMa",
+          "name": "결제 상태",
+          "pName": "payments_status",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "READY",
+          "isAllowNull": false,
+          "comment": "READY(결제준비), \nIN_PROGRESS,\n DONE, \nCANCELED(결제취소)",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "qDyf9sPWhF6njALTC",
+          "name": "결제 타입",
+          "pName": "payments_type",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "NORMAL(일반결제), BILLING(자동결제), BRANDPAY(브랜드페이)",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "imnnLd2shYFAvFtb7",
+          "name": "결제수단",
+          "pName": "method",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "카드, 가상계좌, 간편결제, 휴대폰, 계좌이체, 문화상품권, 도서문화상품권, 게임문화상품권",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "o3Sz89b8Mrd4WhZc8",
+          "name": "결제 승인 시간",
+          "pName": "approvedAt",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "dzDt7pcHRnzvKiEYu",
+          "name": "결제 수단별 세부 데이터",
+          "pName": "detail",
+          "domain": "",
+          "type": "JSONB",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "세부데이터를 통으로 저장",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "X99n5K84fyhnMwoKW",
+          "name": "결제 생성 시간",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "F9GE92WDxWKr54YuD",
+          "name": "결제 수정 시간",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "NULL",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "gXaHCZQh8mnTT4HBA",
+          "name": "취소 일시",
+          "pName": "canceled_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "JTMSLkXTHmDKyTkpT",
+          "name": "취소사유",
+          "pName": "cancel_reason",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "amaEFX7T7fP3Gsqkx",
+          "name": "Key",
+          "pName": "Key",
+          "domain": "",
+          "type": "",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "P7rjwDwFPFtZehKzz",
+          "relFieldId": "E5gMtRnCJNhbHmabG",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "fgb8g7mcnD3WpLSQx"
+        },
+        {
+          "_id": "THFcyj6uM4ePutzhN",
+          "name": "Key2",
+          "pName": "Key2",
+          "domain": "",
+          "type": "",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "P7rjwDwFPFtZehKzz",
+          "relFieldId": "cY9fhKmoizk5hHSyv",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "fgb8g7mcnD3WpLSQx"
+        }
+      ],
+      "keys": {
+        "pks": [
+          {
+            "_id": "5KZMP3dmi3wQSyyQe",
+            "name": "결제 ID",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null,
+            "relGroupId": null
+          }
+        ],
+        "fks": []
+      },
+      "color": "rgba(123, 0, 178, 0.5)"
+    },
+    {
+      "_id": "etjPMPE7RizaEgD6X",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2650,
+        "y": 2640
+      },
+      "name": "관심 공동 구매",
+      "pName": "GroupBuyLikes",
+      "fields": [
+        {
+          "_id": "FGFJXKibHKrN2TC7u",
+          "name": "공동구매 ID",
+          "pName": "groupbuy_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "hBYP395oyxtZyo9Pr",
+          "relFieldId": "2grv7sRspH2PhY7F4",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "wtd6pTHikRC9R3sAu"
+        },
+        {
+          "_id": "xm8TdtbGogbYe6xek",
+          "name": "회원 ID",
+          "pName": "member_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "iKqd3yiiveh7bzswF",
+          "relFieldId": "ra5w5eyriqPSdtYyt",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "Df3gf4qSdSSmJfwvs"
+        }
+      ],
+      "keys": {
+        "pks": [],
+        "fks": []
+      },
+      "color": "rgba(178, 69, 0, 0.5)"
+    },
+    {
+      "_id": "fjrp9uLjjP4wqBZ4Q",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "category",
+      "name": "category",
+      "position": {
+        "x": 2230,
+        "y": 1860
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "nBy5Zc8pbf6BLqiCS",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null,
+            "relGroupId": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "5LvxayXavYt3ybCC7",
+          "name": "parent_id",
+          "pName": "parent_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "uchTPL4pbqstLzFrA",
+          "name": "name",
+          "pName": "name",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "oTfbuHfHL4xHaS23R",
+          "name": "depth",
+          "pName": "depth",
+          "domain": "",
+          "type": "SMALLINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "f7keM9PrKJ3SrDGYq",
+          "name": "facet",
+          "pName": "facet",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "CNBuBSRpq6ZnKWif8",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "XbHkAgFfPJGw4nDc8",
+          "name": "updated_at",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(0, 178, 100, 0.5)"
+    },
+    {
+      "_id": "hBYP395oyxtZyo9Pr",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2610,
+        "y": 3460
+      },
+      "name": "공동구매",
+      "pName": "GroupBuy",
+      "fields": [
+        {
+          "_id": "rFZrdqjiDX4q32wg7",
+          "name": "판매 페이지 이름",
+          "pName": "title",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "MNQqiK9JMLYDbDszT",
+          "name": "목표 인원수",
+          "pName": "target_count",
+          "domain": "",
+          "type": "INT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "iEm2Ke3xSLunCPcMn",
+          "name": "참여 인원수",
+          "pName": "count",
+          "domain": "",
+          "type": "INT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "dsygvYuTJcTSP35J8",
+          "name": "공동구매만료일시",
+          "pName": "group_buy_end_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "GJSuc6QkoKyXcWmHX",
+          "name": "공동구매 상태",
+          "pName": "status",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "공동구매 진행중,\n인원 모집 완료(결제 대기),\n전 인원 결제 완료,\n공동구매 종료,\n공동구매 실패,\n공동구매 취소",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "DBmcdDCfY6R9bxyiB",
+          "name": "판매자 ID",
+          "pName": "seller_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "qmWErRYwDjkn7HjsM",
+          "relFieldId": "2a3TENNmyTmmHMCn5",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "DbGSLeenMx27htHRn"
+        },
+        {
+          "_id": "m5Fb4f3jx4HwcdGXm",
+          "name": "상품 ID",
+          "pName": "product_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "YZjcsB76tKBbNg6B2",
+          "relFieldId": "brJAGpmfu3uTtE5dJ",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "9ZgiEYTpQhGnNeYnz"
+        }
+      ],
+      "keys": {
+        "pks": [
+          {
+            "_id": "2grv7sRspH2PhY7F4",
+            "name": "공동구매 ID",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null,
+            "relGroupId": null
+          }
+        ],
+        "fks": []
+      },
+      "color": "rgba(178, 69, 0, 0.5)"
+    },
+    {
+      "_id": "iKqd3yiiveh7bzswF",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "member",
+      "name": "member",
+      "position": {
+        "x": 2740,
+        "y": 1660
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "ra5w5eyriqPSdtYyt",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "xJiKGXXxeZmQQDKju",
+          "name": "login_id",
+          "pName": "login_id",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "TuC5Xd3KWTGrSuFw3",
+          "name": "nickname",
+          "pName": "nickname",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "MiRzPxp6ebcK9yEdE",
+          "name": "image",
+          "pName": "image",
+          "domain": "",
+          "type": "VARCHAR(2048)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "Pt4CYf7zi76vCk7S2",
+          "name": "phone_number",
+          "pName": "phone_number",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "DgAfmS5CgwkpFoYbd",
+          "name": "email",
+          "pName": "email",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "yyC2it9yMoB78BfRX",
+          "name": "is_seller",
+          "pName": "is_seller",
+          "domain": "",
+          "type": "BOOLEAN",
+          "defaultValue": "FALSE",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "aDW3WFpmrRxeSGsgv",
+          "name": "last_login_at",
+          "pName": "last_login_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "kTk7fjdJgfzc2rXmn",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "RCbzksEGQ5tRN8DrT",
+          "name": "updated_at",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "ocCgGTKp5BPiQkys9",
+          "name": "deleted_at",
+          "pName": "deleted_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "o8fWuLoaskeB5XBBS",
+          "name": "terms_agreed_at",
+          "pName": "Field",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "color": "rgba(0, 106, 178, 0.5)"
+    },
+    {
+      "_id": "pDBabRJpGm2zQJkDL",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "shipping_address",
+      "name": "shipping_address",
+      "position": {
+        "x": 2620,
+        "y": 1240
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "3Typg8HjjxJhnPXq3",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "Hgma3TZextRFYZTet",
+          "name": "member_id",
+          "pName": "member_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "iKqd3yiiveh7bzswF",
+          "relFieldId": "ra5w5eyriqPSdtYyt",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "8H2DEix3kLBJ2Q6Np",
+          "name": "기본 배송지 여부",
+          "pName": "is_default",
+          "domain": "",
+          "type": "BOOLEAN",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "rPijAEzrcTp5ZG9pn",
+          "name": "배송지 별칭",
+          "pName": "alias",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "brBJnBkDYtiitFBKG",
+          "name": "수령인 이름",
+          "pName": "recipient_name",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "yX4muDF6qRontgZQ2",
+          "name": "phone_number",
+          "pName": "phone_number",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "jsLuTaFbpt6xvEGPu",
+          "name": "우편번호",
+          "pName": "zipcode",
+          "domain": "",
+          "type": "VARCHAR(5)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "qLtZZT3DWSPTXWGzw",
+          "name": "기본 주소",
+          "pName": "address",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "S8hFAZHzFEJ3pquCL",
+          "name": "상세 주소",
+          "pName": "address_detail",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "mtiQpR9zbYRHaEGtN",
+          "name": "현관 비밀번호",
+          "pName": "entrance_code",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "eihz79iZtQDTs2x4r",
+          "name": "request_message",
+          "pName": "request_message",
+          "domain": "",
+          "type": "VARCHAR(100)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "nFcdwofTpYR9mBqyT",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "jPHdkdYkcogjmHiKb",
+          "name": "updated_at",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(0, 106, 178, 0.5)"
+    },
+    {
+      "_id": "qmWErRYwDjkn7HjsM",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "seller",
+      "name": "seller",
+      "position": {
+        "x": 2660,
+        "y": 2050
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "2a3TENNmyTmmHMCn5",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "CxAueotDqZ2Mdwyc2",
+          "name": "member_id",
+          "pName": "member_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "iKqd3yiiveh7bzswF",
+          "relFieldId": "ra5w5eyriqPSdtYyt",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "YCjpDKpw6iYMmzmCa",
+          "name": "상호명",
+          "pName": "business_name",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "P7BRJeDM4YyyL2B5H",
+          "name": "사업자등록번호",
+          "pName": "business_number",
+          "domain": "",
+          "type": "TEXT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "vwwvJrCRto9epYwRS",
+          "name": "business_number_hash",
+          "pName": "business_number_hash",
+          "domain": "",
+          "type": "CHAR(64)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "KSq9KCpN6fW8DEJaS",
+          "name": "통산판매업신고번호",
+          "pName": "mail_order_registration_number",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "g2hP9EnHrd2ycciDv",
+          "name": "대표자명",
+          "pName": "owner_name",
+          "domain": "",
+          "type": "VARCHAR(50)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "zopNhZkyyy2LC48N4",
+          "name": "phone_number",
+          "pName": "phone_number",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "iRppvB7TQ59HDCseT",
+          "name": "seller_status",
+          "pName": "seller_status",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "'PENDING'",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "9X4ut7jXyzemuhnLp",
+          "name": "approved_at",
+          "pName": "approved_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "pz6PLpEEu3F3Zhgia",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "fvP3e7izWX23QDYE4",
+          "name": "updated_at",
+          "pName": "updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "NQgLDwTbWkeG5FXFL",
+          "name": "deleted_at",
+          "pName": "deleted_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(0, 106, 178, 0.5)"
+    },
+    {
+      "_id": "vXtAMstScQwQonKkZ",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2140,
+        "y": 3230
+      },
+      "name": "정산",
+      "pName": "Payout",
+      "fields": [
+        {
+          "_id": "6PfvaAAFmf4ETkCYh",
+          "name": "판매자 ID",
+          "pName": "seller_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "qmWErRYwDjkn7HjsM",
+          "relFieldId": "2a3TENNmyTmmHMCn5",
+          "relType": "ZERO_OR_ONE_OR_MANY",
+          "relGroupId": "FMjL75DCjRvcDwTXG"
+        },
+        {
+          "_id": "STarHEuqnYzEDf3ap",
+          "name": "지급 요청 식별자",
+          "pName": "ref_payout_id",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "최대 50자",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "LmKpiPoNMXwTjZByv",
+          "name": "PG사 판매자 식별자",
+          "pName": "pg_seller_key",
+          "domain": "",
+          "type": "VARCHAR(35)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "vCEiheJQCPGnJ6dP6",
+          "name": "지급일",
+          "pName": "payout_date",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "EvFj3CjsPr2nXTE5b",
+          "name": "정산 금액",
+          "pName": "amount",
+          "domain": "",
+          "type": "INT",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "QMxxGb9uinRFd3hB9",
+          "name": "요청시간",
+          "pName": "request_at",
+          "domain": "",
+          "type": "TIMESTAMP",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        },
+        {
+          "_id": "DTZxEFyhCAr6sncAf",
+          "name": "정산 상태",
+          "pName": "status",
+          "domain": "",
+          "type": "VARCHAR(30)",
+          "defaultValue": "",
+          "isAllowNull": true,
+          "comment": "REQUESTED: 지급이 요청되었지만 아직 처리되지 않은 상태입니다. REQUESTED 상태일 때만 지급대행 요청을 취소할 수 있습니다.\n\n- IN_PROGRESS: 지급을 처리하고 있는 상태입니다.\n\n- COMPLETED: 셀러에 지급이 완료된 상태입니다.\n\n- FAILED: 지급 요청이 실패한 상태입니다.\n\n- CANCELED: 지급 요청이 취소된 상태입니다.\n\n- REJECTED: 지급 요청이 반려된 상태입니다. 웹훅은 FAILED 상태로 발송됩니다.",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [
+          {
+            "_id": "corB7NRkyFwJynw7g",
+            "name": "정산 ID",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null,
+            "relGroupId": null
+          }
+        ],
+        "fks": []
+      },
+      "color": "rgba(178, 0, 120, 0.5)"
+    },
+    {
+      "_id": "wjnAepQdPjpAjrdzA",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "member_social",
+      "name": "member_social",
+      "position": {
+        "x": 3390,
+        "y": 1460
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "y97eC3MjJ5s8HSTZb",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "kEE7LDyJrXwpMLDyv",
+          "name": "member_id",
+          "pName": "member_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "iKqd3yiiveh7bzswF",
+          "relFieldId": "ra5w5eyriqPSdtYyt",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "J8DcFaiQW9FhYMq6H",
+          "name": "provider",
+          "pName": "provider",
+          "domain": "",
+          "type": "VARCHAR(20)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "CJCKd4y3zy64r4Qmv",
+          "name": "provider_id",
+          "pName": "provider_id",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "ecpKaX4ZHqML7CLSW",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(0, 106, 178, 0.5)"
+    },
+    {
+      "_id": "x4SrmHYof8iC7f5nc",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "pName": "member_local",
+      "name": "member_local",
+      "position": {
+        "x": 3390,
+        "y": 1300
+      },
+      "keys": {
+        "pks": [
+          {
+            "_id": "i8z6bYjDdgn3t4RFt",
+            "name": "id",
+            "pName": "id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": null,
+            "relFieldId": null,
+            "relType": null
+          }
+        ],
+        "fks": []
+      },
+      "fields": [
+        {
+          "_id": "sByib3DC3noKzpACe",
+          "name": "member_id",
+          "pName": "member_id",
+          "domain": "",
+          "type": "BIGINT",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": "iKqd3yiiveh7bzswF",
+          "relFieldId": "ra5w5eyriqPSdtYyt",
+          "relType": "ZERO_OR_ONE_OR_MANY"
+        },
+        {
+          "_id": "ggwpvGSs88RxQwRGe",
+          "name": "password",
+          "pName": "password",
+          "domain": "",
+          "type": "VARCHAR(255)",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "czakv8JPw9G26YPF7",
+          "name": "password_updated_at",
+          "pName": "password_updated_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        },
+        {
+          "_id": "TZLNfsAkigdDXzPjr",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "now()",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null
+        }
+      ],
+      "color": "rgba(0, 106, 178, 0.5)"
+    },
+    {
+      "_id": "xfRxXJKkvj2PWz7HK",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 1100,
+        "y": 1620
+      },
+      "name": "reject_history",
+      "pName": "reject_history",
+      "fields": [
+        {
+          "_id": "YfJ7FAqzHHNYgReL2",
+          "name": "created_at",
+          "pName": "created_at",
+          "domain": "",
+          "type": "TIMESTAMPTZ",
+          "defaultValue": "",
+          "isAllowNull": false,
+          "comment": "",
+          "relEntity": null,
+          "relFieldId": null,
+          "relType": null,
+          "relGroupId": null
+        }
+      ],
+      "keys": {
+        "pks": [],
+        "fks": [
+          {
+            "_id": "XFZuQXzuAQfaxd3Xi",
+            "name": "demand_id",
+            "pName": "demand_id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": "MwctW7XDCttAbT8QW",
+            "relFieldId": "XFCaEmpb6Zoug5b9D",
+            "relType": "ZERO_OR_ONE_OR_MANY",
+            "relGroupId": "xDMx45LvYJsn68oQo"
+          },
+          {
+            "_id": "5p8PaqJc2vK4ysBxC",
+            "name": "demand_board_id",
+            "pName": "demand_board_id",
+            "domain": "",
+            "type": "BIGINT",
+            "defaultValue": "",
+            "isAllowNull": false,
+            "comment": "",
+            "relEntity": "86mCYas6qevpkwAKk",
+            "relFieldId": "4injCiypns7noMKsg",
+            "relType": "ZERO_OR_ONE_OR_MANY",
+            "relGroupId": "QRgLDG57MwMLxK98Z"
+          }
+        ]
+      },
+      "color": "rgba(0, 178, 100, 0.5)"
+    }
+  ],
+  "memoData": [
+    {
+      "_id": "2RTuJXmjfgidk3GWL",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 890,
+        "y": 1840
+      },
+      "content": "index:\n1. \"category_id\" where status = 'OPEN'\n2. \"status\", \"sale_end_at\"",
+      "color": "#B7B055",
+      "width": 322,
+      "height": 109,
+      "minWidth": 251,
+      "minHeight": 96
+    },
+    {
+      "_id": "4S5MK5SDkspB9DFGP",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3410,
+        "y": 2040
+      },
+      "content": "unique:\n1. \"member_id\", \"notification_event_id\"\n\nindex:\n1. \"member_id\" , \"id DESC\"",
+      "color": "#B7B055",
+      "width": 252,
+      "height": 110,
+      "minWidth": 251,
+      "minHeight": 96
+    },
+    {
+      "_id": "5guiXMakisoNoG3Ww",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3500,
+        "y": 2480
+      },
+      "content": "소비자 식별키, 판매자 식별키 테이블은 전부 유니크로 해야함.",
+      "color": "#B7B055",
+      "width": 363,
+      "height": 100,
+      "minWidth": 363,
+      "minHeight": 96
+    },
+    {
+      "_id": "6B5dD97aXQJ4seKGA",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 1570,
+        "y": 1240
+      },
+      "content": "unique:\n1. \"member_id\", \"catalog_id'\nWHERE status IN ('UNASSIGNED', 'SUBSTITUTE_OFFERED', 'ASSIGNED');\n\nindex:\n1. \"member_id\", \"status\"\n2. \"demand_board_id\" WHERE status = 'ASSIGNED';\n3. \"catalog_id\" WHERE status = 'UNASSIGNED'; \n4. \"label\" WHERE status = 'UNASSIGNED'; \n5. \"created_at\"      WHERE status = 'UNASSIGNED';",
+      "color": "#B7B055",
+      "width": 471,
+      "height": 171,
+      "minWidth": 471,
+      "minHeight": 171
+    },
+    {
+      "_id": "9wiPAmfo9PNFWBEFq",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3130,
+        "y": 1660
+      },
+      "content": "unique: \n1. \"login_id\" where deleted_at is NULL\n2. \"nickname\" where deleted_at is NULL",
+      "color": "#B7B055",
+      "width": 247,
+      "height": 100,
+      "minWidth": 16,
+      "minHeight": 16
+    },
+    {
+      "_id": "BEKeGtPN7tazNZLb6",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 1580,
+        "y": 770
+      },
+      "content": "비고: 원래 이용 약관 저장이 따로 되어야 하지만,  포트폴리오를\n위한 프로젝트임을 감안하여 현 해당 기능 및 저장은 하지 않음\n(필요시 추가)",
+      "color": "#B7B055",
+      "width": 397,
+      "height": 100,
+      "minWidth": 397,
+      "minHeight": 96
+    },
+    {
+      "_id": "EKXQzagtqGRygRH7x",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 1020,
+        "y": 1430
+      },
+      "content": "AI는 해당 LABEL에 WHERE 붙여 CLUSTERING 진행\n\nAI는 is_substituable true일 경우 status를 \"SUBSTITUTE_OFFERED\" 으로 바꾸어야 하며,\n연관된 demand_board_id를 넣어주어야 한다.",
+      "color": "#B7B055",
+      "width": 552,
+      "height": 126,
+      "minWidth": 551,
+      "minHeight": 96
+    },
+    {
+      "_id": "HRhw2sG5wa9sGzDj7",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 1810,
+        "y": 3460
+      },
+      "content": "판매자 식별키를 분리?\n\n두 테이블을 join하거나\ndb호출을 2번하거나 해야\n할 것 같으니 그냥 포함하는\n방향으로 가는게 좋을듯함.\n\n그냥 FK가 더 좋을 것 같음",
+      "color": "#B7B055",
+      "width": 169,
+      "height": 140,
+      "minWidth": 169,
+      "minHeight": 140
+    },
+    {
+      "_id": "LE7QrGCsW4o2em4iu",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2140,
+        "y": 1610
+      },
+      "content": "낙찰시 주문에 들어갈 demand들의 상태값을\npayment require로 변경 (수정 시 주문 당담자에게 전달)",
+      "color": "#B7B055",
+      "width": 352,
+      "height": 100,
+      "minWidth": 352,
+      "minHeight": 97
+    },
+    {
+      "_id": "MWzKvwhJGZHRmEnnE",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 4080,
+        "y": 3370
+      },
+      "content": "수신받은 웹훅 저장",
+      "color": "#B7B055",
+      "width": 124,
+      "height": 100,
+      "minWidth": 124,
+      "minHeight": 96
+    },
+    {
+      "_id": "NYRd5rMcjSnH2ymQj",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2990,
+        "y": 3290
+      },
+      "content": "주문은 결제 이전에 공동구매가 생성될 때 자동으로 생성\n\n주문번호는 유니크\n별도의 멱등키를 사용하지 않고 member_id와 group_buy_id의 복합키로\n멱등성을 보장(유니ㅡ)\n\n수요ID도 유니크",
+      "color": "#B7B055",
+      "width": 426,
+      "height": 124,
+      "minWidth": 425,
+      "minHeight": 124
+    },
+    {
+      "_id": "Q4ocoDpAfg4DpFjM3",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2220,
+        "y": 3450
+      },
+      "content": "유니크: 지급 요청 식별자",
+      "color": "#B7B055",
+      "width": 156,
+      "height": 100,
+      "minWidth": 156,
+      "minHeight": 96
+    },
+    {
+      "_id": "QyTM95SKgPQrXesSB",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2790,
+        "y": 2530
+      },
+      "content": "복합키 사용",
+      "color": "#B7B055",
+      "width": 100,
+      "height": 100,
+      "minWidth": 96,
+      "minHeight": 96
+    },
+    {
+      "_id": "RLwagQgCxaHvJAN2K",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 4270,
+        "y": 1870
+      },
+      "content": "unique:\n1. \"type\",\"event_key\"",
+      "color": "#B7B055",
+      "width": 142,
+      "height": 100,
+      "minWidth": 142,
+      "minHeight": 96
+    },
+    {
+      "_id": "YvHJpwYSXGTbGERmJ",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2660,
+        "y": 2350
+      },
+      "content": "unique:\n1. \"member_id\"\n2. \"business_number_hash\" where deleted_at is NULL",
+      "color": "#B7B055",
+      "width": 339,
+      "height": 100,
+      "minWidth": 339,
+      "minHeight": 96
+    },
+    {
+      "_id": "aB4vq425RpsiSCPDH",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 1240,
+        "y": 2700
+      },
+      "content": "unique:\n1.\"product_id\"\n\nindex:\n1. \"demand_baord_id\"",
+      "color": "#B7B055",
+      "width": 229,
+      "height": 109,
+      "minWidth": 148,
+      "minHeight": 96
+    },
+    {
+      "_id": "bfqymxDoBYf3pC9yK",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 1700,
+        "y": 2750
+      },
+      "content": "demand_board table과 catalog_id가 중복되어 저장되지만 \njoin 비용을 줄이기 위해 감수했습니다",
+      "color": "#B7B055",
+      "width": 367,
+      "height": 100,
+      "minWidth": 367,
+      "minHeight": 96
+    },
+    {
+      "_id": "izuSHKADiJpJZEwXa",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2340,
+        "y": 2030
+      },
+      "content": "unique:\n1. COALESCE(parent_id, 0), name",
+      "color": "#B7B055",
+      "width": 219,
+      "height": 100,
+      "minWidth": 219,
+      "minHeight": 96
+    },
+    {
+      "_id": "jt2K49xxnrpRSyzZE",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3730,
+        "y": 1460
+      },
+      "content": "unique:\n\"provider\", \"provider_id\"",
+      "color": "#B7B055",
+      "width": 165,
+      "height": 100,
+      "minWidth": 165,
+      "minHeight": 96
+    },
+    {
+      "_id": "kJeTjYZPDJb9v33yo",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2170,
+        "y": 2420
+      },
+      "content": "unique:\n1. \"seller_id\", \"demand_board_id\" where status \nIN ('BIDDING','AWARDED','ON_SALE','SOLD_OUT')\n\nindex:\n1. \"demand_board_id\"\n2. \"sale_end_at\" where status IN ('ON_SALE','SOLD_OUT')\n3. \"seller_id\"",
+      "color": "#B7B055",
+      "width": 365,
+      "height": 140,
+      "minWidth": 365,
+      "minHeight": 140
+    },
+    {
+      "_id": "kuWExpMQbtf5jTP6f",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2620,
+        "y": 1100
+      },
+      "content": "index: \n1. \"member_id\"\n\nunique:\n1. \"member_id\" where \"is_default\" = TRUE\n\n비고:\n배송지의 경우 주문에서 SNAPSHOT 형태로 저장하기 때문에 삭제시 물리적 삭제",
+      "color": "#B7B055",
+      "width": 506,
+      "height": 141,
+      "minWidth": 505,
+      "minHeight": 141
+    },
+    {
+      "_id": "q4ReKi4YMuNm8gCyb",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 2040,
+        "y": 2110
+      },
+      "content": "unique:\n1. \"name\"",
+      "color": "#B7B055",
+      "width": 100,
+      "height": 100,
+      "minWidth": 96,
+      "minHeight": 96
+    },
+    {
+      "_id": "yZtAKTuhaJZCSuJ9F",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3640,
+        "y": 3430
+      },
+      "content": "결제테이블 생성 -> 토스에 결제 요청 -> 결과를 결제테이블에 저장",
+      "color": "#B7B055",
+      "width": 388,
+      "height": 100,
+      "minWidth": 388,
+      "minHeight": 96
+    },
+    {
+      "_id": "znWzedqu3roPDNwpS",
+      "_diagramId": "cQFR9LiaYP6GEgMCo",
+      "position": {
+        "x": 3840,
+        "y": 1300
+      },
+      "content": "unique:\n\"member_id\"",
+      "color": "#B7B055",
+      "width": 100,
+      "height": 100,
+      "minWidth": 96,
+      "minHeight": 96
+    }
+  ],
+  "domainData": [],
+  "createdAt": "2026-09-14T05:32:42.512Z",
+  "creatorName": "",
+  "creatorThumb": ""
+}

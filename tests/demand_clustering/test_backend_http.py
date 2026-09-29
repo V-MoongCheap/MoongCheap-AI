@@ -60,7 +60,7 @@ def test_lost_response_is_propagated_without_http_retry(contract):
 
     assert len(calls) == 1
     assert calls[0]["headers"] == {
-        "X-Internal-Key": "internal-secret",
+        "X-Internal-Api-Key": "internal-secret",
         "Accept": "application/json",
         "Content-Type": "application/json",
     }
@@ -75,7 +75,7 @@ def test_redirects_and_http_errors_fail_without_resending_or_exposing_key(
     response = response_type()
     response.status_code = status_code
     response.ok = status_code < 400
-    response.text = "request rejected: X-Internal-Key=internal-secret"
+    response.text = "request rejected: X-Internal-Api-Key=internal-secret"
     calls = []
 
     def respond(url, **kwargs):

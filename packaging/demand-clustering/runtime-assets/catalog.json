@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "demand-clustering-image-catalog-seed.v1",
+  "release": "backend-v5-domeggook-20260925",
+  "taxonomyVersion": "v2.2",
+  "categorySeedRowCount": 42,
+  "mappedCategorySeedRowCount": 25,
+  "unmappedCategorySeedRowCount": 17,
+  "catalogRowCount": 1989,
+  "mappedCategoryRowCount": 1890,
+  "unmappedCategoryRowCount": 99,
+  "catalogSha256": "b3b85914ae1b127e84ee746fc02304c3231b62d418e111d2ee9fb70a89d7da3c",
+  "compressedSha256": "220a77f354c85c7c30233c1cd1774ee71b28572f757736f56836d0aa094965f4",
+  "categorySeedSha256": "5a5209aef69b30c8600b9b290631b7cd46c7d8c8bc57ef69dfc94e50b4552e82",
+  "categoryCompressedSha256": "1948917ce386bb516d3d37c2867dab78a0a423ff7a49364c173a5bf6d71962b6",
+  "taxonomySha256": "807a9e8055286812ec2b4350070af8a750d81eb0be573701f83e80c9fad30b6f",
+  "identityContract": "bind v5 name to Backend product_catalog.name by exact match; Backend product_catalog.name is unique",
+  "substitutionPolicy": "same v5 leaf category, explicit name facets, no MFDS claim IDs"
+}

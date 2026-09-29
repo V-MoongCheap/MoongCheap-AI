@@ -11,7 +11,6 @@ import pandas as pd
 from .category_v2 import classify_service_group
 from .health_v1 import split_ingredient_text, split_recognition_number
 
-
 TARGETS = {"VITAMIN_MINERAL": "비타민·미네랄", "OTHER_FUNCTIONAL": "기타 기능성 건강식품"}
 FUNCTION_GROUPS = ("면역력", "피로", "혈행", "기억력", "항산화", "배변", "장 건강", "관절", "눈 건강", "혈당", "체지방", "간 건강", "피부", "콜레스테롤", "혈압", "수면")
 SUBGROUP_RULES = {
@@ -65,7 +64,7 @@ def build_category_detail_analysis(frame: pd.DataFrame, output_dir: Path) -> dic
         _add_rows(rows, key, name, "NORMALIZED_FUNCTIONAL_INGREDIENT_TOP30", ingredient_series, ingredient_frame, denominator=total)
         function_series = category["main_functionality"].map(lambda value: next((term for term in FUNCTION_GROUPS if term in value), "UNCLASSIFIED"))
         _add_rows(rows, key, name, "REGULATED_FUNCTION_GROUP", function_series, category)
-        subgroup_series = category.apply(lambda row: next((group_name for group_name, keywords in SUBGROUP_RULES[key] if any(keyword.casefold() in (row["product_type"] + " " + row["functional_ingredients"] + " " + row["main_functionality"]).casefold() for keyword in keywords)), "UNSPECIFIED"), axis=1)
+        subgroup_series = category.apply(lambda row, category_key=key: next((group_name for group_name, keywords in SUBGROUP_RULES[category_key] if any(keyword.casefold() in (row["product_type"] + " " + row["functional_ingredients"] + " " + row["main_functionality"]).casefold() for keyword in keywords)), "UNSPECIFIED"), axis=1)
         _add_rows(rows, key, name, "CANDIDATE_SUBGROUP", subgroup_series, category, top_n=50)
         report_sections.extend(["", f"## {name}", f"- Category 상품 수: {total:,}건", "- 아래 Group은 자동 분할 결과가 아닌 검토용 후보입니다."])
         report_sections.append("\n### 후보 하위 Group")

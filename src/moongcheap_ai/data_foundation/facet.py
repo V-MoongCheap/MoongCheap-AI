@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import json
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
-
 
 STOPWORDS = {"건강기능식품", "제품", "기능성", "섭취", "도움을 줄 수 있음", "기준", "규격", "제조"}
 
@@ -86,13 +85,13 @@ def preprocess_i2710(raw_dir: Path, output_csv: Path) -> dict[str, int]:
     output = []
     for row in rows:
         output.append({
-            "category_reference_name": _pick(row, "PRDLST_NM", "prdlstNm", "제품명", "categoryName", "분류명"),
+            "category_reference_name": _pick(row, "PRDCT_NM", "PRDLST_NM", "prdlstNm", "제품명", "categoryName", "분류명"),
             "main_functionality": _pick(row, "PRIMARY_FNCLTY", "주된기능성", "functionality"),
-            "daily_intake_min": _pick(row, "MIN_INTAKE", "일일섭취최소량", "min"),
-            "daily_intake_max": _pick(row, "MAX_INTAKE", "일일섭취최대량", "max"),
-            "unit": _pick(row, "UNIT", "단위"),
-            "ingredient_name": _pick(row, "RAWMTRL_NM", "원료명", "ingredient"),
-            "caution": _pick(row, "IFTKN_ATNT_MATTER", "주의사항", "caution"),
+            "daily_intake_min": _pick(row, "DAY_INTK_LOWLIMIT", "MIN_INTAKE", "일일섭취최소량", "min"),
+            "daily_intake_max": _pick(row, "DAY_INTK_HIGHLIMIT", "MAX_INTAKE", "일일섭취최대량", "max"),
+            "unit": _pick(row, "INTK_UNIT", "UNIT", "단위"),
+            "ingredient_name": _pick(row, "SKLL_IX_IRDNT_RAWMTRL", "RAWMTRL_NM", "원료명", "ingredient"),
+            "caution": _pick(row, "IFTKN_ATNT_MATR_CN", "IFTKN_ATNT_MATTER", "주의사항", "caution"),
         })
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(output).to_csv(output_csv, index=False, encoding="utf-8-sig")
@@ -122,7 +121,6 @@ def repeated_terms(df: pd.DataFrame, text_columns: list[str], min_documents: int
 
 def structured_distribution(df: pd.DataFrame, fields: list[str]) -> pd.DataFrame:
     rows = []
-    category_col = "raw_category_name" if "raw_category_name" in df.columns else None
     for field in fields:
         if field not in df.columns:
             continue

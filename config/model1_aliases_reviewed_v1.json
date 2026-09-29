@@ -1,7 +1,7 @@
 {
   "version": "model1-reviewed-aliases-v1",
-  "source": "data\\review\\model1_alias_human_review.csv",
-  "taxonomy": "F:\\kt\\kt\\integration_project\\data\\processed\\downstream_v2_1\\taxonomy_candidate_v2_1.json",
+  "source": "data/review/model1_alias_human_review.csv",
+  "taxonomy": "config/facet_taxonomy_v2_1.json",
   "taxonomy_is_modified": false,
   "aliases": [
     {

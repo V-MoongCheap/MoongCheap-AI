@@ -8,7 +8,10 @@
 2. Demand Cluster–Seller Offer Matching
 3. Seller Demand Analysis
 
-현재 작업 Branch에는 AI-Hub 점검, 관측된 KAN Category 처리, 상품 staging 및 식별, MFDS 수집·파싱, Rule 기반 Facet 후보 도출 V0가 포함되어 있습니다. Clustering과 Seller Matching은 아직 구현하지 않았습니다.
+현재 작업 Branch에는 상품·Category·MFDS Facet 근거 처리, Model 1 Taxonomy 후보 생성,
+Model 2 Demand Labeling, Demand Clustering baseline, Seller Matching baseline,
+Seller Demand Analysis 및 로컬 E2E 검증이 포함되어 있습니다. 실제 Backend DB와
+Cloud 배포 연결은 별도 연동 단계입니다.
 
 Implementation lives under `src/moongcheap_ai`; data, Category, Facet, and Labeling additions belong under `src/moongcheap_ai/data_foundation/`, with matching tests under `tests/data_foundation/`.
 

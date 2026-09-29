@@ -24,7 +24,7 @@ NAVER_API_HUB_CLIENT_SECRET
 먼저 요청만 검토한다.
 
 ```powershell
-python .git_upload_workspace/scripts/facet/collect_naver_shopping_insight.py `
+python scripts/facet/collect_naver_shopping_insight.py `
   --category-map data/config/naver_category_map.json `
   --dry-run
 ```
@@ -32,7 +32,7 @@ python .git_upload_workspace/scripts/facet/collect_naver_shopping_insight.py `
 실제 호출:
 
 ```powershell
-python .git_upload_workspace/scripts/facet/collect_naver_shopping_insight.py `
+python scripts/facet/collect_naver_shopping_insight.py `
   --category-map data/config/naver_category_map.json
 ```
 

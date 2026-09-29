@@ -1,0 +1,16 @@
+case_id,category_id,extra_requirement,is_substitutable
+powder-alias,health-functional-food:probiotics,가루면 좋겠어요.,true
+capsule-alias,health-functional-food:probiotics,알약 제품이면 좋겠어요.,true
+tablet-alias,health-functional-food:probiotics,정제 제품이면 좋겠어요.,true
+daily-once,health-functional-food:probiotics,하루 한 번 먹는 제품이면 좋겠어요.,true
+daily-twice,health-functional-food:probiotics,하루 두 번 먹는 제품이면 좋겠어요.,true
+daily-three,health-functional-food:probiotics,하루 세 번 먹는 제품이면 좋겠어요.,true
+daily-four,health-functional-food:probiotics,하루 네 번 먹는 제품이면 좋겠어요.,true
+mixed-frequency,health-functional-food:probiotics,분말이면서 하루 한 번 먹는 제품이면 좋겠어요.,true
+compound-ingredient,health-functional-food:probiotics,프로바이오틱스와 아연이면 좋겠어요.,true
+must,health-functional-food:probiotics,반드시 분말 제품으로 부탁해요.,true
+exclude,health-functional-food:probiotics,분말은 제외해주세요.,true
+any-of,health-functional-food:probiotics,분말 또는 캡슐도 괜찮아요.,true
+free-text,health-functional-food:probiotics,딸기맛 제품이면 좋겠어요.,true
+no-consent,health-functional-food:probiotics,분말 제품이면 좋겠어요.,false
+no-requirement,health-functional-food:probiotics,,true

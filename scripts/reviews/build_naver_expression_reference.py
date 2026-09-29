@@ -29,7 +29,13 @@ FACET_SEEDS = {
 # conservative so a reviewer can see the exact sentence that produced them.
 CANDIDATE_PATTERNS = {
     "ingredient_inclusion": ["성분이 좋", "원료가 좋", "함량이 높", "영양성분"],
-    "intake_convenience": ["먹기 편", "복용하기 편", "간편하게 먹", "챙겨 먹기", "간편히"],
+    "intake_convenience": [
+        "먹기 편",
+        "복용하기 편",
+        "간편하게 먹",
+        "챙겨 먹기",
+        "간편히",
+    ],
     "odor": ["비린내", "냄새가 나", "냄새가 없", "냄새가 안", "향이"],
     "packaging": ["개별 포장", "한 포씩", "스틱 포장", "포장이", "포장도"],
     "product_form": ["캡슐", "알약", "정제", "액상", "분말", "가루"],
@@ -38,8 +44,12 @@ CANDIDATE_PATTERNS = {
     "taste": ["쓴맛", "단맛", "뒷맛", "맛이", "맛은"],
 }
 
-MEDICAL_EXPRESSION = re.compile(r"효과|효능|치료|개선|완화|질환|증상|혈압|혈당|콜레스테롤|면역|관절|간건강|눈건강")
-UNRELATED_CONTEXT = re.compile(r"옷|신발|의자|가구|휴대폰|노트북|노트북|게임|자동차|강아지|고양이|화장품|립|샴푸|마스크|충전|이어폰")
+MEDICAL_EXPRESSION = re.compile(
+    r"효과|효능|치료|개선|완화|질환|증상|혈압|혈당|콜레스테롤|면역|관절|간건강|눈건강"
+)
+UNRELATED_CONTEXT = re.compile(
+    r"옷|신발|의자|가구|휴대폰|노트북|노트북|게임|자동차|강아지|고양이|화장품|립|샴푸|마스크|충전|이어폰"
+)
 
 
 def _similarity(seed: str, candidate: str) -> float:
@@ -47,7 +57,9 @@ def _similarity(seed: str, candidate: str) -> float:
     candidate_chars = set(candidate.replace(" ", ""))
     if not seed_chars or not candidate_chars:
         return 0.0
-    return round(len(seed_chars & candidate_chars) / len(seed_chars | candidate_chars), 3)
+    return round(
+        len(seed_chars & candidate_chars) / len(seed_chars | candidate_chars), 3
+    )
 
 
 def _sentence_context(text: str, phrase: str, width: int = 100) -> str:
@@ -62,7 +74,15 @@ def _sentence_context(text: str, phrase: str, width: int = 100) -> str:
 def _load_corpus(path: Path) -> tuple[pd.DataFrame, dict[str, object]]:
     raw = path.read_bytes()
     sha256 = hashlib.sha256(raw).hexdigest()
-    frame = pd.read_csv(path, sep="\t", header=None, names=["rating", "review_text"], encoding="utf-8", dtype=str, keep_default_na=False)
+    frame = pd.read_csv(
+        path,
+        sep="\t",
+        header=None,
+        names=["rating", "review_text"],
+        encoding="utf-8",
+        dtype=str,
+        keep_default_na=False,
+    )
     text = frame["review_text"].astype(str)
     audit = {
         "filename": path.name,
@@ -89,12 +109,21 @@ def _load_corpus(path: Path) -> tuple[pd.DataFrame, dict[str, object]]:
 
 def _supported_facets(queue_path: Path) -> list[tuple[str, str]]:
     queue = pd.read_csv(queue_path, dtype=str).fillna("")
-    count = pd.to_numeric(queue.get("review_source_count", 0), errors="coerce").fillna(0)
-    selected = queue[count.gt(0)][["facet_candidate", "value_candidate"]].drop_duplicates()
-    return [(str(row.facet_candidate), str(row.value_candidate)) for row in selected.itertuples()]
+    count = pd.to_numeric(queue.get("review_source_count", 0), errors="coerce").fillna(
+        0
+    )
+    selected = queue[count.gt(0)][
+        ["facet_candidate", "value_candidate"]
+    ].drop_duplicates()
+    return [
+        (str(row.facet_candidate), str(row.value_candidate))
+        for row in selected.itertuples()
+    ]
 
 
-def build_candidates(corpus: pd.DataFrame, supported: list[tuple[str, str]]) -> tuple[pd.DataFrame, dict[str, dict[str, int]]]:
+def build_candidates(
+    corpus: pd.DataFrame, supported: list[tuple[str, str]]
+) -> tuple[pd.DataFrame, dict[str, dict[str, int]]]:
     rows: list[dict[str, object]] = []
     summary: dict[str, dict[str, int]] = {}
     for facet_id, value_candidate in supported:
@@ -104,7 +133,11 @@ def build_candidates(corpus: pd.DataFrame, supported: list[tuple[str, str]]) -> 
         relevant_sentences = 0
         for item in corpus.itertuples(index=False):
             text = str(item.review_text).strip()
-            if not text or MEDICAL_EXPRESSION.search(text) or UNRELATED_CONTEXT.search(text):
+            if (
+                not text
+                or MEDICAL_EXPRESSION.search(text)
+                or UNRELATED_CONTEXT.search(text)
+            ):
                 continue
             matched_seeds = [seed for seed in seeds if seed in text]
             if not matched_seeds:
@@ -125,7 +158,9 @@ def build_candidates(corpus: pd.DataFrame, supported: list[tuple[str, str]]) -> 
                         "proposed_alias": "",
                         "reviewer_decision": "PENDING_REVIEW",
                     }
-                facet_rows[key]["occurrence_count"] = int(facet_rows[key]["occurrence_count"]) + 1
+                facet_rows[key]["occurrence_count"] = (
+                    int(facet_rows[key]["occurrence_count"]) + 1
+                )
         for row in facet_rows.values():
             row["value_candidate"] = value_candidate
             rows.append(row)
@@ -135,18 +170,33 @@ def build_candidates(corpus: pd.DataFrame, supported: list[tuple[str, str]]) -> 
             "related_sentence_count": relevant_sentences,
             "review_queue_count": len(facet_rows),
         }
-    columns = ["facet_id", "value_candidate", "seed_expression", "candidate_expression", "example_sentence", "occurrence_count", "semantic_similarity", "proposed_alias", "reviewer_decision"]
+    columns = [
+        "facet_id",
+        "value_candidate",
+        "seed_expression",
+        "candidate_expression",
+        "example_sentence",
+        "occurrence_count",
+        "semantic_similarity",
+        "proposed_alias",
+        "reviewer_decision",
+    ]
     return pd.DataFrame(rows, columns=columns), summary
 
 
-def build_report(audit: dict[str, object], summary: dict[str, dict[str, int]], output: Path, raw_path: Path) -> None:
+def build_report(
+    audit: dict[str, object],
+    summary: dict[str, dict[str, int]],
+    output: Path,
+    raw_path: Path,
+) -> None:
     lines = [
         "# Naver Shopping Expression Reference",
         "",
         "이 자료는 한국 쇼핑 리뷰 표현과 Alias 후보를 탐색하기 위한 참고 데이터다. 건강기능식품 리뷰로 분류하지 않으며 HFF Facet Consumer Salience Count에 포함하지 않는다.",
         "",
         "## Raw Audit",
-        f"- source_type: `KOREAN_SHOPPING_REVIEW_EXPRESSION_REFERENCE`",
+        "- source_type: `KOREAN_SHOPPING_REVIEW_EXPRESSION_REFERENCE`",
         f"- raw_path: `{raw_path}`",
         f"- row_count: {audit['row_count']}",
         f"- columns: `{audit['columns']}`",
@@ -171,7 +221,9 @@ def build_report(audit: dict[str, object], summary: dict[str, dict[str, int]], o
         "|---|---:|---:|---:|---:|",
     ]
     for key, values in summary.items():
-        lines.append(f"| {key} | {values['seed_expression_count']} | {values['candidate_alias_count']} | {values['related_sentence_count']} | {values['review_queue_count']} |")
+        lines.append(
+            f"| {key} | {values['seed_expression_count']} | {values['candidate_alias_count']} | {values['related_sentence_count']} | {values['review_queue_count']} |"
+        )
     lines += [
         "",
         "## Limitations",
@@ -187,8 +239,18 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--review-queue", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=Path("data/processed/expression_reference/naver_shopping_facet_alias_candidates.csv"))
-    parser.add_argument("--report", type=Path, default=Path("reports/naver_shopping_expression_reference.md"))
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path(
+            "data/processed/expression_reference/naver_shopping_facet_alias_candidates.csv"
+        ),
+    )
+    parser.add_argument(
+        "--report",
+        type=Path,
+        default=Path("reports/naver_shopping_expression_reference.md"),
+    )
     args = parser.parse_args()
     corpus, audit = _load_corpus(args.input)
     supported = _supported_facets(args.review_queue)
@@ -196,7 +258,17 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     candidates.to_csv(args.output, index=False, encoding="utf-8-sig")
     build_report(audit, summary, args.report, args.input)
-    print({"status": "COMPLETED", "rows": audit["row_count"], "usable_rows": int(corpus.review_text.astype(str).str.strip().ne("").sum()), "supported_facet_count": len(supported), "candidate_count": len(candidates), "output": str(args.output), "report": str(args.report)})
+    print(
+        {
+            "status": "COMPLETED",
+            "rows": audit["row_count"],
+            "usable_rows": int(corpus.review_text.astype(str).str.strip().ne("").sum()),
+            "supported_facet_count": len(supported),
+            "candidate_count": len(candidates),
+            "output": str(args.output),
+            "report": str(args.report),
+        }
+    )
     return 0
 
 
