@@ -54,6 +54,12 @@ python -m moongcheap_ai.data_foundation.runtime_job `
 - `A_LLM_RETRIES`: 배치 요청 재시도 횟수. 기본값은 `2`이며, 재시도 후에도
   실패한 배치는 더 작은 단위로 분할하여 다른 수요의 처리를 계속한다.
 
+`--write-db`로 Backend PostgreSQL을 직접 읽는 운영 경로에서는 Reader가 함께
+조회한 `category.facet` TEXT(JSON 문자열)로 Taxonomy를 메모리에서 구성한다.
+따라서 이 경로는 로컬 Taxonomy 파일이 없어도 동작하며, 이미지에는 Rule 파일과
+B 호환 Alias 파일(`config/demand_constraint_aliases.json`)을 함께 포함해야 한다.
+CSV dry-run 또는 고정 Artifact 검증에서는 `A_TAXONOMY_PATH`를 사용한다.
+
 Model 2 통신 계약은 현재 Ollama HTTP API를 기준으로 한다.
 
 - Method: `POST`

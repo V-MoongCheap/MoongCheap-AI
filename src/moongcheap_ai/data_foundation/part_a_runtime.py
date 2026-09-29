@@ -119,7 +119,14 @@ def run_part_a_batch(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Parse a batch and return only Part A's typed contract output."""
 
-    taxonomy = TaxonomyLoader.from_path(taxonomy_path)
+    if taxonomy_payload is not None:
+        # Production Labeling reads category.facet from Backend and builds the
+        # taxonomy in memory. Do not require a local artifact in that mode.
+        taxonomy = TaxonomyLoader(dict(taxonomy_payload))
+    elif taxonomy_path is not None:
+        taxonomy = TaxonomyLoader.from_path(taxonomy_path)
+    else:
+        raise ValueError("taxonomy_path or taxonomy_payload is required")
     payload = taxonomy.taxonomy
     parser = DemandConstraintParser.from_taxonomy(
         payload,
