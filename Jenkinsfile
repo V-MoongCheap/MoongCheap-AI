@@ -427,6 +427,7 @@ pipeline {
 
                                 uv sync \
                                   --project packaging/a-labeling \
+                                  --python 3.13.12 \
                                   --locked \
                                   --extra dev
 
@@ -534,6 +535,7 @@ pipeline {
 
                                 uv sync \
                                   --project packaging/demand-clustering \
+                                  --python 3.13.12 \
                                   --locked \
                                   --extra data \
                                   --extra dev
@@ -642,6 +644,7 @@ pipeline {
 
                         ./trivy fs \
                           --severity HIGH,CRITICAL \
+                          --ignorefile .trivyignore.yaml \
                           --exit-code 1 \
                           .
                     '''
@@ -695,6 +698,7 @@ pipeline {
 
                         ./gitleaks dir \
                           . \
+                          --config .gitleaks.toml \
                           --exit-code 1 \
                           --redact
                     '''
@@ -1321,17 +1325,17 @@ pipeline {
 
                             ASKPASS="$(pwd)/git-askpass.sh"
 
-                            cat > "$ASKPASS" <<'EOF'
-                              #!/bin/sh
-                              case "$1" in
-                                *Username*)
-                                  printf '%s\\n' "$GIT_USER"
-                                  ;;
-                                *Password*)
-                                  printf '%s\\n' "$GIT_TOKEN"
-                                  ;;
-                              esac
-                              EOF
+                            printf '%s\n' \
+                              '#!/bin/sh' \
+                              'case "$1" in' \
+                              '  *Username*)' \
+                              '    printf "%s\\n" "$GIT_USER"' \
+                              '    ;;' \
+                              '  *Password*)' \
+                              '    printf "%s\\n" "$GIT_TOKEN"' \
+                              '    ;;' \
+                              'esac' \
+                              > "$ASKPASS"
 
                             chmod 700 "$ASKPASS"
 

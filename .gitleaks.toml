@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Pinned public model artifact SHA-256 checksums"
+paths = [
+  '''^packaging/demand-clustering/runtime-assets/model\.json$''',
+]
