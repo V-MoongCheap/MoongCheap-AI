@@ -429,12 +429,21 @@ pipeline {
                                   --project packaging/a-labeling \
                                   --python 3.13.12 \
                                   --locked \
+                                  --extra data \
                                   --extra dev
+
+                                # The A project runs the repository-wide suite;
+                                # translation tests need this test-only package.
+                                uv pip install \
+                                  --python packaging/a-labeling/.venv/bin/python \
+                                  'pypinyin>=0.55,<1'
 
                                 uv run \
                                   --project packaging/a-labeling \
                                   --no-sync \
-                                  pytest -q
+                                  pytest \
+                                  -c packaging/a-labeling/pyproject.toml \
+                                  -q
                             '''
                         }
                     }
