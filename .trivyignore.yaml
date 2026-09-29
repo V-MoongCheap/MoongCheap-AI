@@ -1,0 +1,8 @@
+vulnerabilities:
+  - id: CVE-2026-25087
+    paths:
+      - packaging/a-labeling/uv.lock
+    statement: >-
+      pyarrow is present only in the optional data extra and is not installed
+      in the A-labeling runtime image; the Part A owner must review the upgrade.
+    expired_at: 2026-10-31

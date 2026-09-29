@@ -427,13 +427,23 @@ pipeline {
 
                                 uv sync \
                                   --project packaging/a-labeling \
+                                  --python 3.13.12 \
                                   --locked \
+                                  --extra data \
                                   --extra dev
+
+                                # The A project runs the repository-wide suite;
+                                # translation tests need this test-only package.
+                                uv pip install \
+                                  --python packaging/a-labeling/.venv/bin/python \
+                                  'pypinyin>=0.55,<1'
 
                                 uv run \
                                   --project packaging/a-labeling \
                                   --no-sync \
-                                  pytest -q
+                                  pytest \
+                                  -c packaging/a-labeling/pyproject.toml \
+                                  -q
                             '''
                         }
                     }
@@ -534,6 +544,7 @@ pipeline {
 
                                 uv sync \
                                   --project packaging/demand-clustering \
+                                  --python 3.13.12 \
                                   --locked \
                                   --extra data \
                                   --extra dev
@@ -618,6 +629,16 @@ pipeline {
                     sh '''
                         set -eu
 
+                        export DEBIAN_FRONTEND=noninteractive
+
+                        apt-get update -qq
+                        apt-get install -y -qq \
+                          --no-install-recommends \
+                          ca-certificates \
+                          curl
+
+                        rm -rf /var/lib/apt/lists/*
+
                         TRIVY_VERSION=0.74.0
 
                         curl -fSL \
@@ -632,6 +653,7 @@ pipeline {
 
                         ./trivy fs \
                           --severity HIGH,CRITICAL \
+                          --ignorefile .trivyignore.yaml \
                           --exit-code 1 \
                           .
                     '''
@@ -661,6 +683,16 @@ pipeline {
                     sh '''
                         set -eu
 
+                        export DEBIAN_FRONTEND=noninteractive
+
+                        apt-get update -qq
+                        apt-get install -y -qq \
+                          --no-install-recommends \
+                          ca-certificates \
+                          curl
+
+                        rm -rf /var/lib/apt/lists/*
+
                         GITLEAKS_VERSION=8.21.2
 
                         curl -fSL \
@@ -675,6 +707,7 @@ pipeline {
 
                         ./gitleaks dir \
                           . \
+                          --config .gitleaks.toml \
                           --exit-code 1 \
                           --redact
                     '''
@@ -1301,17 +1334,17 @@ pipeline {
 
                             ASKPASS="$(pwd)/git-askpass.sh"
 
-                            cat > "$ASKPASS" <<'EOF'
-                              #!/bin/sh
-                              case "$1" in
-                                *Username*)
-                                  printf '%s\\n' "$GIT_USER"
-                                  ;;
-                                *Password*)
-                                  printf '%s\\n' "$GIT_TOKEN"
-                                  ;;
-                              esac
-                              EOF
+                            printf '%s\\n' \
+                              '#!/bin/sh' \
+                              'case "$1" in' \
+                              '  *Username*)' \
+                              '    printf "%s\\n" "$GIT_USER"' \
+                              '    ;;' \
+                              '  *Password*)' \
+                              '    printf "%s\\n" "$GIT_TOKEN"' \
+                              '    ;;' \
+                              'esac' \
+                              > "$ASKPASS"
 
                             chmod 700 "$ASKPASS"
 
