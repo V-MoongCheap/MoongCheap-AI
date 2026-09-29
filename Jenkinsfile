@@ -1638,44 +1638,147 @@ pipeline {
 
 
                             # ========================================
-                            # Auto Merge
+                            # Merge Pull Request
                             # ========================================
 
-                            GRAPHQL_QUERY="$(printf \
-                              '{"query":"mutation { enablePullRequestAutoMerge(input: {pullRequestId: \\"%s\\", mergeMethod: SQUASH}) { pullRequest { number autoMergeRequest { enabledAt } } } }"}' \
-                              "$PR_NODE_ID")"
+                            MERGED=false
 
 
-                            MERGE_RESPONSE="$(curl \
-                              --fail-with-body \
-                              -sS \
-                              -X POST \
-                              -H "Authorization: Bearer ${GIT_TOKEN}" \
-                              -H "Content-Type: application/json" \
-                              "https://api.github.com/graphql" \
-                              -d "$GRAPHQL_QUERY")"
+                            # GitHub may still be calculating mergeability
+                            # immediately after creating the pull request.
+                            PR_MERGEABLE="pending"
 
 
-                            GRAPHQL_ERRORS="$(printf '%s' \
-                              "$MERGE_RESPONSE" |
-                              node -pe \
-                              'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.errors ? JSON.stringify(x.errors) : ""')"
+                            for i in $(seq 1 12)
+                            do
 
 
-                            if [ -n "$GRAPHQL_ERRORS" ]; then
+                                PR_MERGEABILITY_RESPONSE="$(curl \
+                                  --fail-with-body \
+                                  -sS \
+                                  -H "Authorization: Bearer ${GIT_TOKEN}" \
+                                  -H "Accept: application/vnd.github+json" \
+                                  "https://api.github.com/repos/${GITOPS_API_REPO}/pulls/${PR_NUMBER}")"
+
+
+                                PR_MERGEABLE="$(printf '%s' \
+                                  "$PR_MERGEABILITY_RESPONSE" |
+                                  node -pe \
+                                  'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.mergeable === null ? "pending" : String(x.mergeable)')"
+
+
+                                PR_MERGEABLE_STATE="$(printf '%s' \
+                                  "$PR_MERGEABILITY_RESPONSE" |
+                                  node -pe \
+                                  'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.mergeable_state || "unknown"')"
+
+
+                                if [ "$PR_MERGEABLE" != "pending" ] && \
+                                   [ "$PR_MERGEABLE_STATE" != "unknown" ]; then
+
+                                    break
+                                fi
+
 
                                 echo \
-                                  "Auto Merge 활성화 실패: $GRAPHQL_ERRORS"
+                                  "GitOps PR Merge 가능 여부 확인 중... (${i}/12)"
 
-                                exit 1
+                                sleep 5
+                            done
+
+
+                            # An unprotected branch can be merged immediately.
+                            # Auto-merge is only valid when branch rules require
+                            # reviews or status checks that are still pending.
+                            if [ "$PR_MERGEABLE" = "true" ] && \
+                               [ "$PR_MERGEABLE_STATE" = "clean" ]; then
+
+                                DIRECT_MERGE_JSON="$(printf \
+                                  '{"merge_method":"squash","commit_title":"%s"}' \
+                                  "$PR_TITLE")"
+
+
+                                DIRECT_MERGE_RESPONSE="$(curl \
+                                  -sS \
+                                  -X PUT \
+                                  -H "Authorization: Bearer ${GIT_TOKEN}" \
+                                  -H "Accept: application/vnd.github+json" \
+                                  -H "Content-Type: application/json" \
+                                  "https://api.github.com/repos/${GITOPS_API_REPO}/pulls/${PR_NUMBER}/merge" \
+                                  -d "$DIRECT_MERGE_JSON")"
+
+
+                                DIRECT_MERGED="$(printf '%s' \
+                                  "$DIRECT_MERGE_RESPONSE" |
+                                  node -pe \
+                                  'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); String(x.merged === true)')"
+
+
+                                if [ "$DIRECT_MERGED" = "true" ]; then
+
+                                    MERGED=true
+
+                                    echo \
+                                      "GitOps PR 즉시 Merge 완료: #${PR_NUMBER}"
+
+                                else
+
+                                    DIRECT_MERGE_MESSAGE="$(printf '%s' \
+                                      "$DIRECT_MERGE_RESPONSE" |
+                                      node -pe \
+                                      'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.message || "unknown error"')"
+
+                                    echo \
+                                      "GitOps PR 즉시 Merge 불가 (${PR_MERGEABLE_STATE}): ${DIRECT_MERGE_MESSAGE}"
+                                fi
+
+                            else
+
+                                echo \
+                                  "GitOps PR 즉시 Merge 불가: mergeable=${PR_MERGEABLE}, state=${PR_MERGEABLE_STATE}"
+                            fi
+
+
+                            if [ "$MERGED" != "true" ]; then
+
+                                GRAPHQL_QUERY="$(printf \
+                                  '{"query":"mutation { enablePullRequestAutoMerge(input: {pullRequestId: \\"%s\\", mergeMethod: SQUASH}) { pullRequest { number autoMergeRequest { enabledAt } } } }"}' \
+                                  "$PR_NODE_ID")"
+
+
+                                MERGE_RESPONSE="$(curl \
+                                  --fail-with-body \
+                                  -sS \
+                                  -X POST \
+                                  -H "Authorization: Bearer ${GIT_TOKEN}" \
+                                  -H "Content-Type: application/json" \
+                                  "https://api.github.com/graphql" \
+                                  -d "$GRAPHQL_QUERY")"
+
+
+                                GRAPHQL_ERRORS="$(printf '%s' \
+                                  "$MERGE_RESPONSE" |
+                                  node -pe \
+                                  'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.errors ? JSON.stringify(x.errors) : ""')"
+
+
+                                if [ -n "$GRAPHQL_ERRORS" ]; then
+
+                                    echo \
+                                      "Auto Merge 활성화 실패: $GRAPHQL_ERRORS"
+
+                                    exit 1
+                                fi
+
+
+                                echo \
+                                  "GitOps PR Auto Merge 활성화 완료: #${PR_NUMBER}"
                             fi
 
 
                             # ========================================
                             # Wait for Merge
                             # ========================================
-
-                            MERGED=false
 
 
                             for i in $(seq 1 30)
