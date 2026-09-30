@@ -127,20 +127,8 @@ def test_runtime_splits_failed_llm_batches_and_processes_every_row(tmp_path, mon
     )
 
     assert len(labeled) == 3
-    assert set(labeled["llm_status"]) == {"APPLIED"}
-    assert set(labeled["label_status"]) == {"LABELED"}
-    # Exercise the writer boundary: an accepted model result must not fail
-    # validation before reaching PostgreSQL.
-    from unittest.mock import MagicMock
-
-    from moongcheap_ai.data_foundation.postgres_writer import write_label_results
-
-    connection = MagicMock()
-    connection.cursor.return_value.__enter__.return_value.rowcount = 1
-    assert write_label_results(
-        connection, labeled.to_dict("records"), processed_at="2026-09-30T00:00:00Z"
-    ) == 3
-    connection.commit.assert_called_once()
+    assert set(labeled["llm_status"]) == {"REVIEW"}
+    assert set(labeled["label_status"]) == {"REVIEW"}
     assert FlakyLabeler.call_count > 3
 
 
@@ -167,12 +155,35 @@ def test_first_fallback_decision_is_not_overridden_by_second_call(tmp_path, monk
     frame = pd.DataFrame([{"demand_id": "1", "catalog_id": "1", "category_id": "c1", "extra_requirement": "조건 확인"}])
     labeled, _ = run_batch(frame, tmp_path / "unused.json", taxonomy_payload=taxonomy, model2_fallback_enabled=True)
     assert Labeler.calls == 1
-    assert labeled.loc[0, "label_status"] == ("LABELED" if outcome == "accepted" else "REVIEW")
+    assert labeled.loc[0, "label_status"] == "REVIEW"
     summary = labeled.attrs["model2_fallback"]
     assert summary["calls"] == 1
-    assert summary["applied"] == int(outcome == "accepted")
+    assert summary["applied"] == 0
     assert summary["failed"] == int(outcome == "unavailable")
-    assert summary["review"] == int(outcome == "review")
+    assert summary["review"] == int(outcome != "unavailable")
+
+
+def test_model_cannot_turn_unrelated_text_into_a_facet(tmp_path, monkeypatch) -> None:
+    taxonomy = {"categories": [{"category_id": "c1", "facets": [{
+        "facet_id": 1, "name": "form", "order": 1,
+        "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "분말"}],
+    }]}]}
+
+    class Labeler:
+        call_count = 0
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def classify(self, rows, loader):
+            self.call_count += 1
+            return {"1": {"form": {"code": 1}}}
+
+    monkeypatch.setattr(runtime_job, "OllamaDemandLabeler", Labeler)
+    frame = pd.DataFrame([{"demand_id": "1", "catalog_id": "1", "category_id": "c1", "extra_requirement": "내일까지 배송해주세요"}])
+    labeled, _ = run_batch(frame, tmp_path / "unused.json", taxonomy_payload=taxonomy, model2_fallback_enabled=True)
+    assert labeled.loc[0, "label_status"] == "REVIEW"
+    assert labeled.loc[0, "fallback_status"] == "REVIEW"
 
 
 def test_label_runtime_builds_backend_payload(tmp_path) -> None:

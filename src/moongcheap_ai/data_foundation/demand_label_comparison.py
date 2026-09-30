@@ -202,6 +202,22 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
             continue
         value = values[0]
         defaults[facet_name] = {"code": int(value["code"]), "value": value.get("value", ""), "matched_alias": "LLM"}
+    requirement = str(row.get("extra_requirement", "")).strip().casefold()
+    selected = [
+        value
+        for facet_name, value in defaults.items()
+        if int(value.get("code", 0) or 0) != 0
+    ]
+    if requirement and selected:
+        evidence = set()
+        for facet_values in allowed.values():
+            for value in facet_values:
+                if int(value.get("code", 0) or 0) == 0:
+                    continue
+                evidence.add(str(value.get("value", "")).strip().casefold())
+                evidence.update(str(alias).strip().casefold() for alias in value.get("aliases", []))
+        if not any(token and token in requirement for token in evidence):
+            warnings.append("LLM result has no taxonomy text evidence")
     return defaults, warnings
 
 

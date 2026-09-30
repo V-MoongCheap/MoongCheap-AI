@@ -269,10 +269,10 @@ def test_runtime_job_uses_qwen_only_for_unresolved_rows(tmp_path, monkeypatch):
 
     assert len(calls) == 1
     assert calls[0][0]["demand_id"] == "fallback"
-    assert result.set_index("demand_id").loc["parsed", "interpretation_method"] != "RULE_FIRST_QWEN_FALLBACK"
-    assert result.set_index("demand_id").loc["fallback", "status"] == "PARSED"
-    assert result.set_index("demand_id").loc["fallback", "label"] == "1"
-    assert result.set_index("demand_id").loc["fallback", "fallback_status"] == "ACCEPTED"
+    assert result.set_index("demand_id").loc["parsed", "fallback_status"] == ""
+    assert result.set_index("demand_id").loc["fallback", "status"] == "REVIEW"
+    assert result.set_index("demand_id").loc["fallback", "fallback_status"] == "REVIEW"
+    assert "no taxonomy text evidence" in result.set_index("demand_id").loc["fallback", "fallback_warning"]
 
 
 def test_runtime_job_keeps_unavailable_qwen_rows_in_review(tmp_path, monkeypatch):
@@ -285,7 +285,9 @@ def test_runtime_job_keeps_unavailable_qwen_rows_in_review(tmp_path, monkeypatch
             pass
 
         def classify(self, rows, loader):
-            from moongcheap_ai.data_foundation.demand_label_comparison import LLMLabelingError
+            from moongcheap_ai.data_foundation.demand_label_comparison import (
+                LLMLabelingError,
+            )
             raise LLMLabelingError("ollama unavailable")
 
     monkeypatch.setattr("moongcheap_ai.data_foundation.runtime_job.OllamaDemandLabeler", UnavailableQwen)
