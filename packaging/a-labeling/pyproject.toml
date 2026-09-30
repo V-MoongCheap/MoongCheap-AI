@@ -23,6 +23,7 @@ dev = [
     "pytest>=8,<9",
     "jsonschema>=4,<5",
     "PyYAML>=6,<7",
+    "pypinyin>=0.55,<1",
     "ruff>=0.11,<1",
 ]
 
