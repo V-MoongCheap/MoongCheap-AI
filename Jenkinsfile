@@ -442,7 +442,7 @@ pipeline {
                                   --locked \
                                   --extra dev
 
-                                uv run \
+                                PYTHONPATH=. uv run \
                                   --project packaging/a-labeling \
                                   --no-sync \
                                   pytest -q
