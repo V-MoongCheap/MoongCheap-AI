@@ -215,6 +215,10 @@ pipeline {
                                 'scripts/awarding/'
                             ) ||
 
+                            file.startsWith(
+                                'tests/seller_matching/'
+                            ) ||
+
                             file ==
                                 'docker/Dockerfile.awarding' ||
 
@@ -283,6 +287,8 @@ pipeline {
                                 file.startsWith('src/') ||
 
                                 file.startsWith('docs/contracts/') ||
+
+                                file.startsWith('tests/seller_analysis/') ||
 
                                 file ==
                                     'docker/Dockerfile.seller-analysis' ||
