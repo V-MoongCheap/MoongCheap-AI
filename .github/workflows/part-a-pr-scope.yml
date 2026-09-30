@@ -1,4 +1,4 @@
-name: Part A PR scope
+name: Shared policy boundary
 
 on:
   pull_request:

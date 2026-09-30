@@ -24,7 +24,15 @@ def test_shared_policy_change_requires_explicit_marker() -> None:
     ) == []
 
 
-def test_part_b_owned_runtime_change_is_rejected() -> None:
-    errors = validate_scope(["docker/Dockerfile.demand-clustering"])
-    assert errors
-    assert "Part B-owned" in errors[0]
+def test_part_b_runtime_change_is_allowed_in_a_shared_repository() -> None:
+    assert validate_scope(["docker/Dockerfile.demand-clustering"]) == []
+
+
+def test_mixed_part_changes_are_allowed_when_shared_policy_is_unchanged() -> None:
+    assert validate_scope(
+        [
+            "src/moongcheap_ai/data_foundation/model1.py",
+            "src/moongcheap_ai/demand_clustering/runtime_job.py",
+            "docker/Dockerfile.seller-analysis",
+        ]
+    ) == []
