@@ -94,6 +94,9 @@ Backend API를 거치지 않고 직접 DB에 반영한다.
   필수 아키텍처로 지정하지 않으며, Ollama의 배치·수명주기는 Cloud 배포 설정을 따른다.
 - Rule이 처리한 행은 LLM으로 덮어쓰지 않는다. 모델 후보는 unresolved positive 요청에
   한정하며, 명시적 제외·충돌·부정·대조·대안 표현은 모델에 보내지 않고 검토 상태로 둔다.
+- A 전용 정책은 같은 Facet의 값이 여러 개 등장하는 부정·대조·비교 문장을 자동 확정하지
+  않는다. 해석이 뒤집힐 수 있는 문장은 `NEGATIVE_CONTRAST_UNRESOLVED`로 `REVIEW`에 두고,
+  `processed_at`을 기록하지 않아 이후 재처리 가능하게 한다.
 - 모델 결과는 Category Taxonomy의 Facet key 전체를 정확히 포함해야 한다. 선택한 각
   Value/alias가 원문에 있어야 하며, 한 Facet에서 여러 Value가 언급되거나 결과 ID/key,
   JSON이 잘못되면 적용하지 않는다. 비어 있지 않은 요구사항을 전부 `ALL`로 만드는 결과도

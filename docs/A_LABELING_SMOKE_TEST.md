@@ -21,6 +21,11 @@
 - `EXCLUDE` 값은 typed constraints에 보존하지만 긍정 압축 `label`에는 넣지 않는다.
   부정·대조·대안 문장은 LLM 호출 후보에서 제외하고, 모델 결과의 중복/누락/예상 밖 Demand ID,
   Taxonomy Facet 누락, 한 Facet의 복수 후보는 실패 또는 `REVIEW`로 처리한다.
+- 추가 극단 입력 점검에서 같은 Facet의 서로 다른 값이 함께 언급된 부정·대조·비교 문장이
+  규칙 파서에 의해 반대 값으로 확정될 수 있음을 재현했다. A 전용 입력 정책에서 해당 문장을
+  `NEGATIVE_CONTRAST_UNRESOLVED` / `REVIEW`로 보류하며, `processed_at`은 비워 재처리 가능하게 한다.
+  명시적인 단일 `EXCLUDE`는 계속 typed constraints에 보존하고 압축 label에는 긍정값으로 넣지 않는다.
+- “캡슐보다는 분말”을 포함한 부정·대조·비교 문장 5종 회귀 테스트와 단일 제외 조건 테스트 통과.
 - 최종 코드로 실제 Ollama 호출 및 RDS 세션 임시 테이블 검증:
   배송 요구 `REVIEW`/미저장, 빈 요구 `ALL` 저장, 저장 1건, 재저장 0건.
 - 실제 Ollama/RDS 검증은 `moongcheap-ai-test`의 세션 전용 임시 테이블을 사용했으며,
@@ -28,7 +33,9 @@
 - 현재 배포 중인 CronJob 이미지에는 이 PR의 수정이 아직 포함되지 않았다.
   병합 후 이미지 재빌드·배포가 필요하며, 운영 CronJob의 마지막 확인 실행은 rows 0이라
   새 실제 수요를 대상으로 한 비영(非零) 처리 결과는 아직 확인되지 않았다.
-- 최종 로컬 검증: `1085 passed, 31 skipped`; 변경 파일 Ruff와 `git diff --check` 통과.
+- 2026-10-01 로컬 전체 회귀 검증: `1090 passed, 31 skipped`; 변경 파일 Ruff와 `git diff --check` 통과.
+- 2026-10-01 EKS 재확인은 현재 환경에서 Cluster API hostname DNS 조회가 실패해 완료하지 못했다.
+  따라서 이 날짜의 배포 이미지 및 비어 있지 않은 운영 batch 결과는 확인된 것으로 간주하지 않는다.
 
 아래 9월 14일 결과는 당시 구현의 과거 기록이다. REVIEW 저장 정책, 이미지 구성 및 미수행 항목은 현재 운영 정책으로 해석하지 않는다.
 

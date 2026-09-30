@@ -34,9 +34,10 @@ def _normalise_evidence_text(value: Any) -> str:
 
 _NON_POSITIVE_REQUIREMENT_MARKERS = (
     "아니", "말고", "말아", "제외", "빼고", "빼줘", "없이", "없는", "않", "안 ",
-    "안들어", "안 든", "싫", "금지", "피하", "알레르기", "알러지", "비선호", "불가", "못 ",
+    "안들어", "안 든", "싫", "별로", "보다는", "대신", "차라리", "꺼려", "기피",
+    "선호하지", "원하지", "원치", "금지", "피하", "알레르기", "알러지", "비선호", "불가", "못 ",
     "또는", "혹은", "아니면", "이나", "거나", "중 하나", "둘 다", "상관없", "무관", "제한",
-    "without", "avoid", "except", "exclude", "allergy", "non-", "not ", "not-", "never",
+    "without", "avoid", "except", "exclude", "allergy", "non-", "not ", "not-", "never", "rather than", "instead of",
 )
 
 

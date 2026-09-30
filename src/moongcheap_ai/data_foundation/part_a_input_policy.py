@@ -10,13 +10,13 @@ from __future__ import annotations
 import re
 from dataclasses import replace
 
+from ..demand_constraints.classifier import normalize
+from ..demand_constraints.extractor import ExtractionResult
+from ..demand_constraints.facet_matcher import MatchedFacet
 from ..demand_constraints.input_policy import (
     ConstraintInputPolicy,
     DemandRequirementResult,
 )
-from ..demand_constraints.classifier import normalize
-from ..demand_constraints.extractor import ExtractionResult
-from ..demand_constraints.facet_matcher import MatchedFacet
 
 
 class PartAConstraintInputPolicy(ConstraintInputPolicy):
@@ -39,6 +39,39 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
     def _compact_value(value: str) -> str:
         value = re.sub(r"\([^)]*\)", "", value)
         return re.sub(r"[\s\-_/·,]", "", normalize(value))
+
+    def _has_ambiguous_negative_contrast(self, category_id: str, text: str) -> bool:
+        """Catch contrastive wording the lexical extractor may assign backwards."""
+        normalized = normalize(text)
+        if not re.search(
+            r"(?:별로|싫|원하지|원치|대신|보다|보다는|안\s*맞|맞지\s*않|좋지\s*않|피하|꺼려|기피)",
+            normalized,
+        ):
+            return False
+
+        compact_text = self._compact_value(text)
+        category_key = self._category_key(category_id)
+        for facet_name, values in self.matcher.values.get(category_key, {}).items():
+            mentioned_codes: set[int] = set()
+            for candidate in values:
+                if candidate.value_code == 0:
+                    continue
+                surfaces = (
+                    candidate.value,
+                    *self.matcher.aliases.get(
+                        (category_key, facet_name, candidate.value_code), ()
+                    ),
+                )
+                if any(
+                    (compact_surface := self._compact_value(surface))
+                    and len(compact_surface) > 1
+                    and compact_surface in compact_text
+                    for surface in surfaces
+                ):
+                    mentioned_codes.add(candidate.value_code)
+            if len(mentioned_codes) > 1:
+                return True
+        return False
 
     def _explicit_requirement_facets(
         self, category_id: str, text: str
@@ -241,6 +274,16 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
 
     def interpret(self, category_id: str, text: str, *, is_substitutable: bool):
         value = text.strip()
+        if value and self._has_ambiguous_negative_contrast(category_id, value):
+            return DemandRequirementResult(
+                status="REVIEW",
+                constraints=(),
+                warnings=("NEGATIVE_CONTRAST_UNRESOLVED",),
+                clauses=(value,),
+                interpretation_method="A_NEGATIVE_CONTRAST_REVIEW",
+                effective_requirement_mode="NONE",
+                diagnostic_code="NEGATIVE_CONTRAST_UNRESOLVED",
+            )
         if value and is_substitutable and self.classifier.input_channel_typed_nonblocking_states:
             branches = self._conflict_branches(value)
             if branches is not None:
