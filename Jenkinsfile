@@ -624,34 +624,12 @@ pipeline {
 
                 unstash 'source'
 
-                container('builder') {
+                container('trivy') {
 
                     sh '''
                         set -eu
 
-                        export DEBIAN_FRONTEND=noninteractive
-
-                        apt-get update -qq
-                        apt-get install -y -qq \
-                          --no-install-recommends \
-                          ca-certificates \
-                          curl
-
-                        rm -rf /var/lib/apt/lists/*
-
-                        TRIVY_VERSION=0.74.0
-
-                        curl -fSL \
-                          -o trivy.tar.gz \
-                          "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-
-                        tar -xzf \
-                          trivy.tar.gz \
-                          trivy
-
-                        chmod +x trivy
-
-                        ./trivy fs \
+                        trivy fs \
                           --severity HIGH,CRITICAL \
                           --ignorefile .trivyignore.yaml \
                           --exit-code 1 \
@@ -678,34 +656,12 @@ pipeline {
 
                 unstash 'source'
 
-                container('builder') {
+                container('gitleaks') {
 
                     sh '''
                         set -eu
 
-                        export DEBIAN_FRONTEND=noninteractive
-
-                        apt-get update -qq
-                        apt-get install -y -qq \
-                          --no-install-recommends \
-                          ca-certificates \
-                          curl
-
-                        rm -rf /var/lib/apt/lists/*
-
-                        GITLEAKS_VERSION=8.21.2
-
-                        curl -fSL \
-                          -o gitleaks.tar.gz \
-                          "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-
-                        tar -xzf \
-                          gitleaks.tar.gz \
-                          gitleaks
-
-                        chmod +x gitleaks
-
-                        ./gitleaks dir \
+                        gitleaks dir \
                           . \
                           --config .gitleaks.toml \
                           --exit-code 1 \
