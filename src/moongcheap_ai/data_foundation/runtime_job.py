@@ -150,6 +150,9 @@ def run_batch(
                 {"REVIEW", "CONFLICT", "PASSTHROUGH", "LABELED_WITH_REVIEW"}
             )
             & labeled["demand_id"].astype(str).isin(source_by_id)
+            # The first fallback already validated these rows. A second
+            # invocation must not override its REVIEW/UNAVAILABLE decision.
+            & labeled.get("fallback_status", pd.Series("", index=labeled.index)).eq("")
         ]
         target = _limit_llm_target(target, llm_max_rows)
         pages = _llm_pages(target, llm_max_rows)
@@ -217,10 +220,10 @@ def run_batch(
                         # The model output is only allowed to resolve a row when it
                         # supplied every facet and did not silently turn a non-empty
                         # requirement into ALL. Negation remains parser-owned.
-                        allowed_facets = set(
+                        allowed_facets = {
                             str(item["name"])
                             for item in (loader.category(str(source.get("category_id", ""))) or {}).get("facets", [])
-                        )
+                        }
                         negative_markers = ("피하고", "제외", "금지", "없는", "않", "안 ")
                         requirement = str(source.get("extra_requirement", ""))
                         supplied = {str(key) for key in raw_values}
@@ -240,11 +243,18 @@ def run_batch(
                             continue
                         labeled.at[target_index, "label"] = loader.encode(defaults)
                         labeled.at[target_index, "facet_values"] = json.dumps(defaults, ensure_ascii=False, separators=(",", ":"))
-                        labeled.at[target_index, "label_status"] = "PARSED"
+                        labeled.at[target_index, "label_status"] = "LABELED"
                         labeled.at[target_index, "interpretation_method"] = "RULE_LLM_FALLBACK"
                         labeled.at[target_index, "llm_status"] = "APPLIED"
                         llm_summary["applied"] += 1
             llm_summary["calls"] = labeler.call_count
+    if model2_fallback_enabled:
+        llm_summary["calls"] += int(fallback_summary["calls"])
+        llm_summary["applied"] += int(fallback_summary["accepted"])
+        fallback_status = labeled.get("fallback_status", pd.Series("", index=labeled.index))
+        llm_summary["failed"] += int(fallback_status.eq("UNAVAILABLE").sum())
+        llm_summary["review"] += int(fallback_status.eq("REVIEW").sum())
+        llm_summary["target_rows"] += int(fallback_status.ne("").sum())
     labeled.attrs["model2_fallback"] = llm_summary
     return labeled, build_label_result_payload(labeled, processed_at=timestamp)
 
@@ -277,7 +287,7 @@ def _apply_model2_fallback(
         & ~result["effectiveRequirementMode"].astype(str).str.upper().isin({"EXCLUDE", "CONFLICT"})
     )
     candidates = result[candidate_mask]
-    summary = {"enabled": True, "calls": 0, "accepted": 0, "review": int(len(candidates))}
+    summary = {"enabled": True, "calls": 0, "accepted": 0, "review": len(candidates)}
     if candidates.empty:
         return result, summary
     labeler = OllamaDemandLabeler(model, endpoint=endpoint, timeout=timeout)
