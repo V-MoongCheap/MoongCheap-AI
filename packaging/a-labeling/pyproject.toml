@@ -18,7 +18,7 @@ dependencies = [
 a-labeling-batch = "moongcheap_ai.data_foundation.runtime_job:main"
 
 [project.optional-dependencies]
-data = ["pyarrow>=15,<22", "openpyxl>=3.1,<4"]
+data = ["pyarrow>=23.0.1,<24", "openpyxl>=3.1,<4"]
 dev = [
     "pytest>=8,<9",
     "jsonschema>=4,<5",
