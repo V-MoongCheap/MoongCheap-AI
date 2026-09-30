@@ -120,6 +120,14 @@ pipeline {
                     env.SELLER_ANALYSIS_TAG =
                         "seller-analysis-${env.ENVIRONMENT}-${env.GIT_SHORT_SHA}"
 
+                    echo """
+                    ================================
+                    Build Parameter Debug
+                    ================================
+                    FORCE_BUILD_ALL: ${params.FORCE_BUILD_ALL}
+                    FORCE_BUILD_ALL Type: ${params.FORCE_BUILD_ALL?.getClass()?.getName()}
+                    ================================
+                    """.stripIndent()
 
                     // --------------------------------------------------
                     // Change Detection
@@ -127,12 +135,16 @@ pipeline {
 
                     if (params.FORCE_BUILD_ALL) {
 
+                        echo "[Build Plan] FORCE_BUILD_ALL enabled"
+
                         env.BUILD_LABELING          = 'true'
                         env.BUILD_AWARDING          = 'true'
                         env.BUILD_DEMAND_CLUSTERING = 'true'
                         env.BUILD_SELLER_ANALYSIS   = 'true'
 
                     } else {
+
+                        echo "[Build Plan] FORCE_BUILD_ALL disabled - detecting changed files"
 
                         def compareFrom =
                             env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?:
@@ -312,6 +324,9 @@ pipeline {
                     ================================
                     AI Image Build Plan
                     ================================
+
+                    Force Build All:
+                    ${params.FORCE_BUILD_ALL}
 
                     Labeling:
                     ${env.BUILD_LABELING}
