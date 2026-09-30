@@ -3,12 +3,22 @@ import json
 import pandas as pd
 import pytest
 
-from moongcheap_ai.data_foundation.backend_contract import validate_backend_response
-from moongcheap_ai.data_foundation.backend_contract import build_label_result_payload
 from moongcheap_ai.data_foundation import runtime_job
-from moongcheap_ai.data_foundation.demand_label_comparison import LLMLabelingError, ensure_ollama_model_available
+from moongcheap_ai.data_foundation.backend_contract import (
+    build_label_result_payload,
+    validate_backend_response,
+)
+from moongcheap_ai.data_foundation.demand_label_comparison import (
+    LLMLabelingError,
+    ensure_ollama_model_available,
+)
 from moongcheap_ai.data_foundation.labeling import taxonomy_from_category_facet_rows
-from moongcheap_ai.data_foundation.runtime_job import _first_env, _limit_llm_target, _llm_pages, run_batch
+from moongcheap_ai.data_foundation.runtime_job import (
+    _first_env,
+    _limit_llm_target,
+    _llm_pages,
+    run_batch,
+)
 
 
 def test_llm_target_is_never_dropped_and_positive_limit_creates_pages() -> None:
@@ -118,7 +128,51 @@ def test_runtime_splits_failed_llm_batches_and_processes_every_row(tmp_path, mon
 
     assert len(labeled) == 3
     assert set(labeled["llm_status"]) == {"APPLIED"}
+    assert set(labeled["label_status"]) == {"LABELED"}
+    # Exercise the writer boundary: an accepted model result must not fail
+    # validation before reaching PostgreSQL.
+    from unittest.mock import MagicMock
+
+    from moongcheap_ai.data_foundation.postgres_writer import write_label_results
+
+    connection = MagicMock()
+    connection.cursor.return_value.__enter__.return_value.rowcount = 1
+    assert write_label_results(
+        connection, labeled.to_dict("records"), processed_at="2026-09-30T00:00:00Z"
+    ) == 3
+    connection.commit.assert_called_once()
     assert FlakyLabeler.call_count > 3
+
+
+@pytest.mark.parametrize("outcome", ["review", "accepted", "unavailable"])
+def test_first_fallback_decision_is_not_overridden_by_second_call(tmp_path, monkeypatch, outcome) -> None:
+    taxonomy = {"categories": [{"category_id": "c1", "facets": [{
+        "facet_id": 1, "name": "form", "order": 1,
+        "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "분말"}],
+    }]}]}
+    class Labeler:
+        calls = 0
+
+        def __init__(self, *args, **kwargs):
+            self.call_count = 0
+
+        def classify(self, rows, loader):
+            self.call_count += 1
+            type(self).calls += 1
+            if outcome == "unavailable":
+                raise LLMLabelingError("temporary connection failure")
+            return {"1": {"form": {"code": 1 if outcome == "accepted" else 0}}}
+
+    monkeypatch.setattr(runtime_job, "OllamaDemandLabeler", Labeler)
+    frame = pd.DataFrame([{"demand_id": "1", "catalog_id": "1", "category_id": "c1", "extra_requirement": "조건 확인"}])
+    labeled, _ = run_batch(frame, tmp_path / "unused.json", taxonomy_payload=taxonomy, model2_fallback_enabled=True)
+    assert Labeler.calls == 1
+    assert labeled.loc[0, "label_status"] == ("LABELED" if outcome == "accepted" else "REVIEW")
+    summary = labeled.attrs["model2_fallback"]
+    assert summary["calls"] == 1
+    assert summary["applied"] == int(outcome == "accepted")
+    assert summary["failed"] == int(outcome == "unavailable")
+    assert summary["review"] == int(outcome == "review")
 
 
 def test_label_runtime_builds_backend_payload(tmp_path) -> None:

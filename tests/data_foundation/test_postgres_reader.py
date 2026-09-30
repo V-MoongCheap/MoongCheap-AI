@@ -1,11 +1,38 @@
+import sqlite3
 from pathlib import Path
+from typing import Self
 
 import pandas as pd
+import pytest
 
 from moongcheap_ai.data_foundation.postgres_reader import (
+    DEFAULT_DEMANDS_SQL,
+    DEFAULT_DEMANDS_SQL_WITH_CATEGORY,
     read_unprocessed_demands,
     resolve_taxonomy_category_keys,
 )
+
+
+@pytest.mark.parametrize("query", [DEFAULT_DEMANDS_SQL, DEFAULT_DEMANDS_SQL_WITH_CATEGORY])
+def test_reader_selects_only_writable_pending_demands(query: str) -> None:
+    with sqlite3.connect(":memory:") as connection:
+        connection.executescript("""
+            CREATE TABLE demand (id INTEGER, catalog_id INTEGER, extra_requirement TEXT,
+                desired_price_min INTEGER, desired_price_max INTEGER, quantity INTEGER,
+                is_substitutable INTEGER, processed_at TEXT, status TEXT);
+            CREATE TABLE product_catalog (id INTEGER, category_id INTEGER);
+            CREATE TABLE category (id INTEGER, facet TEXT);
+            INSERT INTO product_catalog VALUES (1, 1);
+            INSERT INTO category VALUES (1, '{}');
+        """)
+        statuses = ["UNASSIGNED", "ASSIGNED", "SUBSTITUTE_OFFERED", "PAYMENT_PENDING",
+                    "FAILED", "CANCELED", "CLOSED", "EXPIRED", None, "UNKNOWN"]
+        connection.executemany(
+            "INSERT INTO demand (id, catalog_id, status) VALUES (?, 1, ?)",
+            enumerate(statuses, start=1),
+        )
+        connection.execute("INSERT INTO demand (id, catalog_id, status, processed_at) VALUES (99, 1, 'UNASSIGNED', '2026-09-30')")
+        assert [row[0] for row in connection.execute(query)] == [1]
 
 
 def test_resolve_category_key_from_full_facet_text() -> None:
@@ -38,7 +65,7 @@ class _Cursor:
         self.description = None
         self.executed: list[str] = []
 
-    def __enter__(self) -> "_Cursor":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_args: object) -> None:

@@ -1,5 +1,24 @@
 # Part A Labeling Smoke Test
 
+## 2026-09-30 EKS/RDS 검증 및 현재 저장 정책
+
+- 배포 이미지 `labeling-develop-f1222f4`의 수동 Job 정상 종료 확인.
+- 배치 로그: 입력 27건, LLM 요약 calls 2 / applied 0 / failed 0, DB updatedCount 0.
+- 조회 시점의 미처리 27건은 모두 UNASSIGNED가 아니었다. 정상 종료만으로 새 라벨 저장 성공을 판정하지 않는다.
+- A 계정의 `demand.label`, `demand.processed_at` UPDATE 권한 확인.
+- 실제 RDS 세션 전용 임시 테이블에 기존 UNASSIGNED 수요 2건을 복사하여 검증:
+  첫 저장 2건, label 및 processed_at 확인, 동일 결과 재저장 0건, 처리 후 조회 0건.
+  공용 demand 테이블은 수정하지 않았으며 임시 테이블은 세션 종료로 제거됐다.
+- 현재 조회/저장 대상은 `status = 'UNASSIGNED' AND processed_at IS NULL`이다.
+- 저장 가능한 결과 상태는 LABELED이며 REVIEW는 저장하지 않는다.
+- LLM 결과 채택 경로도 LABELED로 정규화한다. 기존 PARSED 반환은 DB 저장기와 불일치하여 수정했다.
+- 배포 이미지에서 합성 입력(제형 요구/빈 요구/배송 요구)으로 PARSED 저장 실패를 재현했다.
+  첫 fallback이 보류한 배송 요구를 두 번째 호출이 제형으로 채택하는 사례도 발견했다.
+  이미 fallback이 검증한 행은 중복 호출하지 않으며, 호출/채택/실패 요약은 첫 경로까지 합산한다.
+- 위 두 코드 수정은 기존 배포 이미지에 포함되지 않으므로 병합·이미지 재빌드·배포 후 확인이 필요하다.
+
+아래 9월 14일 결과는 당시 구현의 과거 기록이다. REVIEW 저장 정책, 이미지 구성 및 미수행 항목은 현재 운영 정책으로 해석하지 않는다.
+
 ## 실행일
 
 2026-09-14
