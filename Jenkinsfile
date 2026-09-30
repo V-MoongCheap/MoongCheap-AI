@@ -26,11 +26,6 @@ pipeline {
 
         GITOPS_REPO_URL = 'https://github.com/V-MoongCheap/MoongCheap-Cloud.git'
 
-        BUILD_LABELING          = 'false'
-        BUILD_AWARDING          = 'false'
-        BUILD_DEMAND_CLUSTERING = 'false'
-        BUILD_SELLER_ANALYSIS   = 'false'
-
         GITOPS_PR_NUMBER     = ''
         GITOPS_PR_URL        = ''
         GITOPS_PR_STATUS     = ''
@@ -133,14 +128,20 @@ pipeline {
                     // Change Detection
                     // --------------------------------------------------
 
+                    // Build flags 초기화
+                    env.BUILD_LABELING = 'false'
+                    env.BUILD_AWARDING = 'false'
+                    env.BUILD_DEMAND_CLUSTERING = 'false'
+                    env.BUILD_SELLER_ANALYSIS = 'false'
+
                     if (params.FORCE_BUILD_ALL) {
 
                         echo "[Build Plan] FORCE_BUILD_ALL enabled"
 
-                        env.BUILD_LABELING          = 'true'
-                        env.BUILD_AWARDING          = 'true'
+                        env.BUILD_LABELING = 'true'
+                        env.BUILD_AWARDING = 'true'
                         env.BUILD_DEMAND_CLUSTERING = 'true'
-                        env.BUILD_SELLER_ANALYSIS   = 'true'
+                        env.BUILD_SELLER_ANALYSIS = 'true'
 
                     } else {
 
@@ -196,7 +197,10 @@ pipeline {
                                 'config/demand_constraint_aliases.json' ||
 
                             file ==
-                                'config/demand_constraint_rules.json'
+                                'config/demand_constraint_rules.json' ||
+
+                            file ==
+                                'config/facet_taxonomy_v2_2.json'
 
                         } ? 'true' : 'false'
 
