@@ -20,10 +20,18 @@ from moongcheap_ai.data_foundation.labeling import (
 )
 from moongcheap_ai.data_foundation.runtime_job import (
     _first_env,
+    _labeling_status_counts,
     _limit_llm_target,
     _llm_pages,
     run_batch,
 )
+
+
+def test_batch_status_log_counts_review_without_logging_requirement_text() -> None:
+    frame = pd.DataFrame({"label_status": ["LABELED", "REVIEW", "REVIEW", None]})
+
+    assert _labeling_status_counts(frame) == {"": 1, "LABELED": 1, "REVIEW": 2}
+    assert _labeling_status_counts(pd.DataFrame()) == {}
 
 
 def test_llm_target_is_never_dropped_and_positive_limit_creates_pages() -> None:
@@ -397,6 +405,7 @@ def test_runtime_keeps_model_value_without_text_evidence_in_review(tmp_path, mon
     "분말이 아니라 캡슐을 원해요",
     "분말은 싫고 캡슐로 주세요",
     "분말 또는 캡슐이면 괜찮아요",
+    "분말과 캡슐을 모두 원해요",
 ])
 def test_model_fallback_never_promotes_negative_or_ambiguous_mentions(tmp_path, monkeypatch, requirement) -> None:
     taxonomy = {"categories": [{"category_id": "c1", "facets": [{

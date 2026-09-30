@@ -40,19 +40,13 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
         value = re.sub(r"\([^)]*\)", "", value)
         return re.sub(r"[\s\-_/·,]", "", normalize(value))
 
-    def _has_ambiguous_negative_contrast(self, category_id: str, text: str) -> bool:
-        """Catch contrastive wording the lexical extractor may assign backwards."""
-        normalized = normalize(text)
-        if not re.search(
-            r"(?:별로|싫|원하지|원치|대신|보다|보다는|안\s*맞|맞지\s*않|좋지\s*않|피하|꺼려|기피)",
-            normalized,
-        ):
-            return False
-
+    def _mentioned_value_codes_by_facet(
+        self, category_id: str, text: str
+    ) -> dict[str, set[int]]:
         compact_text = self._compact_value(text)
         category_key = self._category_key(category_id)
+        mentioned: dict[str, set[int]] = {}
         for facet_name, values in self.matcher.values.get(category_key, {}).items():
-            mentioned_codes: set[int] = set()
             for candidate in values:
                 if candidate.value_code == 0:
                     continue
@@ -68,8 +62,45 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
                     and compact_surface in compact_text
                     for surface in surfaces
                 ):
-                    mentioned_codes.add(candidate.value_code)
-            if len(mentioned_codes) > 1:
+                    mentioned.setdefault(facet_name, set()).add(candidate.value_code)
+        return mentioned
+
+    def _has_unresolved_positive_multi_value(
+        self, category_id: str, text: str, result: DemandRequirementResult
+    ) -> bool:
+        """Detect when a positive parse drops another mentioned value in that Facet."""
+        if result.status != "PARSED" or result.effective_requirement_mode != "STRUCTURED":
+            return False
+
+        positive_codes: dict[str, set[int]] = {}
+        excluded_codes: dict[str, set[int]] = {}
+        for item in result.constraints:
+            target = (
+                excluded_codes
+                if item.constraint_type == "EXCLUDE"
+                else positive_codes
+            )
+            target.setdefault(item.facet_name, set()).add(item.value_code)
+
+        group_codes: dict[str, set[int]] = {}
+        for group in result.preference_groups:
+            for item in group.members:
+                group_codes.setdefault(item.facet_name, set()).add(item.value_code)
+
+        for facet_name, mentioned_codes in self._mentioned_value_codes_by_facet(
+            category_id, text
+        ).items():
+            if len(mentioned_codes) < 2:
+                continue
+            positives = positive_codes.get(facet_name, set())
+            if not positives:
+                continue
+            represented = (
+                positives
+                | excluded_codes.get(facet_name, set())
+                | group_codes.get(facet_name, set())
+            )
+            if not mentioned_codes.issubset(represented):
                 return True
         return False
 
@@ -274,16 +305,6 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
 
     def interpret(self, category_id: str, text: str, *, is_substitutable: bool):
         value = text.strip()
-        if value and self._has_ambiguous_negative_contrast(category_id, value):
-            return DemandRequirementResult(
-                status="REVIEW",
-                constraints=(),
-                warnings=("NEGATIVE_CONTRAST_UNRESOLVED",),
-                clauses=(value,),
-                interpretation_method="A_NEGATIVE_CONTRAST_REVIEW",
-                effective_requirement_mode="NONE",
-                diagnostic_code="NEGATIVE_CONTRAST_UNRESOLVED",
-            )
         if value and is_substitutable and self.classifier.input_channel_typed_nonblocking_states:
             branches = self._conflict_branches(value)
             if branches is not None:
@@ -366,14 +387,26 @@ class PartAConstraintInputPolicy(ConstraintInputPolicy):
         explicit = None
         if value and safe_review:
             explicit = self._explicit_requirement_result(category_id, value)
-        if explicit is None:
-            return result
-        return replace(
-            result,
-            status=explicit.status,
-            constraints=explicit.constraints,
-            warnings=explicit.warnings,
-            clauses=explicit.clauses,
-            interpretation_method="EXPLICIT_REQUIREMENT_FRAME",
-            effective_requirement_mode="STRUCTURED",
-        )
+        if explicit is not None:
+            result = replace(
+                result,
+                status=explicit.status,
+                constraints=explicit.constraints,
+                warnings=explicit.warnings,
+                clauses=explicit.clauses,
+                interpretation_method="EXPLICIT_REQUIREMENT_FRAME",
+                effective_requirement_mode="STRUCTURED",
+            )
+        if self._has_unresolved_positive_multi_value(category_id, value, result):
+            return replace(
+                result,
+                status="REVIEW",
+                constraints=(),
+                preference_groups=(),
+                semantic_preferences=(),
+                warnings=("MULTIPLE_VALUES_SAME_FACET_UNRESOLVED",),
+                interpretation_method="A_MULTI_VALUE_FACET_REVIEW",
+                diagnostic_code="MULTIPLE_VALUES_SAME_FACET_UNRESOLVED",
+                effective_requirement_mode="NONE",
+            )
+        return result

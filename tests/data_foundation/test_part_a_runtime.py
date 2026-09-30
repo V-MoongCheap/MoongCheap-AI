@@ -72,8 +72,13 @@ def test_excluded_value_is_preserved_but_not_encoded_as_positive_label(tmp_path)
     "분말은 원하지 않고 캡슐을 원해요",
     "분말이 안 맞고 캡슐이면 좋겠어요",
     "분말 대신 캡슐을 원해요",
+    "캡슐보다는 분말을 원해요",
+    "분말과 캡슐을 모두 원해요",
+    "분말 및 캡슐이면 좋겠어요",
+    "분말, 캡슐을 모두 원해요",
+    "분말과 캡슐 형태가 필요해요",
 ])
-def test_ambiguous_negative_contrast_is_held_for_review(tmp_path, requirement):
+def test_multiple_same_facet_values_are_held_for_review(tmp_path, requirement):
     taxonomy, rules, aliases = _fixtures(tmp_path)
     demands = pd.DataFrame([{
         "demand_id": "contrast",
@@ -89,24 +94,7 @@ def test_ambiguous_negative_contrast_is_held_for_review(tmp_path, requirement):
     assert result.loc[0, "effectiveRequirementMode"] == "NONE"
     assert result.loc[0, "label"] == "0"
     assert result.loc[0, "processed_at"] == ""
-    assert "NEGATIVE_CONTRAST_UNRESOLVED" in result.loc[0, "reasonCodes"]
-
-
-def test_comparative_preference_with_multiple_values_is_held_for_review(tmp_path):
-    taxonomy, rules, aliases = _fixtures(tmp_path)
-    demands = pd.DataFrame([{
-        "demand_id": "contrast-clear",
-        "catalog_id": "p1",
-        "category_id": "c1",
-        "extra_requirement": "캡슐보다는 분말을 원해요",
-        "is_substitutable": "true",
-    }])
-
-    result, _ = run_part_a_batch(demands, taxonomy, rules, aliases)
-
-    assert result.loc[0, "status"] == "REVIEW"
-    assert result.loc[0, "constraints"] == "[]"
-    assert result.loc[0, "processed_at"] == ""
+    assert "MULTIPLE_VALUES_SAME_FACET_UNRESOLVED" in result.loc[0, "reasonCodes"]
 
 
 def test_part_a_isolates_parser_failure_and_preserves_backend_ids(tmp_path, monkeypatch):

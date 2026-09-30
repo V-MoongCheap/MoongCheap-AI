@@ -30,6 +30,7 @@ from .part_a_runtime import run_part_a_batch
 from .postgres_reader import open_read_only_postgres, read_unprocessed_demands
 from .postgres_writer import open_postgres, write_label_results
 
+
 def _required(source: Mapping[str, str], key: str) -> str:
     value = source.get(key, "").strip()
     if not value:
@@ -57,6 +58,14 @@ def _llm_pages(target: pd.DataFrame, page_size: int) -> list[pd.DataFrame]:
         return []
     size = page_size if page_size > 0 else len(target)
     return [target.iloc[start : start + size] for start in range(0, len(target), size)]
+
+
+def _labeling_status_counts(labeled: pd.DataFrame) -> dict[str, int]:
+    """Return stable status counts for batch logs without exposing demand text."""
+    if "label_status" not in labeled.columns:
+        return {}
+    counts = labeled["label_status"].fillna("").astype(str).str.upper().value_counts()
+    return {str(status): int(count) for status, count in sorted(counts.items())}
 
 
 def run_batch(
@@ -154,6 +163,10 @@ def run_batch(
             & labeled["demand_id"].astype(str).isin(source_by_id)
             & ~labeled["effectiveRequirementMode"].astype(str).str.upper().isin({"EXCLUDE", "CONFLICT"})
             & ~labeled["extra_requirement"].map(_has_non_positive_requirement_marker)
+            & ~labeled.get("reasonCodes", pd.Series("", index=labeled.index))
+            .fillna("").astype(str).str.contains(
+                "MULTIPLE_VALUES_SAME_FACET_UNRESOLVED", regex=False
+            )
             # The first fallback already validated these rows. A second
             # invocation must not override its REVIEW/UNAVAILABLE decision.
             & labeled.get("fallback_status", pd.Series("", index=labeled.index)).eq("")
@@ -287,17 +300,28 @@ def _apply_model2_fallback(
         & extra_requirement.fillna("").astype(str).str.strip().ne("")
         & ~result["effectiveRequirementMode"].astype(str).str.upper().isin({"EXCLUDE", "CONFLICT"})
     )
+    multi_value_unresolved = result.get(
+        "reasonCodes", pd.Series("", index=result.index)
+    ).fillna("").astype(str).str.contains(
+        "MULTIPLE_VALUES_SAME_FACET_UNRESOLVED", regex=False
+    )
     non_positive_candidates = candidate_mask & extra_requirement.map(_has_non_positive_requirement_marker)
+    multi_value_candidates = candidate_mask & multi_value_unresolved
     result.loc[non_positive_candidates, "fallback_status"] = "REVIEW"
     result.loc[non_positive_candidates, "fallback_warning"] = (
         "negative or contrastive constraints remain parser-owned"
     )
-    candidates = result[candidate_mask & ~non_positive_candidates]
+    result.loc[multi_value_candidates, "fallback_status"] = "REVIEW"
+    result.loc[multi_value_candidates, "fallback_warning"] = (
+        "multiple values in one facet cannot be represented by a single label"
+    )
+    blocked_candidates = non_positive_candidates | multi_value_candidates
+    candidates = result[candidate_mask & ~blocked_candidates]
     summary = {
         "enabled": True,
         "calls": 0,
         "accepted": 0,
-        "review": len(candidates) + int(non_positive_candidates.sum()),
+        "review": len(candidates) + int(blocked_candidates.sum()),
     }
     if candidates.empty:
         return result, summary
@@ -510,7 +534,16 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             response = {"status": "DRY_RUN"}
-        print(json.dumps({"status": "COMPLETED", "rows": len(labeled), "output": str(args.output), "model2Fallback": labeled.attrs.get("model2_fallback", {}), "backend": response}, ensure_ascii=False))
+        status_counts = _labeling_status_counts(labeled)
+        print(json.dumps({
+            "status": "COMPLETED",
+            "rows": len(labeled),
+            "labelingStatusCounts": status_counts,
+            "reviewCount": status_counts.get("REVIEW", 0),
+            "output": str(args.output),
+            "model2Fallback": labeled.attrs.get("model2_fallback", {}),
+            "backend": response,
+        }, ensure_ascii=False))
         return 0
     except (LLMLabelingError, ValueError, RuntimeError, OSError) as error:
         print(json.dumps({"status": "FAILED", "error": str(error)}, ensure_ascii=False), file=sys.stderr)
