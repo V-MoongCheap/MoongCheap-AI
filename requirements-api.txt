@@ -7,6 +7,7 @@
 #   pip install -r requirements-api.txt
 #   SELLER_ANALYSIS_INTERNAL_KEY=... \
 #     python -m uvicorn moongcheap_ai.seller_analysis.api:create_app --factory --app-dir src --port 8081
-fastapi==0.115.6
+fastapi==0.142.1
+starlette==1.7.0       # fastapi 가 끌어오는 버전을 고정한다. 0.41.3 은 HIGH 3건(CVE-2025-62727 · CVE-2026-48818 · CVE-2026-54283)
 uvicorn==0.34.0
 httpx==0.28.1          # TestClient 가 요구한다
