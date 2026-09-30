@@ -5,7 +5,6 @@ pipeline {
     options {
         timeout(time: 90, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)
-        skipDefaultCheckout(true)
     }
 
     parameters {
@@ -27,6 +26,16 @@ pipeline {
 
         GITOPS_REPO_URL = 'https://github.com/V-MoongCheap/MoongCheap-Cloud.git'
 
+        BUILD_LABELING          = 'false'
+        BUILD_AWARDING          = 'false'
+        BUILD_DEMAND_CLUSTERING = 'false'
+        BUILD_SELLER_ANALYSIS   = 'false'
+
+        GITOPS_PR_NUMBER     = ''
+        GITOPS_PR_URL        = ''
+        GITOPS_PR_STATUS     = ''
+        GITOPS_BRANCH_STATUS = ''
+        GITOPS_PR_CREATED    = 'false'
     }
 
 
@@ -49,21 +58,6 @@ pipeline {
                 checkout scm
 
                 script {
-
-                    // Values declared in a Declarative environment block cannot
-                    // be overridden later with env.* assignments. Initialize
-                    // runtime state here so change detection and GitOps output
-                    // can update it for subsequent stages.
-                    env.BUILD_LABELING          = 'false'
-                    env.BUILD_AWARDING          = 'false'
-                    env.BUILD_DEMAND_CLUSTERING = 'false'
-                    env.BUILD_SELLER_ANALYSIS   = 'false'
-
-                    env.GITOPS_PR_NUMBER     = ''
-                    env.GITOPS_PR_URL        = ''
-                    env.GITOPS_PR_STATUS     = ''
-                    env.GITOPS_BRANCH_STATUS = ''
-                    env.GITOPS_PR_CREATED    = 'false'
 
                     // --------------------------------------------------
                     // Environment
@@ -377,7 +371,6 @@ pipeline {
                 stash(
                     name: 'source',
                     includes: '**/*',
-                    excludes: '.git/**',
                     useDefaultExcludes: false
                 )
             }
@@ -400,7 +393,6 @@ pipeline {
                 stage('A Labeling Test') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_LABELING == 'true'
                         }
@@ -427,23 +419,13 @@ pipeline {
 
                                 uv sync \
                                   --project packaging/a-labeling \
-                                  --python 3.13.12 \
                                   --locked \
-                                  --extra data \
                                   --extra dev
-
-                                # The A project runs the repository-wide suite;
-                                # translation tests need this test-only package.
-                                uv pip install \
-                                  --python packaging/a-labeling/.venv/bin/python \
-                                  'pypinyin>=0.55,<1'
 
                                 uv run \
                                   --project packaging/a-labeling \
                                   --no-sync \
-                                  pytest \
-                                  -c packaging/a-labeling/pyproject.toml \
-                                  -q
+                                  pytest -q
                             '''
                         }
                     }
@@ -457,7 +439,6 @@ pipeline {
                 stage('Awarding Test') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_AWARDING == 'true'
                         }
@@ -490,7 +471,6 @@ pipeline {
 
                                     python -m pytest \
                                       tests/seller_matching \
-                                      --ignore=tests/seller_matching/test_baseline.py \
                                       -q
 
                                 elif [ -d tests/awarding ]; then
@@ -517,7 +497,6 @@ pipeline {
                 stage('Demand Clustering Test') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_DEMAND_CLUSTERING == 'true'
                         }
@@ -544,7 +523,6 @@ pipeline {
 
                                 uv sync \
                                   --project packaging/demand-clustering \
-                                  --python 3.13.12 \
                                   --locked \
                                   --extra data \
                                   --extra dev
@@ -567,7 +545,6 @@ pipeline {
                 stage('Seller Analysis Test') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_SELLER_ANALYSIS == 'true'
                         }
@@ -683,7 +660,6 @@ pipeline {
                 stage('A Labeling Image') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_LABELING == 'true'
                         }
@@ -819,7 +795,6 @@ pipeline {
                 stage('Awarding Image') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_AWARDING == 'true'
                         }
@@ -955,7 +930,6 @@ pipeline {
                 stage('Demand Clustering Image') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_DEMAND_CLUSTERING == 'true'
                         }
@@ -1091,7 +1065,6 @@ pipeline {
                 stage('Seller Analysis Image') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_SELLER_ANALYSIS == 'true'
                         }
@@ -1233,7 +1206,6 @@ pipeline {
         stage('Update GitOps Repo (Image Tags)') {
 
             when {
-                beforeAgent true
 
                 expression {
 
@@ -1290,17 +1262,17 @@ pipeline {
 
                             ASKPASS="$(pwd)/git-askpass.sh"
 
-                            printf '%s\\n' \
-                              '#!/bin/sh' \
-                              'case "$1" in' \
-                              '  *Username*)' \
-                              '    printf "%s\\n" "$GIT_USER"' \
-                              '    ;;' \
-                              '  *Password*)' \
-                              '    printf "%s\\n" "$GIT_TOKEN"' \
-                              '    ;;' \
-                              'esac' \
-                              > "$ASKPASS"
+                            cat > "$ASKPASS" <<'EOF'
+                              #!/bin/sh
+                              case "$1" in
+                                *Username*)
+                                  printf '%s\\n' "$GIT_USER"
+                                  ;;
+                                *Password*)
+                                  printf '%s\\n' "$GIT_TOKEN"
+                                  ;;
+                              esac
+                              EOF
 
                             chmod 700 "$ASKPASS"
 
@@ -1594,154 +1566,44 @@ pipeline {
 
 
                             # ========================================
-                            # Merge Pull Request
+                            # Auto Merge
                             # ========================================
 
-                            MERGED=false
+                            GRAPHQL_QUERY="$(printf \
+                              '{"query":"mutation { enablePullRequestAutoMerge(input: {pullRequestId: \\"%s\\", mergeMethod: SQUASH}) { pullRequest { number autoMergeRequest { enabledAt } } } }"}' \
+                              "$PR_NODE_ID")"
 
 
-                            # GitHub may still be calculating mergeability
-                            # immediately after creating the pull request.
-                            PR_MERGEABLE="pending"
+                            MERGE_RESPONSE="$(curl \
+                              --fail-with-body \
+                              -sS \
+                              -X POST \
+                              -H "Authorization: Bearer ${GIT_TOKEN}" \
+                              -H "Content-Type: application/json" \
+                              "https://api.github.com/graphql" \
+                              -d "$GRAPHQL_QUERY")"
 
 
-                            for i in $(seq 1 12)
-                            do
+                            GRAPHQL_ERRORS="$(printf '%s' \
+                              "$MERGE_RESPONSE" |
+                              node -pe \
+                              'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.errors ? JSON.stringify(x.errors) : ""')"
 
 
-                                PR_MERGEABILITY_RESPONSE="$(curl \
-                                  --fail-with-body \
-                                  -sS \
-                                  -H "Authorization: Bearer ${GIT_TOKEN}" \
-                                  -H "Accept: application/vnd.github+json" \
-                                  "https://api.github.com/repos/${GITOPS_API_REPO}/pulls/${PR_NUMBER}")"
-
-
-                                PR_MERGEABLE="$(printf '%s' \
-                                  "$PR_MERGEABILITY_RESPONSE" |
-                                  node -pe \
-                                  'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.mergeable === null ? "pending" : String(x.mergeable)')"
-
-
-                                PR_MERGEABLE_STATE="$(printf '%s' \
-                                  "$PR_MERGEABILITY_RESPONSE" |
-                                  node -pe \
-                                  'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.mergeable_state || "unknown"')"
-
-
-                                if [ "$PR_MERGEABLE" != "pending" ] && \
-                                   [ "$PR_MERGEABLE_STATE" != "unknown" ]; then
-
-                                    break
-                                fi
-
+                            if [ -n "$GRAPHQL_ERRORS" ]; then
 
                                 echo \
-                                  "GitOps PR Merge 가능 여부 확인 중... (${i}/12)"
+                                  "Auto Merge 활성화 실패: $GRAPHQL_ERRORS"
 
-                                sleep 5
-                            done
-
-
-                            # An unprotected branch can be merged immediately.
-                            # Auto-merge is only valid when branch rules require
-                            # reviews or status checks that are still pending.
-                            if [ "$PR_MERGEABLE" = "true" ] && \
-                               [ "$PR_MERGEABLE_STATE" = "clean" ]; then
-
-                                DIRECT_MERGE_JSON="$(printf \
-                                  '{"merge_method":"squash","commit_title":"%s"}' \
-                                  "$PR_TITLE")"
-
-
-                                if DIRECT_MERGE_RESPONSE="$(curl \
-                                  --fail-with-body \
-                                  -sS \
-                                  -X PUT \
-                                  -H "Authorization: Bearer ${GIT_TOKEN}" \
-                                  -H "Accept: application/vnd.github+json" \
-                                  -H "Content-Type: application/json" \
-                                  "https://api.github.com/repos/${GITOPS_API_REPO}/pulls/${PR_NUMBER}/merge" \
-                                  -d "$DIRECT_MERGE_JSON")"
-                                then
-
-                                    DIRECT_MERGED="$(printf '%s' \
-                                      "$DIRECT_MERGE_RESPONSE" |
-                                      node -pe \
-                                      'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); String(x.merged === true)')"
-
-
-                                    if [ "$DIRECT_MERGED" = "true" ]; then
-
-                                        MERGED=true
-
-                                        echo \
-                                          "GitOps PR 즉시 Merge 완료: #${PR_NUMBER}"
-
-                                    else
-
-                                        DIRECT_MERGE_MESSAGE="$(printf '%s' \
-                                          "$DIRECT_MERGE_RESPONSE" |
-                                          node -pe \
-                                          'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.message || "unknown error"')"
-
-                                        echo \
-                                          "GitOps PR 즉시 Merge 불가 (${PR_MERGEABLE_STATE}): ${DIRECT_MERGE_MESSAGE}"
-                                    fi
-
-                                else
-
-                                    echo \
-                                      "GitOps PR 즉시 Merge API 요청 실패"
-                                fi
-
-                            else
-
-                                echo \
-                                  "GitOps PR 즉시 Merge 불가: mergeable=${PR_MERGEABLE}, state=${PR_MERGEABLE_STATE}"
-                            fi
-
-
-                            if [ "$MERGED" != "true" ]; then
-
-                                GRAPHQL_QUERY="$(printf \
-                                  '{"query":"mutation { enablePullRequestAutoMerge(input: {pullRequestId: \\"%s\\", mergeMethod: SQUASH}) { pullRequest { number autoMergeRequest { enabledAt } } } }"}' \
-                                  "$PR_NODE_ID")"
-
-
-                                MERGE_RESPONSE="$(curl \
-                                  --fail-with-body \
-                                  -sS \
-                                  -X POST \
-                                  -H "Authorization: Bearer ${GIT_TOKEN}" \
-                                  -H "Content-Type: application/json" \
-                                  "https://api.github.com/graphql" \
-                                  -d "$GRAPHQL_QUERY")"
-
-
-                                GRAPHQL_ERRORS="$(printf '%s' \
-                                  "$MERGE_RESPONSE" |
-                                  node -pe \
-                                  'const x=JSON.parse(require("fs").readFileSync(0,"utf8")); x.errors ? JSON.stringify(x.errors) : ""')"
-
-
-                                if [ -n "$GRAPHQL_ERRORS" ]; then
-
-                                    echo \
-                                      "Auto Merge 활성화 실패: $GRAPHQL_ERRORS"
-
-                                    exit 1
-                                fi
-
-
-                                echo \
-                                  "GitOps PR Auto Merge 활성화 완료: #${PR_NUMBER}"
+                                exit 1
                             fi
 
 
                             # ========================================
                             # Wait for Merge
                             # ========================================
+
+                            MERGED=false
 
 
                             for i in $(seq 1 30)
