@@ -94,8 +94,9 @@ docker run --rm -i --network none --read-only \
 검증 대상이다.
 
 별도로 주입할 필수 값은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `BACKEND_BASE_URL`,
-`BACKEND_INTERNAL_KEY`다. 기본 K8s 설정은 `backend-env`의 기존 DB 세 항목을 받아
-앱에서 PostgreSQL DSN을 조합한다. Backend DB 계정을 공유하되 B의 세션은 읽기 전용이다.
+`BACKEND_INTERNAL_KEY`다. 기본 K8s 설정은 Part B 전용
+`ai-clustering-database`의 DB 세 항목을 받아 앱에서 PostgreSQL DSN을 조합한다.
+B의 세션은 추가로 읽기 전용을 강제한다.
 기존 `SHARED_DATABASE_URL`도 지원하며, 비어 있지 않으면 DB 세 변수보다 우선한다.
 B 전용 개발 overlay는 `BACKEND_BASE_URL=http://backend`를 주입한다. 같은
 `moongcheap-develop`의 Backend Service 80번 포트가 Pod의 8080번 포트로 전달한다.
@@ -104,7 +105,8 @@ B 전용 개발 overlay는 `BACKEND_BASE_URL=http://backend`를 주입한다. �
 Backend와 합의한 AWS Parameter Store `SecureString`이다. 배포 환경이 이를
 `BACKEND_INTERNAL_KEY`로 주입하며 앱은 `X-Internal-Api-Key` 헤더로 전송한다.
 매니페스트는 `backend-env/MOONGCHEAP_INTERNAL_API_KEY`를 참조하지만, 확인한 Cloud
-`develop` (`8fd7e20`)의 ExternalSecret 템플릿에는 이 항목이 매핑돼 있다. 실제 AWS
+`develop` (`ea2a5c6`)의 ExternalSecret 템플릿에는 이 항목이 매핑돼 있다. DB 자격증명은
+별도 `externalsecret-ai-clustering-database.yaml`이 공급한다. 실제 AWS
 원본 값과 클러스터 동기화 성공 여부를 확인하고 DB·Backend 연동 검증을 마치기 전까지
 배포를 활성화하지 않는다. 앱은 AWS 자격 증명이나 직접적인 AWS API 호출을 요구하지 않는다.
 실제 Secret 값은 이미지·Git·로그에 넣지 않는다.
@@ -168,7 +170,7 @@ Secret 공급은 인프라가 준비하고, 모델·상품 자료는 이미지�
 | 이미지·E5 | 빌드, 오프라인 CPU 실행 검증 완료 | 인프라의 이미지 배포; 현재 모델은 이미지에 포함 |
 | v5 상품 시드 | 1,989건, 상품명·Seed ID·도매꾹 ID 유일성 검증 | 배포 DB의 상품명과 정확 일치 실연동 확인 |
 | taxonomy | v5 1,890건 매핑, 99건 미매핑 | 미매핑 상품은 대체제안만 건너뜀는지 실연동 확인 |
-| 연결 설정 | 실제 배포 연동 미검증; backend-env DB 세 항목 재사용, 내부 키 항목 공급 대기 | DB·Backend 연결 확인, 내부 키 주입과 헤더 이름 정합성 확인 |
+| 연결 설정 | Cloud Helm의 `ai-clustering-database` DB 세 항목과 `backend-env` 내부 키 계약 반영 | DB·Backend 연결 확인, 두 ExternalSecret 동기화와 헤더 이름 정합성 확인 |
 | Backend API | 합의한 두 API가 동작하는 배포 대상은 미확인 | 대상 환경에서 API 1·2 및 `X-Internal-Api-Key` 계약 지원 여부 확인 |
 | 거절 이력 | 갱신 ERD 이미지 기준 `reject_history` 조회·후보 제외 구현 | 실제 테이블 배포, 거절과 상태 복귀의 원자적 저장, SELECT 권한 및 API 2의 동시성 재검증 확인 |
 

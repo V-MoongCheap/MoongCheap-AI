@@ -13,7 +13,10 @@ from collections import Counter
 from importlib.metadata import version
 from pathlib import Path
 
-from moongcheap_ai.demand_clustering.part_a_integration import build_part_b_parser, file_digest
+from moongcheap_ai.demand_clustering.part_a_integration import (
+    build_part_b_runtime_parser,
+    file_digest,
+)
 from moongcheap_ai.demand_constraints import DemandConstraintParser
 
 
@@ -178,8 +181,10 @@ def main():
         "before": DemandConstraintParser.from_taxonomy(
             before_taxonomy, rules_path=args.rules, aliases_path=args.compatibility_aliases,
         ),
-        "aOnly": build_part_b_parser(taxonomy, rules_path=args.rules, aliases_path=args.aliases)[0],
-        "after": build_part_b_parser(
+        "aOnly": build_part_b_runtime_parser(
+            taxonomy, rules_path=args.rules, aliases_path=args.aliases
+        )[0],
+        "after": build_part_b_runtime_parser(
             taxonomy, rules_path=args.rules, aliases_path=args.aliases,
             compatibility_aliases_path=args.compatibility_aliases,
         )[0],

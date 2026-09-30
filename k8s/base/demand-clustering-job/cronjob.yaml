@@ -55,21 +55,21 @@ spec:
                 - name: DB_URL
                   valueFrom:
                     secretKeyRef:
-                      name: backend-env
+                      name: ai-clustering-database
                       key: DB_URL
                 - name: DB_USERNAME
                   valueFrom:
                     secretKeyRef:
-                      name: backend-env
+                      name: ai-clustering-database
                       key: DB_USERNAME
                 - name: DB_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: backend-env
+                      name: ai-clustering-database
                       key: DB_PASSWORD
                 - name: BACKEND_INTERNAL_KEY
-                  # Cloud must supply this missing backend-env key from the
-                  # agreed SSM Parameter Store SecureString before unsuspending.
+                  # Cloud supplies the shared internal API key separately from
+                  # the dedicated read-only clustering database credentials.
                   valueFrom:
                     secretKeyRef:
                       name: backend-env

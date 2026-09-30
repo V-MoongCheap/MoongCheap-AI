@@ -27,16 +27,23 @@ def resources(request, tmp_path_factory):
     )
     result = subprocess.run(
         [kubectl, "kustomize", str(ROOT / "k8s" / request.param)],
-        check=True, capture_output=True, text=True, timeout=30, env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env=environment,
     )
     all_documents = list(yaml.safe_load_all(result.stdout))
     documents = [
-        document for document in all_documents
+        document
+        for document in all_documents
         if document["metadata"]["name"].startswith("demand-clustering")
     ]
     assert len(documents) == 3
     assert {document["kind"] for document in documents} == {
-        "CronJob", "ConfigMap", "ServiceAccount",
+        "CronJob",
+        "ConfigMap",
+        "ServiceAccount",
     }
     expected_namespace = {
         "base": None,
@@ -72,7 +79,9 @@ def test_schedule_starts_suspended_and_disables_immediate_retry(resources):
 def test_shared_backend_ai_node_selector_without_dedicated_ai_taint(resources):
     pod = pod_spec(resources)
     assert pod["nodeSelector"] == {
-        "workload": "backend-ai", "kubernetes.io/os": "linux", "kubernetes.io/arch": "amd64",
+        "workload": "backend-ai",
+        "kubernetes.io/os": "linux",
+        "kubernetes.io/arch": "amd64",
     }
     assert pod["tolerations"] == []
     assert "nodeName" not in pod
@@ -82,19 +91,35 @@ def test_shared_backend_ai_node_selector_without_dedicated_ai_taint(resources):
 def test_only_required_secrets_are_injected_by_reference(resources):
     container = pod_spec(resources)["containers"][0]
     assert container["env"] == [
-        {"name": name, "valueFrom": {"secretKeyRef": {"name": "backend-env", "key": key}}}
-        for name, key in (
-            ("DB_URL", "DB_URL"),
-            ("DB_USERNAME", "DB_USERNAME"),
-            ("DB_PASSWORD", "DB_PASSWORD"),
-            ("BACKEND_INTERNAL_KEY", "MOONGCHEAP_INTERNAL_API_KEY"),
+        {
+            "name": name,
+            "valueFrom": {
+                "secretKeyRef": {"name": secret_name, "key": key},
+            },
+        }
+        for name, secret_name, key in (
+            ("DB_URL", "ai-clustering-database", "DB_URL"),
+            ("DB_USERNAME", "ai-clustering-database", "DB_USERNAME"),
+            ("DB_PASSWORD", "ai-clustering-database", "DB_PASSWORD"),
+            (
+                "BACKEND_INTERNAL_KEY",
+                "backend-env",
+                "MOONGCHEAP_INTERNAL_API_KEY",
+            ),
         )
     ]
     config = resources["ConfigMap"]["data"]
     for forbidden in (
-        "SHARED_DATABASE_URL", "BACKEND_INTERNAL_KEY", "BACKEND_SERVICE_TOKEN",
-        "DB_URL", "DB_USERNAME", "DB_PASSWORD", "MOONGCHEAP_INTERNAL_API_KEY",
-        "BATCH_STATE_DIR", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
+        "SHARED_DATABASE_URL",
+        "BACKEND_INTERNAL_KEY",
+        "BACKEND_SERVICE_TOKEN",
+        "DB_URL",
+        "DB_USERNAME",
+        "DB_PASSWORD",
+        "MOONGCHEAP_INTERNAL_API_KEY",
+        "BATCH_STATE_DIR",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
     ):
         assert forbidden not in config
 
@@ -119,8 +144,14 @@ def test_generated_config_reference_and_runtime_settings(resources):
     assert config["HF_HUB_OFFLINE"] == config["TRANSFORMERS_OFFLINE"] == "1"
     assert config["OMP_NUM_THREADS"] == config["MKL_NUM_THREADS"] == "1"
     assert config["HF_HOME"] == "/tmp/huggingface"
-    assert config["DEMAND_CONSTRAINT_ALIASES_PATH"] == "/app/config/model1_aliases_reviewed_v2.json"
-    assert config["DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH"] == "/app/config/demand_constraint_aliases.json"
+    assert (
+        config["DEMAND_CONSTRAINT_ALIASES_PATH"]
+        == "/app/config/model1_aliases_reviewed_v2.json"
+    )
+    assert (
+        config["DEMAND_CONSTRAINT_COMPAT_ALIASES_PATH"]
+        == "/app/config/demand_constraint_aliases.json"
+    )
     catalog_seed = PurePosixPath(config["DEMAND_CATALOG_SEED_PATH"])
     taxonomy = PurePosixPath(config["DEMAND_TAXONOMY_PATH"])
     assert catalog_seed.parent == taxonomy.parent
@@ -147,11 +178,14 @@ def test_non_root_without_kubernetes_api_token(resources):
     assert pod["serviceAccountName"] == resources["ServiceAccount"]["metadata"]["name"]
     assert resources["ServiceAccount"]["automountServiceAccountToken"] is False
     assert pod["securityContext"] == {
-        "runAsNonRoot": True, "runAsUser": 65534, "runAsGroup": 65534,
+        "runAsNonRoot": True,
+        "runAsUser": 65534,
+        "runAsGroup": 65534,
         "seccompProfile": {"type": "RuntimeDefault"},
     }
     assert pod["containers"][0]["securityContext"] == {
-        "allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
+        "allowPrivilegeEscalation": False,
+        "readOnlyRootFilesystem": True,
         "capabilities": {"drop": ["ALL"]},
     }
 
@@ -183,17 +217,20 @@ def test_handoff_uses_part_b_paths_and_agreed_parameter_store_source():
             encoding="utf-8"
         )
     )
-    assert overlay["namespace"] == kubernetes["namespace_example"] == "moongcheap-develop"
+    assert (
+        overlay["namespace"] == kubernetes["namespace_example"] == "moongcheap-develop"
+    )
     secrets = {row["name"]: row for row in handoff["secret_variables"]}
     key = secrets["BACKEND_INTERNAL_KEY"]
     assert key["source"] == {
-        "provider": "aws-ssm-parameter-store", "type": "SecureString",
+        "provider": "aws-ssm-parameter-store",
+        "type": "SecureString",
     }
     assert "X-Internal-Api-Key" in key["purpose"]
     assert key["secret_name"] == "backend-env"
     assert key["secret_key"] == "MOONGCHEAP_INTERNAL_API_KEY"
     for name in ("DB_URL", "DB_USERNAME", "DB_PASSWORD"):
-        assert secrets[name]["secret_name"] == "backend-env"
+        assert secrets[name]["secret_name"] == "ai-clustering-database"
         assert secrets[name]["secret_key"] == name
     assert handoff["runtime_filesystem"]["read_only_mounts"] == []
     assert handoff["artifact_migration"]["image_only_rollout_supported"] is True

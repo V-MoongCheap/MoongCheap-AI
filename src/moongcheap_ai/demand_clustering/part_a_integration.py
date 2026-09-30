@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import pandas as pd
 
 from ..demand_constraints import DemandConstraintParser
 from ..demand_constraints.classifier import normalize
+from .part_b_input_policy import PartBConstraintInputPolicy
+from .taxonomy_compat import prepare_part_b_taxonomy
 
 
 def taxonomy_version(taxonomy: Mapping[str, Any]) -> str:
@@ -205,3 +208,32 @@ def build_part_b_parser(
     # All A bindings were validated and applied to their exact category/code.
     # B never invokes the shared matcher's permissive code-or-value fallback.
     return DemandConstraintParser.from_taxonomy(enriched, rules_path=rules_path), summary
+
+
+def build_part_b_runtime_parser(
+    taxonomy: Mapping[str, Any],
+    *,
+    rules_path: Path,
+    aliases_path: Path | None = None,
+    compatibility_aliases_path: Path | None = None,
+) -> tuple[DemandConstraintParser, dict[str, Any]]:
+    """Build B's runtime parser without changing Part A's integration helper."""
+
+    compatibility_taxonomy = prepare_part_b_taxonomy(taxonomy)
+    parser, summary = build_part_b_parser(
+        compatibility_taxonomy.taxonomy,
+        rules_path=rules_path,
+        aliases_path=aliases_path,
+        compatibility_aliases_path=compatibility_aliases_path,
+    )
+    policy = PartBConstraintInputPolicy(
+        parser.input_policy.matcher,
+        parser.extractor,
+        compatibility_taxonomy.canonical_codes,
+    )
+    return DemandConstraintParser(parser.extractor, policy), {
+        **summary,
+        "deprecatedTaxonomyCanonicalizationCount": (
+            compatibility_taxonomy.canonicalized_value_count
+        ),
+    }
