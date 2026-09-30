@@ -5,7 +5,6 @@ pipeline {
     options {
         timeout(time: 90, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)
-        skipDefaultCheckout(true)
     }
 
     parameters {
@@ -27,6 +26,16 @@ pipeline {
 
         GITOPS_REPO_URL = 'https://github.com/V-MoongCheap/MoongCheap-Cloud.git'
 
+        BUILD_LABELING          = 'false'
+        BUILD_AWARDING          = 'false'
+        BUILD_DEMAND_CLUSTERING = 'false'
+        BUILD_SELLER_ANALYSIS   = 'false'
+
+        GITOPS_PR_NUMBER     = ''
+        GITOPS_PR_URL        = ''
+        GITOPS_PR_STATUS     = ''
+        GITOPS_BRANCH_STATUS = ''
+        GITOPS_PR_CREATED    = 'false'
     }
 
 
@@ -49,21 +58,6 @@ pipeline {
                 checkout scm
 
                 script {
-
-                    // Values declared in a Declarative environment block cannot
-                    // be overridden later with env.* assignments. Initialize
-                    // runtime state here so change detection and GitOps output
-                    // can update it for subsequent stages.
-                    env.BUILD_LABELING          = 'false'
-                    env.BUILD_AWARDING          = 'false'
-                    env.BUILD_DEMAND_CLUSTERING = 'false'
-                    env.BUILD_SELLER_ANALYSIS   = 'false'
-
-                    env.GITOPS_PR_NUMBER     = ''
-                    env.GITOPS_PR_URL        = ''
-                    env.GITOPS_PR_STATUS     = ''
-                    env.GITOPS_BRANCH_STATUS = ''
-                    env.GITOPS_PR_CREATED    = 'false'
 
                     // --------------------------------------------------
                     // Environment
@@ -185,9 +179,6 @@ pipeline {
 
                             file ==
                                 'config/model1_aliases_reviewed_v2.json' ||
-
-                            file ==
-                                'config/facet_taxonomy_v2_2.json' ||
 
                             file ==
                                 'config/demand_constraint_aliases.json' ||
@@ -403,7 +394,6 @@ pipeline {
                 stage('A Labeling Test') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_LABELING == 'true'
                         }
@@ -430,23 +420,13 @@ pipeline {
 
                                 uv sync \
                                   --project packaging/a-labeling \
-                                  --python 3.13.12 \
                                   --locked \
-                                  --extra data \
                                   --extra dev
-
-                                # The A project runs the repository-wide suite;
-                                # translation tests need this test-only package.
-                                uv pip install \
-                                  --python packaging/a-labeling/.venv/bin/python \
-                                  'pypinyin>=0.55,<1'
 
                                 uv run \
                                   --project packaging/a-labeling \
                                   --no-sync \
-                                  pytest \
-                                  -c packaging/a-labeling/pyproject.toml \
-                                  -q
+                                  pytest -q
                             '''
                         }
                     }
@@ -460,7 +440,6 @@ pipeline {
                 stage('Awarding Test') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_AWARDING == 'true'
                         }
@@ -493,7 +472,6 @@ pipeline {
 
                                     python -m pytest \
                                       tests/seller_matching \
-                                      --ignore=tests/seller_matching/test_baseline.py \
                                       -q
 
                                 elif [ -d tests/awarding ]; then
@@ -520,7 +498,6 @@ pipeline {
                 stage('Demand Clustering Test') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_DEMAND_CLUSTERING == 'true'
                         }
@@ -547,7 +524,6 @@ pipeline {
 
                                 uv sync \
                                   --project packaging/demand-clustering \
-                                  --python 3.13.12 \
                                   --locked \
                                   --extra data \
                                   --extra dev
@@ -570,7 +546,6 @@ pipeline {
                 stage('Seller Analysis Test') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_SELLER_ANALYSIS == 'true'
                         }
@@ -619,17 +594,7 @@ pipeline {
 
             agent {
                 kubernetes {
-                    inheritFrom 'python-builder'
-                    yaml """
-                    apiVersion: v1
-                    kind: Pod
-                    spec:
-                      containers:
-                        - name: trivy
-                          image: aquasec/trivy:0.74.0
-                          command: [cat]
-                          tty: true
-                    """
+                    label BUILD_LABEL
                 }
             }
 
@@ -661,17 +626,7 @@ pipeline {
 
             agent {
                 kubernetes {
-                    inheritFrom 'python-builder'
-                    yaml """
-                    apiVersion: v1
-                    kind: Pod
-                    spec:
-                      containers:
-                        - name: gitleaks
-                          image: zricethezav/gitleaks:v8.21.2
-                          command: [cat]
-                          tty: true
-                    """
+                    label BUILD_LABEL
                 }
             }
 
@@ -706,7 +661,6 @@ pipeline {
                 stage('A Labeling Image') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_LABELING == 'true'
                         }
@@ -842,7 +796,6 @@ pipeline {
                 stage('Awarding Image') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_AWARDING == 'true'
                         }
@@ -978,7 +931,6 @@ pipeline {
                 stage('Demand Clustering Image') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_DEMAND_CLUSTERING == 'true'
                         }
@@ -1114,7 +1066,6 @@ pipeline {
                 stage('Seller Analysis Image') {
 
                     when {
-                        beforeAgent true
                         expression {
                             env.BUILD_SELLER_ANALYSIS == 'true'
                         }
@@ -1256,7 +1207,6 @@ pipeline {
         stage('Update GitOps Repo (Image Tags)') {
 
             when {
-                beforeAgent true
 
                 expression {
 
@@ -1283,11 +1233,8 @@ pipeline {
                     withCredentials([
 
                         usernamePassword(
-
-                            credentialsId: 'gitops-repo-push',
-
+                            credentialsId: 'moongcheap-jenkins-ci',
                             usernameVariable: 'GIT_USER',
-
                             passwordVariable: 'GIT_TOKEN'
                         )
                     ]) {
@@ -1313,17 +1260,17 @@ pipeline {
 
                             ASKPASS="$(pwd)/git-askpass.sh"
 
-                            printf '%s\\n' \
-                              '#!/bin/sh' \
-                              'case "$1" in' \
-                              '  *Username*)' \
-                              '    printf "%s\\n" "$GIT_USER"' \
-                              '    ;;' \
-                              '  *Password*)' \
-                              '    printf "%s\\n" "$GIT_TOKEN"' \
-                              '    ;;' \
-                              'esac' \
-                              > "$ASKPASS"
+                            cat > "$ASKPASS" <<'EOF'
+                              #!/bin/sh
+                              case "$1" in
+                                *Username*)
+                                  printf '%s\\n' "$GIT_USER"
+                                  ;;
+                                *Password*)
+                                  printf '%s\\n' "$GIT_TOKEN"
+                                  ;;
+                              esac
+                              EOF
 
                             chmod 700 "$ASKPASS"
 
