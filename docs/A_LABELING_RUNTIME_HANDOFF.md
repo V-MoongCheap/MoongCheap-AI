@@ -34,8 +34,8 @@ python -m moongcheap_ai.data_foundation.runtime_job `
   Backend API 제출 경로를 별도로 사용할 때만 필요한 선택 설정이다. 현재 A
   CronJob의 기본 저장 경로는 PostgreSQL 직접 UPDATE다.
 - `A_BACKEND_HTTP_TIMEOUT_SECONDS`: 기본 15초
-- `A_LLM_ENABLED`: 배포에서는 `true`가 필수다. `false`는 모델 런타임 없이
-  로컬 Rule 회귀 테스트를 할 때만 허용한다.
+- `A_LLM_ENABLED`: Model 2 보조를 활성화할 때 `true`로 설정한다. 기존 Cloud 호환 변수인
+  `A_MODEL2_FALLBACK_ENABLED=true`도 지원한다. 두 설정이 모두 꺼져 있으면 Rule/Alias만 실행한다.
 - `A_LLM_MODEL`: 사용할 LLM 모델 이름. 현재 후보는
   `qwen2.5:7b-instruct` Q4다.
 - `A_LLM_ENDPOINT`: 현재 표준인 Ollama `/api/generate` endpoint. Cloud develop
@@ -89,13 +89,17 @@ Backend API를 거치지 않고 직접 DB에 반영한다.
   추가로 주입한다.
 - API 호출은 설정된 횟수만큼 재시도한다. 그래도 실패하면 배치를 반으로
   분할하여 재시도하고, 단일 수요까지 실패한 행만 `FAILED/REVIEW`로 남긴다.
-- 모델 사용은 필수지만, A Pod 내부 실행·sidecar·별도 LLM Worker 중 배치 방식은
-  아직 미정이다. 현재 A 이미지에는 모델 가중치나 Ollama가 포함되어 있지 않으므로,
-  A 이미지에 포함하는 방식을 선택하면 Dockerfile과 리소스 계약을 추가로 갱신해야 한다.
-- Rule이 이미 처리한 행은 LLM으로 덮어쓰지 않는다. `REVIEW`/`CONFLICT`/
-  `PASSTHROUGH`/`LABELED_WITH_REVIEW` 행만 LLM 후보로 보낸다.
-- LLM 결과는 Taxonomy에 존재하는 Facet/Value를 모두 반환하고, 비어 있지 않은 요구사항을 `ALL`로 만들지 않을 때만 적용한다.
-- 부정 표현은 Rule Parser가 담당하며 LLM은 부정 조건을 최종 확정하지 않는다.
+- 배포에서 Model 2 보조를 켤 때 A는 설정된 Ollama HTTP endpoint를 호출한다.
+  A 이미지에는 모델 가중치나 Ollama가 포함되지 않는다. 이 계약은 별도 Worker를
+  필수 아키텍처로 지정하지 않으며, Ollama의 배치·수명주기는 Cloud 배포 설정을 따른다.
+- Rule이 처리한 행은 LLM으로 덮어쓰지 않는다. 모델 후보는 unresolved positive 요청에
+  한정하며, 명시적 제외·충돌·부정·대조·대안 표현은 모델에 보내지 않고 검토 상태로 둔다.
+- 모델 결과는 Category Taxonomy의 Facet key 전체를 정확히 포함해야 한다. 선택한 각
+  Value/alias가 원문에 있어야 하며, 한 Facet에서 여러 Value가 언급되거나 결과 ID/key,
+  JSON이 잘못되면 적용하지 않는다. 비어 있지 않은 요구사항을 전부 `ALL`로 만드는 결과도
+  적용하지 않는다.
+- 압축 `label`에는 긍정 `MUST`/`PREFER` 값만 인코딩한다. `EXCLUDE`는 typed constraints에
+  보존하지만, 제외 대상을 긍정 label 코드로 저장하지 않는다.
 - Cloud ConfigMap이 기존 호환 변수만 사용하는 경우에는
   `A_MODEL2_FALLBACK_ENABLED=true`도 함께 공급해야 한다. 해당 값이 `false`이면
   fallback과 모델 preflight가 모두 비활성화되어 Rule-only로 실행된다.

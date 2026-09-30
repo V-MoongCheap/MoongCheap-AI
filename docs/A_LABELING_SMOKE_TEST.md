@@ -18,6 +18,9 @@
 - 모델이 Taxonomy Value를 선택했지만 원문에 해당 Value/alias 근거가 없으면 `REVIEW`로 보류한다.
   모델이 고른 각 Value에 대해 그 Value 또는 해당 Value의 alias가 원문에 있는지 확인한다.
   배송 요구를 제형으로 잘못 반환한 실제 Ollama 응답과, 다른 Facet 값만 언급된 문장을 보류하는 것을 확인했다.
+- `EXCLUDE` 값은 typed constraints에 보존하지만 긍정 압축 `label`에는 넣지 않는다.
+  부정·대조·대안 문장은 LLM 호출 후보에서 제외하고, 모델 결과의 중복/누락/예상 밖 Demand ID,
+  Taxonomy Facet 누락, 한 Facet의 복수 후보는 실패 또는 `REVIEW`로 처리한다.
 - 최종 코드로 실제 Ollama 호출 및 RDS 세션 임시 테이블 검증:
   배송 요구 `REVIEW`/미저장, 빈 요구 `ALL` 저장, 저장 1건, 재저장 0건.
 - 실제 Ollama/RDS 검증은 `moongcheap-ai-test`의 세션 전용 임시 테이블을 사용했으며,
@@ -25,7 +28,7 @@
 - 현재 배포 중인 CronJob 이미지에는 이 PR의 수정이 아직 포함되지 않았다.
   병합 후 이미지 재빌드·배포가 필요하며, 운영 CronJob의 마지막 확인 실행은 rows 0이라
   새 실제 수요를 대상으로 한 비영(非零) 처리 결과는 아직 확인되지 않았다.
-- 최종 로컬 검증: `1060 passed, 31 skipped`; 변경 파일 Ruff와 `git diff --check` 통과.
+- 최종 로컬 검증: `1085 passed, 31 skipped`; 변경 파일 Ruff와 `git diff --check` 통과.
 
 아래 9월 14일 결과는 당시 구현의 과거 기록이다. REVIEW 저장 정책, 이미지 구성 및 미수행 항목은 현재 운영 정책으로 해석하지 않는다.
 

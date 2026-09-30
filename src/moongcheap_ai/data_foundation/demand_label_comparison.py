@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 from typing import Any
@@ -16,6 +17,32 @@ from .labeling import TaxonomyLoader
 
 class LLMLabelingError(RuntimeError):
     pass
+
+
+def _json_object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def _normalise_evidence_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value)).casefold()).strip()
+
+
+_NON_POSITIVE_REQUIREMENT_MARKERS = (
+    "아니", "말고", "말아", "제외", "빼고", "빼줘", "없이", "없는", "않", "안 ",
+    "안들어", "안 든", "싫", "금지", "피하", "알레르기", "알러지", "비선호", "불가", "못 ",
+    "또는", "혹은", "아니면", "이나", "거나", "중 하나", "둘 다", "상관없", "무관", "제한",
+    "without", "avoid", "except", "exclude", "allergy", "non-", "not ", "not-", "never",
+)
+
+
+def _has_non_positive_requirement_marker(requirement: Any) -> bool:
+    normalized = _normalise_evidence_text(requirement)
+    return any(marker in normalized for marker in _NON_POSITIVE_REQUIREMENT_MARKERS)
 
 
 def ensure_ollama_model_available(endpoint: str, model: str, timeout: int = 10) -> None:
@@ -99,6 +126,8 @@ def _normalise_model_facet_values(raw: Any) -> dict[str, Any]:
         for item in raw:
             if isinstance(item, dict) and "facet_name" in item:
                 facet_name = str(item["facet_name"])
+                if facet_name in converted:
+                    raise LLMLabelingError(f"Ollama returned duplicate facet: {facet_name}")
                 converted[facet_name] = {key: item[key] for key in ("code", "value") if key in item}
         return converted
     if not isinstance(raw, dict):
@@ -120,6 +149,22 @@ class OllamaDemandLabeler:
         self.runtime_seconds = 0.0
 
     def classify(self, rows: list[dict[str, Any]], loader: TaxonomyLoader) -> dict[str, dict[str, Any]]:
+        requested_ids = []
+        for row in rows:
+            if not isinstance(row, dict):
+                raise LLMLabelingError("Ollama request rows must be objects")
+            demand_id = str(row.get("demand_id", "")).strip()
+            if demand_id.casefold() in {"", "none", "nan", "<na>"}:
+                raise LLMLabelingError("Ollama request row is missing demand_id")
+            category_id = str(row.get("category_id", "")).strip()
+            if category_id.casefold() in {"", "none", "nan", "<na>"}:
+                raise LLMLabelingError(f"Ollama request row {demand_id} is missing category_id")
+            requested_ids.append(demand_id)
+        expected_ids = set(requested_ids)
+        if len(expected_ids) != len(requested_ids):
+            raise LLMLabelingError("duplicate demand IDs in Ollama request")
+        if not rows:
+            return {}
         started = time.perf_counter()
         self.call_count += 1
         schema = {
@@ -143,19 +188,31 @@ class OllamaDemandLabeler:
         request = urllib.request.Request(f"{self.endpoint}/api/generate", data=body, headers={"Content-Type": "application/json"}, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            parsed = json.loads(payload.get("response", ""))
+                payload = json.loads(
+                    response.read().decode("utf-8"),
+                    object_pairs_hook=_json_object_without_duplicate_keys,
+                )
+            if not isinstance(payload, dict):
+                raise TypeError("Ollama response envelope must be an object")
+            parsed = json.loads(
+                payload.get("response", ""),
+                object_pairs_hook=_json_object_without_duplicate_keys,
+            )
+            if not isinstance(parsed, (dict, list)):
+                raise TypeError("Ollama response must be an object or result list")
             results = parsed if isinstance(parsed, list) else parsed.get("results")
             if not isinstance(results, list):
                 raise TypeError("results is not a list")
-            expected_ids = {str(row["demand_id"]) for row in rows}
             output = {}
             for item in results:
                 if not isinstance(item, dict) or "demand_id" not in item or not isinstance(item.get("facet_values"), dict):
                     continue
                 demand_id = str(item["demand_id"])
-                if demand_id in expected_ids:
-                    output[demand_id] = _normalise_model_facet_values(item["facet_values"])
+                if demand_id not in expected_ids:
+                    raise LLMLabelingError(f"Ollama returned unexpected demand ID: {demand_id}")
+                if demand_id in output:
+                    raise LLMLabelingError(f"Ollama returned duplicate demand ID: {demand_id}")
+                output[demand_id] = _normalise_model_facet_values(item["facet_values"])
             missing_ids = expected_ids - set(output)
             if missing_ids:
                 raise LLMLabelingError(
@@ -178,6 +235,7 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
     defaults, warnings = loader.product_defaults(row["category_id"], product_rows or [])
     allowed = _allowed(loader, row["category_id"])
     ordered_facets = list(allowed)
+    selected_codes: dict[str, int] = {}
     for facet_name, raw_code in model_values.items():
         facet_key = str(facet_name).strip()
         if ":" in facet_key:
@@ -188,9 +246,11 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
         else:
             facet_name = next((name for name in ordered_facets if name.casefold() == facet_key.casefold()), facet_key)
         if raw_code is None:
+            warnings.append(f"LLM returned null facet value: {facet_name}")
             continue
         code = raw_code.get("code") if isinstance(raw_code, dict) else raw_code
         if isinstance(raw_code, dict) and code is None and raw_code.get("value") is None:
+            warnings.append(f"LLM returned empty facet value: {facet_name}")
             continue
         matched = [value for value in allowed.get(facet_name, []) if str(value.get("code", "")) == str(code)]
         if not matched:
@@ -201,8 +261,14 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
             warnings.append(f"LLM code not found in taxonomy: {facet_name}={code}")
             continue
         value = values[0]
-        defaults[facet_name] = {"code": int(value["code"]), "value": value.get("value", ""), "matched_alias": "LLM"}
-    requirement = str(row.get("extra_requirement", "")).strip().casefold()
+        selected_code = int(value["code"])
+        previous_code = selected_codes.get(facet_name)
+        if previous_code is not None and previous_code != selected_code:
+            warnings.append(f"LLM returned conflicting values for facet: {facet_name}")
+            continue
+        selected_codes[facet_name] = selected_code
+        defaults[facet_name] = {"code": selected_code, "value": value.get("value", ""), "matched_alias": "LLM"}
+    requirement = _normalise_evidence_text(row.get("extra_requirement", ""))
     selected = [
         (facet_name, value)
         for facet_name, value in defaults.items()
@@ -220,11 +286,30 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
                 {},
             )
             evidence = {
-                str(taxonomy_value.get("value", "")).strip().casefold(),
-                *(str(alias).strip().casefold() for alias in taxonomy_value.get("aliases", [])),
+                _normalise_evidence_text(taxonomy_value.get("value", "")),
+                *(_normalise_evidence_text(alias) for alias in taxonomy_value.get("aliases", [])),
             }
             if not any(token and token in requirement for token in evidence):
                 unsupported.append(facet_name)
+                continue
+            mentioned_codes = {
+                int(item.get("code", -1))
+                for item in allowed.get(facet_name, [])
+                if int(item.get("code", 0) or 0) != 0
+                and any(
+                    token and token in requirement
+                    for token in {
+                        _normalise_evidence_text(item.get("value", "")),
+                        *(_normalise_evidence_text(alias) for alias in item.get("aliases", [])),
+                    }
+                )
+            }
+            if len(mentioned_codes) > 1:
+                warnings.append(
+                    f"LLM-selected facet has multiple values in source text: {facet_name}"
+                )
+        if _has_non_positive_requirement_marker(requirement):
+            warnings.append("negative or contrastive constraints remain parser-owned")
         if unsupported:
             warnings.append(
                 "LLM selected facet value lacks matching text evidence: "

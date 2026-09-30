@@ -48,6 +48,24 @@ def test_part_a_returns_backend_contract_without_clustering(tmp_path):
     assert summary["clustering"] == "NOT_PERFORMED"
 
 
+def test_excluded_value_is_preserved_but_not_encoded_as_positive_label(tmp_path):
+    taxonomy, rules, aliases = _fixtures(tmp_path)
+    demands = pd.DataFrame([{
+        "demand_id": "excluded-only",
+        "catalog_id": "p1",
+        "category_id": "c1",
+        "extra_requirement": "분말 말고 캡슐",
+        "is_substitutable": "true",
+    }])
+
+    result, _ = run_part_a_batch(demands, taxonomy, rules, aliases)
+
+    assert result.loc[0, "status"] == "PARSED"
+    assert result.loc[0, "label"] == "0"
+    assert result.loc[0, "facet_values"] == '{"product_form":{"code":0,"value":"ALL"}}'
+    assert json.loads(result.loc[0, "constraints"])[0]["constraintType"] == "EXCLUDE"
+
+
 def test_part_a_isolates_parser_failure_and_preserves_backend_ids(tmp_path, monkeypatch):
     taxonomy, rules, aliases = _fixtures(tmp_path)
     demands = pd.DataFrame([
