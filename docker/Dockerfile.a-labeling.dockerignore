@@ -1,13 +1,16 @@
 # Keep the labeling image independent of local data, secrets, and model caches.
 **
 !packaging/
-!packaging/demand-clustering/
-!packaging/demand-clustering/pyproject.toml
-!packaging/demand-clustering/uv.lock
+!packaging/a-labeling/
+!packaging/a-labeling/pyproject.toml
+!packaging/a-labeling/uv.lock
 !src/
 !src/moongcheap_ai/
 !src/moongcheap_ai/**
 !config/
 !config/model1_aliases_reviewed_v2.json
+!config/demand_constraint_aliases.json
+!config/demand_constraint_rules.json
+!config/facet_taxonomy_v2_2.json
 **/__pycache__/
 **/*.py[cod]

@@ -16,7 +16,7 @@ from moongcheap_ai.data_foundation.model1 import ModelCallError, parse_model_out
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from scripts.evaluation.run_model1_technique_benchmark import (
+from scripts.evaluation.run_model1_technique_benchmark import (  # noqa: E402 -- repository path above enables direct CLI execution
     FEWSHOT,
     STRICT,
     _call_ollama,

@@ -32,7 +32,7 @@ def main() -> None:
     started = time.perf_counter()
     target_categories = {"health-functional-food:vitamin_mineral", "health-functional-food:probiotics", "health-functional-food:skin_collagen"} if args.smoke_only else set(sampled["category_key"].unique())
     provider = config.provider if config else "transformers"
-        model_name = config.model if config else "qwen3:4b"
+    model_name = config.model if config else "qwen3:4b"
     model = create_model_adapter(provider, model_name)
     raw_path = args.output_dir / "facet_discovery_model_raw_v0.jsonl"
     review_rows, failures, merged = [], [], []

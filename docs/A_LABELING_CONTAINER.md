@@ -23,6 +23,15 @@ docker build \
 
 Runtime entrypoint는 `a-labeling-batch --write-db --output /tmp/a-labeling-output.csv`다. 이미지에는 Raw data, `.env`, DB Secret, 모델 가중치를 포함하지 않는다. `/tmp`는 컨테이너의 유일한 쓰기 경로다.
 
+이미지의 `config/`에는 reviewed alias, compatibility alias, constraint rules,
+`facet_taxonomy_v2_2.json`을 포함한다. DB 실행에서는 `category.facet`을 사용하고,
+번들 Taxonomy는 파일 입력 검증용이다. Dockerfile의 COPY 목록을 변경할 때는
+`Dockerfile.a-labeling.dockerignore`의 허용 목록도 함께 갱신한다.
+
+Jenkins 보안 검사 단계는 전용 Trivy/Gitleaks 컨테이너를 자체 Pod 설정으로
+선언한다. Cloud의 기본 `python-builder`에 이 컨테이너들이 있다고 가정하지 않는다.
+Python 테스트는 `uv sync --python 3.13.12`로 이미지와 같은 버전을 선택한다.
+
 ## Model 2 fallback
 
 기본 실행은 결정론적인 Rule/Alias 경로다. 운영에서 Qwen fallback을 사용하려면
