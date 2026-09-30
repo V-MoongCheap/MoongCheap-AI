@@ -440,6 +440,7 @@ pipeline {
                                 uv sync \
                                   --project packaging/a-labeling \
                                   --locked \
+                                  --extra data \
                                   --extra dev
 
                                 PYTHONPATH=. uv run \
