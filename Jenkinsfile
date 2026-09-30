@@ -440,17 +440,13 @@ pipeline {
                                 uv sync \
                                   --project packaging/a-labeling \
                                   --locked \
+                                  --extra data \
                                   --extra dev
 
                                 PYTHONPATH=. uv run \
                                   --project packaging/a-labeling \
                                   --no-sync \
-                                  pytest -q \
-                                  tests/data_foundation \
-                                  tests/evaluation \
-                                  tests/model1 \
-                                  tests/taxonomy \
-                                  tests/test_model1.py
+                                  pytest -q
                             '''
                         }
                     }
