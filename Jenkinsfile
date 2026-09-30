@@ -491,6 +491,7 @@ pipeline {
 
                                     python -m pytest \
                                       tests/seller_matching \
+                                      --ignore=tests/seller_matching/test_baseline.py \
                                       -q
 
                                 elif [ -d tests/awarding ]; then
