@@ -445,7 +445,12 @@ pipeline {
                                 PYTHONPATH=. uv run \
                                   --project packaging/a-labeling \
                                   --no-sync \
-                                  pytest -q
+                                  pytest -q \
+                                  tests/data_foundation \
+                                  tests/evaluation \
+                                  tests/model1 \
+                                  tests/taxonomy \
+                                  tests/test_model1.py
                             '''
                         }
                     }
