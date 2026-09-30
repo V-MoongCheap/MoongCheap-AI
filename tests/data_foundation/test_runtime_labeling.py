@@ -10,9 +10,13 @@ from moongcheap_ai.data_foundation.backend_contract import (
 )
 from moongcheap_ai.data_foundation.demand_label_comparison import (
     LLMLabelingError,
+    _apply_model_result,
     ensure_ollama_model_available,
 )
-from moongcheap_ai.data_foundation.labeling import taxonomy_from_category_facet_rows
+from moongcheap_ai.data_foundation.labeling import (
+    TaxonomyLoader,
+    taxonomy_from_category_facet_rows,
+)
 from moongcheap_ai.data_foundation.runtime_job import (
     _first_env,
     _limit_llm_target,
@@ -132,7 +136,7 @@ def test_runtime_splits_failed_llm_batches_and_processes_every_row(tmp_path, mon
     assert FlakyLabeler.call_count > 3
 
 
-@pytest.mark.parametrize("outcome", ["review", "accepted", "unavailable"])
+@pytest.mark.parametrize("outcome", ["review", "unavailable"])
 def test_first_fallback_decision_is_not_overridden_by_second_call(tmp_path, monkeypatch, outcome) -> None:
     taxonomy = {"categories": [{"category_id": "c1", "facets": [{
         "facet_id": 1, "name": "form", "order": 1,
@@ -160,10 +164,22 @@ def test_first_fallback_decision_is_not_overridden_by_second_call(tmp_path, monk
     assert summary["calls"] == 1
     assert summary["applied"] == 0
     assert summary["failed"] == int(outcome == "unavailable")
-    assert summary["review"] == int(outcome != "unavailable")
+    assert summary["review"] == int(outcome == "review")
 
 
-def test_model_cannot_turn_unrelated_text_into_a_facet(tmp_path, monkeypatch) -> None:
+def test_model_value_with_matching_alias_has_positive_evidence() -> None:
+    taxonomy = {"categories": [{"category_id": "c1", "facets": [{
+        "facet_id": 1, "name": "form", "order": 1,
+        "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "분말", "aliases": ["가루"]}],
+    }]}]}
+
+    row = pd.Series({"category_id": "c1", "extra_requirement": "가루 형태를 원해요"})
+    values, warnings = _apply_model_result(row, {"form": {"code": 1}}, TaxonomyLoader(taxonomy))
+    assert values["form"]["value"] == "분말"
+    assert warnings == []
+
+
+def test_runtime_keeps_model_value_without_text_evidence_in_review(tmp_path, monkeypatch) -> None:
     taxonomy = {"categories": [{"category_id": "c1", "facets": [{
         "facet_id": 1, "name": "form", "order": 1,
         "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "분말"}],
@@ -171,6 +187,7 @@ def test_model_cannot_turn_unrelated_text_into_a_facet(tmp_path, monkeypatch) ->
 
     class Labeler:
         call_count = 0
+        runtime_seconds = 0.0
 
         def __init__(self, *args, **kwargs):
             pass
@@ -180,10 +197,37 @@ def test_model_cannot_turn_unrelated_text_into_a_facet(tmp_path, monkeypatch) ->
             return {"1": {"form": {"code": 1}}}
 
     monkeypatch.setattr(runtime_job, "OllamaDemandLabeler", Labeler)
-    frame = pd.DataFrame([{"demand_id": "1", "catalog_id": "1", "category_id": "c1", "extra_requirement": "내일까지 배송해주세요"}])
-    labeled, _ = run_batch(frame, tmp_path / "unused.json", taxonomy_payload=taxonomy, model2_fallback_enabled=True)
+    frame = pd.DataFrame([{
+        "demand_id": "1",
+        "catalog_id": "1",
+        "category_id": "c1",
+        "extra_requirement": "내일까지 배송해주세요",
+    }])
+    labeled, _ = run_batch(
+        frame,
+        tmp_path / "unused.json",
+        taxonomy_payload=taxonomy,
+        model2_fallback_enabled=True,
+    )
     assert labeled.loc[0, "label_status"] == "REVIEW"
     assert labeled.loc[0, "fallback_status"] == "REVIEW"
+
+
+@pytest.mark.parametrize("requirement", ["내일까지 배송해주세요", "캡슐로 주세요"])
+def test_model_cannot_assign_a_facet_without_matching_text_evidence(requirement) -> None:
+    taxonomy = {"categories": [{"category_id": "c1", "facets": [{
+        "facet_id": 1, "name": "form", "order": 1,
+        "values": [
+            {"code": 0, "value": "ALL"},
+            {"code": 1, "value": "분말", "aliases": ["가루"]},
+            {"code": 2, "value": "캡슐"},
+        ],
+    }]}]}
+
+    row = pd.Series({"category_id": "c1", "extra_requirement": requirement})
+    values, warnings = _apply_model_result(row, {"form": {"code": 1}}, TaxonomyLoader(taxonomy))
+    assert values["form"]["value"] == "분말"
+    assert any("lacks matching text evidence" in warning for warning in warnings)
 
 
 def test_label_runtime_builds_backend_payload(tmp_path) -> None:

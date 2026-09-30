@@ -204,20 +204,32 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
         defaults[facet_name] = {"code": int(value["code"]), "value": value.get("value", ""), "matched_alias": "LLM"}
     requirement = str(row.get("extra_requirement", "")).strip().casefold()
     selected = [
-        value
+        (facet_name, value)
         for facet_name, value in defaults.items()
-        if int(value.get("code", 0) or 0) != 0
+        if value.get("matched_alias") == "LLM" and int(value.get("code", 0) or 0) != 0
     ]
     if requirement and selected:
-        evidence = set()
-        for facet_values in allowed.values():
-            for value in facet_values:
-                if int(value.get("code", 0) or 0) == 0:
-                    continue
-                evidence.add(str(value.get("value", "")).strip().casefold())
-                evidence.update(str(alias).strip().casefold() for alias in value.get("aliases", []))
-        if not any(token and token in requirement for token in evidence):
-            warnings.append("LLM result has no taxonomy text evidence")
+        unsupported = []
+        for facet_name, selected_value in selected:
+            taxonomy_value = next(
+                (
+                    item
+                    for item in allowed.get(facet_name, [])
+                    if int(item.get("code", -1)) == int(selected_value["code"])
+                ),
+                {},
+            )
+            evidence = {
+                str(taxonomy_value.get("value", "")).strip().casefold(),
+                *(str(alias).strip().casefold() for alias in taxonomy_value.get("aliases", [])),
+            }
+            if not any(token and token in requirement for token in evidence):
+                unsupported.append(facet_name)
+        if unsupported:
+            warnings.append(
+                "LLM selected facet value lacks matching text evidence: "
+                + ", ".join(unsupported)
+            )
     return defaults, warnings
 
 

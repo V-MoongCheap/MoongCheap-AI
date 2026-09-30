@@ -272,7 +272,7 @@ def test_runtime_job_uses_qwen_only_for_unresolved_rows(tmp_path, monkeypatch):
     assert result.set_index("demand_id").loc["parsed", "fallback_status"] == ""
     assert result.set_index("demand_id").loc["fallback", "status"] == "REVIEW"
     assert result.set_index("demand_id").loc["fallback", "fallback_status"] == "REVIEW"
-    assert "no taxonomy text evidence" in result.set_index("demand_id").loc["fallback", "fallback_warning"]
+    assert "lacks matching text evidence" in result.set_index("demand_id").loc["fallback", "fallback_warning"]
 
 
 def test_runtime_job_keeps_unavailable_qwen_rows_in_review(tmp_path, monkeypatch):
