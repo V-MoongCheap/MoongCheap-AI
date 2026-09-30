@@ -14,6 +14,9 @@ from moongcheap_ai.demand_clustering.input_models import (
     DemandBoardInput,
     DemandInput,
 )
+from moongcheap_ai.demand_clustering.part_a_integration import (
+    build_part_b_runtime_parser,
+)
 from moongcheap_ai.demand_clustering.postgres_reader import ClusteringInputBatch
 from moongcheap_ai.demand_constraints import DemandConstraintParser
 
@@ -57,12 +60,18 @@ def demand(catalog_id: int, name: str, requirement: str) -> DemandInput:
     )
 
 
-def board(board_id: int, catalog_id: int, name: str) -> DemandBoardInput:
+def board(
+    board_id: int,
+    catalog_id: int,
+    name: str,
+    *,
+    participant_count: int = 5,
+) -> DemandBoardInput:
     return DemandBoardInput(
         id=board_id,
         catalog_id=catalog_id,
         catalog_name=name,
-        participant_count=5,
+        participant_count=participant_count,
         created_at=NOW - timedelta(hours=1),
         sale_end_at=NOW + timedelta(days=1),
         price_min=10_001,
@@ -90,11 +99,13 @@ def planner(seed: pd.DataFrame) -> CatalogSeedSubstituteProposalPlanner:
 
 
 def test_v5_seed_needs_no_claim_columns_and_keeps_sentence_structure() -> None:
-    seed = pd.DataFrame([
-        seed_row(101, "단백질 정제 원상품"),
-        seed_row(201, "단백질 분말 대체상품"),
-        seed_row(202, "단백질 분말 다른세부카테고리", leaf="cat-v5-other"),
-    ])
+    seed = pd.DataFrame(
+        [
+            seed_row(101, "단백질 정제 원상품"),
+            seed_row(201, "단백질 분말 대체상품"),
+            seed_row(202, "단백질 분말 다른세부카테고리", leaf="cat-v5-other"),
+        ]
+    )
 
     result = planner(seed).plan(
         ClusteringInputBatch(
@@ -113,20 +124,98 @@ def test_v5_seed_needs_no_claim_columns_and_keeps_sentence_structure() -> None:
     assert result.decisions[0].selected_board.structured_preference_score == 1.0
 
 
+def test_capsule_preference_outranks_a_larger_powder_board() -> None:
+    seed = pd.read_csv(
+        ROOT
+        / "packaging/demand-clustering/runtime-assets/product_catalog_seed_v5.csv.gz",
+        dtype=str,
+    ).fillna("")
+    taxonomy = json.loads(
+        (ROOT / "config/facet_taxonomy_v2_2.json").read_text(encoding="utf-8")
+    )
+    requirement_parser, integration = build_part_b_runtime_parser(
+        taxonomy,
+        rules_path=ROOT / "config/demand_constraint_rules.json",
+        aliases_path=ROOT / "config/model1_aliases_reviewed_v2.json",
+        compatibility_aliases_path=(
+            ROOT / "config/demand_constraint_aliases.json"
+        ),
+    )
+    proposal_planner = CatalogSeedSubstituteProposalPlanner(
+        seed,
+        taxonomy,
+        requirement_parser,
+        text_similarity_scorer=lambda _query, _candidate: 0.5,
+    )
+    capsule_name = "네이처랜드 컴플리트 프로바이오틱스 500mg x 60캡슐"
+    powder_name = (
+        "유산균 2000mgx30포 생유산균 유산균12종혼합분말 "
+        "바이오틱스 하루한포 특판 사은품 선물용"
+    )
+    profiles = build_runtime_seed_catalog(seed, taxonomy)
+
+    assert integration["primaryAliasLoadStatus"] == "LOADED"
+    assert integration["deprecatedTaxonomyCanonicalizationCount"] == 3
+    assert profiles[capsule_name].facet_values["product_form"] == 2
+    assert profiles[powder_name].facet_values["product_form"] == 1
+
+    result = proposal_planner.plan(
+        ClusteringInputBatch(
+            demands=(
+                demand(
+                    3_000,
+                    "락토핏 골드",
+                    "가능하면 캡슐 제품으로 부탁해요.",
+                ),
+            ),
+            boards=(
+                board(
+                    31,
+                    3_101,
+                    capsule_name,
+                    participant_count=5,
+                ),
+                board(
+                    32,
+                    3_102,
+                    powder_name,
+                    participant_count=10,
+                ),
+            ),
+        ),
+        as_of=NOW,
+    )
+
+    decision = result.decisions[0]
+    assert result.proposals[0]["demandBoardId"] == 31
+    assert decision.selected_board is not None
+    assert decision.selected_board.demand_board_id == 31
+    assert decision.selected_board.matched_preferences == ("product_form:캡슐",)
+    assert [item.participant_count for item in decision.ranked_boards] == [5, 10]
+    assert [item.structured_preference_score for item in decision.ranked_boards] == [
+        1.0,
+        0.0,
+    ]
+
+
 def test_v5_seed_keeps_must_and_exclude_as_hard_gates() -> None:
-    seed = pd.DataFrame([
-        seed_row(101, "원상품 정제"),
-        seed_row(201, "판토텐산 분말"),
-        seed_row(202, "비오틴 분말"),
-    ])
+    seed = pd.DataFrame(
+        [
+            seed_row(101, "원상품 정제"),
+            seed_row(201, "판토텐산 분말"),
+            seed_row(202, "비오틴 분말"),
+        ]
+    )
 
     result = planner(seed).plan(
         ClusteringInputBatch(
-            demands=(demand(
-                101,
-                "원상품 정제",
-                "비오틴은 절대 포함 금지이고, 분말은 꼭 포함해 주세요.",
-            ),),
+            demands=(
+                demand(
+                    101,
+                    "원상품 정제",
+                    "비오틴은 절대 포함 금지이고, 분말은 꼭 포함해 주세요.",
+                ),
+            ),
             boards=(
                 board(31, 201, "판토텐산 분말"),
                 board(32, 202, "비오틴 분말"),
@@ -143,10 +232,12 @@ def test_v5_seed_keeps_must_and_exclude_as_hard_gates() -> None:
 
 
 def test_missing_or_unmapped_seed_product_skips_only_substitution() -> None:
-    seed = pd.DataFrame([
-        seed_row(101, "매핑 상품"),
-        seed_row(201, "카테고리 미매핑 상품", category=""),
-    ])
+    seed = pd.DataFrame(
+        [
+            seed_row(101, "매핑 상품"),
+            seed_row(201, "카테고리 미매핑 상품", category=""),
+        ]
+    )
     runtime = build_runtime_seed_catalog(
         seed,
         json.loads(

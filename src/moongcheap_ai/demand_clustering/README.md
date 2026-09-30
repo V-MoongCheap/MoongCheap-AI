@@ -100,7 +100,7 @@ planner는 v5 seed의 상품명과 PostgreSQL `product_catalog.name`을 정확�
 PostgreSQL 조회, API 1 호출, PostgreSQL 재조회, 대체상품 계획, API 2 호출 순서를
 한 번 수행하고 요약 JSON을 표준 출력에 남긴 뒤 종료한다. DB 연결에는
 `default_transaction_read_only=on`과 autocommit을 함께 적용한다. 기본 K8s 설정은
-Backend DB 계정을 공유하며, 이 세션 설정이 DB role의 권한을 변경하지는 않는다.
+Cloud의 Part B 전용 `ai-clustering-database` Secret을 사용한다.
 
 필수 운영 설정은 다음과 같다.
 
@@ -114,9 +114,9 @@ Backend DB 계정을 공유하며, 이 세션 설정이 DB role의 권한을 변
   `E5_BATCH_SIZE`, `BACKEND_HTTP_TIMEOUT_SECONDS`,
   `POSTGRES_CONNECT_TIMEOUT_SECONDS`
 
-기본 K8s 설정은 `backend-env`의 DB 세 항목을 같은 이름으로 받고,
-`MOONGCHEAP_INTERNAL_API_KEY`를 `BACKEND_INTERNAL_KEY`로 매핑한다. 내부 키 항목은
-Cloud에서 추가 공급해야 하며, 참조를 바꾸는 것만으로 생성되지 않는다.
+기본 K8s 설정은 `ai-clustering-database`의 DB 세 항목을 같은 이름으로 받고,
+`backend-env/MOONGCHEAP_INTERNAL_API_KEY`를 `BACKEND_INTERNAL_KEY`로 매핑한다.
+두 Secret은 Cloud의 ExternalSecret이 공급하며 AI 매니페스트가 생성하지 않는다.
 `DB_URL`의 `jdbc:` 접두사를 제거하고 URL 인코딩한 계정·비밀번호를 넣어 PostgreSQL
 DSN을 만든다. IPv6 주소와 libpq 호환 query를 보존하며, JDBC 전용 query는 지원하지 않는다.
 기존 `SHARED_DATABASE_URL` 직접 입력은 PostgreSQL DSN이어야 하며 JDBC 형식을

@@ -36,6 +36,7 @@ from .substitute_proposal_planner import (
     SkippedSubstituteDemand,
     SubstituteProposalPlanningResult,
 )
+from .taxonomy_compat import prepare_part_b_taxonomy
 
 CATALOG_SEED_COLUMNS = {
     "catalog_seed_id",
@@ -160,8 +161,9 @@ def build_runtime_seed_catalog(
         if values.eq("").any() or values.duplicated().any():
             raise ValueError(f"{label} must be nonempty and unique")
 
-    categories = _taxonomy_categories(taxonomy)
-    version = _taxonomy_version(taxonomy)
+    compatibility_taxonomy = prepare_part_b_taxonomy(taxonomy).taxonomy
+    categories = _taxonomy_categories(compatibility_taxonomy)
+    version = _taxonomy_version(compatibility_taxonomy)
     profiles: dict[str, RuntimeSeedCatalogProfile] = {}
     for row in normalized.to_dict("records"):
         name = _text(row["name"])

@@ -91,12 +91,13 @@ def main() -> int:
         E5RuntimeScorerConfig,
         E5RuntimeTextSimilarityScorer,
     )
+    from moongcheap_ai.demand_clustering.part_a_integration import (
+        build_part_b_runtime_parser,
+        validate_profile_versions,
+    )
     from moongcheap_ai.demand_clustering.substitute_proposal_planner import (
         ClaimIndexedSubstituteProposalPlanner,
         build_runtime_catalog_profiles,
-    )
-    from moongcheap_ai.demand_clustering.part_a_integration import (
-        build_part_b_parser, validate_profile_versions,
     )
 
     profiles = pd.read_csv(args.profiles, dtype=str).fillna("")
@@ -106,7 +107,7 @@ def main() -> int:
     checkpoint("importsAndArtifactRead")
 
     validate_profile_versions(profiles, taxonomy)
-    parser, integration = build_part_b_parser(
+    parser, integration = build_part_b_runtime_parser(
         taxonomy, rules_path=args.rules, aliases_path=args.aliases,
         compatibility_aliases_path=args.compatibility_aliases,
     )
