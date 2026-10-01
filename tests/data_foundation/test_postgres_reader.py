@@ -149,29 +149,19 @@ def test_current_backend_schema_uses_authoritative_catalog_mapping(
     )
 
 
-def test_nullable_catalog_category_keeps_demand_visible_for_safe_review() -> None:
+def test_unmapped_catalog_category_is_outside_a_labeling_input_scope() -> None:
     connection = _Connection(
         [
             [{"has_category_id": True}],
-            [
-                {
-                    "demand_id": 55,
-                    "catalog_id": 99,
-                    "category_db_id": "",
-                    "category_facet": "",
-                    "extra_requirement": "",
-                    "processed_at": "",
-                }
-            ],
+            [],
         ]
     )
 
     result = read_unprocessed_demands(connection)
 
-    assert len(result) == 1
-    assert result.loc[0, "demand_id"] == 55
-    assert result.loc[0, "category_id"] == ""
-    assert "LEFT JOIN category AS c" in DEFAULT_DEMANDS_SQL_WITH_CATEGORY
+    assert result.empty
+    assert "JOIN category AS c" in DEFAULT_DEMANDS_SQL_WITH_CATEGORY
+    assert "LEFT JOIN category AS c" not in DEFAULT_DEMANDS_SQL_WITH_CATEGORY
 
 
 def test_current_backend_schema_fails_without_authoritative_mapping() -> None:

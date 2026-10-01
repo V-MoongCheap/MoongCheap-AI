@@ -341,7 +341,13 @@ class TaxonomyLoader:
     def product_defaults(
         self, category_id: Any, rows: list[dict[str, Any]]
     ) -> tuple[dict[str, dict[str, Any]], list[str]]:
-        """Convert mapped product facet evidence into taxonomy defaults."""
+        """Build a full ordered label baseline from confirmed product facets.
+
+        Missing or unresolved product facts do not invalidate the whole
+        profile. Their positional label slot is represented by taxonomy ALL
+        (code 0); this means no confirmed value is available for that slot,
+        not that the product is known to have an ALL-valued property.
+        """
         category = self.categories.get(_text(category_id).strip())
         if category is None:
             return {}, [f"taxonomy category not found: {category_id}"]
@@ -365,9 +371,13 @@ class TaxonomyLoader:
                 warnings.append(f"product facet not found in taxonomy: {facet_name}")
                 continue
             status = str(row.get("mapping_status", "")).strip().upper()
+            if status in {"UNKNOWN", "AMBIGUOUS", "UNMAPPED", "UNMATCHED"}:
+                # Absence/uncertainty is local to this Facet. Keep other
+                # confirmed product values and encode this slot as ALL below.
+                continue
             if status != "MAPPED":
                 warnings.append(
-                    f"product facet is not known: {facet_name} ({status or 'NO_STATUS'})"
+                    f"unsupported product facet mapping status: {facet_name} ({status or 'NO_STATUS'})"
                 )
                 continue
             if not raw_value:
@@ -428,18 +438,32 @@ class TaxonomyLoader:
                     f"product facet value is ambiguous in taxonomy: {facet_name}={raw_value}"
                 )
         for facet_name in facets:
-            if counts.get(facet_name, 0) == 0:
-                warnings.append(f"product Facet profile is missing facet: {facet_name}")
-            elif counts[facet_name] > 1:
+            if counts.get(facet_name, 0) > 1:
                 warnings.append(f"product Facet profile duplicates facet: {facet_name}")
         # The compact Backend label is a positional vector. Always serialize
         # in taxonomy facet order, never in the incidental CSV row order.
         for facet_name in facets:
             values = mapped_values.get(facet_name, {})
-            if not values:
-                continue
             if len(values) == 1:
                 defaults[facet_name] = next(iter(values.values()))
+            elif not values:
+                all_value = next(
+                    (
+                        item
+                        for item in facets[facet_name].get("values", [])
+                        if int(item.get("code", -1)) == 0
+                        and str(item.get("value", "")).upper() == "ALL"
+                    ),
+                    None,
+                )
+                if all_value is None:
+                    warnings.append(f"taxonomy Facet has no ALL value: {facet_name}")
+                else:
+                    defaults[facet_name] = {
+                        "code": 0,
+                        "value": "ALL",
+                        "matched_alias": "",
+                    }
             else:
                 warnings.append(
                     f"conflicting product facet values for facet: {facet_name}"

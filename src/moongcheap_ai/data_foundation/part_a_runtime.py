@@ -269,8 +269,9 @@ def run_part_a_batch(
                 "passthroughText": requirement if status == "PASSTHROUGH" else None,
                 "reasonCodes": json.dumps(reason_codes, ensure_ascii=False, separators=(",", ":")),
                 # This stage only interprets consumer text. A final numeric
-                # label requires the selected product's complete Facet profile
-                # and is created by the labeling runtime after that is joined.
+                # label requires the selected product's category-matched Facet
+                # evidence; unconfirmed positions become ALL(0) in the final
+                # vector. The labeling runtime creates it after joining profile.
                 "label": "",
                 "facet_values": "{}",
                 "parserVersion": RUNTIME_VERSION,

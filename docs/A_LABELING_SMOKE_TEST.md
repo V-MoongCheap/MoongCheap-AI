@@ -7,11 +7,18 @@ Current behavior supersedes the historical REVIEW persistence statements below:
 - The reader loads the actual selected Backend catalog's Category taxonomy and
   looks up its explicit Product Facet profile by `backend_catalog_id`, which
   contains the actual Backend `product_catalog.id`.
-- Profile rows must cover every Taxonomy Facet and match the Taxonomy category;
-  missing, conflicting, or incompatible profiles are not marked processed.
+- Product profiles need not confirm every Taxonomy Facet. Confirmed mapped values
+  are retained; missing or unresolved Facets use code `0` (`ALL`) only in that
+  label position. This is not a claim about the product's actual property.
+  Conflicting duplicates, invalid mapped values, a missing whole profile, or
+  category mismatch remain unprocessed.
 - The runtime does not infer product Facets from `name`, `spec_summary`, or
-  `description`. An explicit `UNKNOWN` profile value must remain distinct from
-  `ALL` and keep the Demand unprocessed under the current numeric-label contract.
+  `description`. Unconfirmed individual product Facets do not block other known
+  values or the Demand; code `0` fills only the corresponding unconstrained label
+  dimension.
+- Demands whose catalog has no Backend `category_id` are outside the current
+  A taxonomy scope and are excluded by the DB reader join. A categorized row
+  with missing/malformed `category.facet` is still a configuration/data error.
 - Empty requirements, ambiguous/failed analysis, and explicit exclusions retain
   the product baseline. A stable positive consumer constraint overrides only
   its own Facet.
@@ -19,32 +26,45 @@ Current behavior supersedes the historical REVIEW persistence statements below:
   the run fails before DB access/write so the next schedule can retry. This is
   distinct from a per-demand interpretation failure, which retains the product
   baseline as specified above.
-- A valid complete category/product baseline is a completed label and is
-  persisted; a missing/incomplete product profile or Category/taxonomy remains
+- A category-matched product profile with any number of confirmed Facets is a
+  valid baseline: confirmed values are used and unknown dimensions receive
+  `ALL(0)`. A missing whole product profile or Category/taxonomy remains
   retryable. Parser `status` is diagnostic; `label_status` controls persistence.
-- This code change has only been locally tested so far. A rebuilt image and a
-  non-zero dev batch are required before claiming deployment verification.
-- The current local build context does not contain the required product Facet
-  CSV, and the deployed image's contents were not inspected in this run. A new
-  image built from this worktree needs a taxonomy-aligned, actual-Backend-ID
-  artifact at `/artifacts/product_facets.csv`; without it, non-empty batches
-  intentionally fail closed.
+- This change has been locally tested and built into a local image. A CI/ECR
+  image built from the reviewed revision and a non-zero dev batch are still
+  required before claiming deployment verification.
+- A locally prepared artifact is present at `artifacts/product_facets.csv`
+  (SHA-256 `508ba2d9b49a48dfad06342ff29384dfc0d8f9d7c6d1974e26a3b57a2c3bef9f`),
+  but `.gitignore` excludes it. A Git checkout/Jenkins build therefore will not
+  receive it unless it is separately staged in the build input. The deployed
+  image's contents were not inspected in this run; verify this exact artifact
+  hash at `/artifacts/product_facets.csv` inside the image before running
+  any database batch, including an empty batch.
 - The older 5,000-row smoke results below predate this product-baseline policy
   and do not verify the current rule that product Facets seed each label.
 
 ## 2026-10-01 local regression verification
 
-- Full repository regression: `1156 passed, 31 skipped`.
-- The seller-awarding localhost mock tests were included in this run; loopback
-  socket access was available.
-- Ruff and `git diff --check` passed. Docker image build was not verified
-  because the local Docker daemon was unavailable.
-- The A-labeling lockfile check passed. Wheel build could not be verified
-  because this environment could not resolve PyPI DNS for the isolated build
-  dependency (`hatchling`).
-- `kubectl kustomize k8s/base/a-labeling-job` rendered successfully; the base
-  CronJob remains suspended and points to the required runtime profile path.
-- No live database or Kubernetes write test was run after this code change.
+- A-focused regression (runtime, product mapping, and DB reader): `127 passed`.
+- Full repository regression, rerun with localhost mock-server permission:
+  `1158 passed, 31 skipped`. The initial sandboxed run blocked loopback binds;
+  the affected seller-awarding test file passed separately (`20 passed`) after
+  allowing its local mock servers. The 31 Seller Analysis HTTP tests skip because
+  FastAPI is not installed in this local environment; they still need a
+  dependency-complete CI run.
+- Ruff on changed Python files and `git diff --check` passed.
+- The local 1,890-product Facet artifact (5,670 rows; SHA-256
+  `508ba2d9b49a48dfad06342ff29384dfc0d8f9d7c6d1974e26a3b57a2c3bef9f`) was
+  processed offline: all 1,890 profiles produced a full baseline, with unknown
+  Facet dimensions represented by `ALL(0)` and confirmed values retained.
+- The B runtime taxonomy checksum currently matches `catalog.json`'s
+  `taxonomySha256` (`807a9e8055286812ec2b4350070af8a750d81eb0be573701f83e80c9fad30b6f`).
+- Local A Docker image build succeeded. Running the built image as its configured
+  non-root user reported the same artifact SHA-256 shown above, and the batch CLI
+  starts and prints help. The Dockerfile now refuses to build a deployable A
+  image when the required CSV is absent/empty. This image was not pushed to ECR;
+  live Ollama/DB writes and deployed-image inspection remain unverified. CI still
+  needs an approved method to stage the Git-ignored artifact.
 
 ## 2026-09-30 EKS/RDS 검증 (당시 저장 정책의 역사 기록)
 

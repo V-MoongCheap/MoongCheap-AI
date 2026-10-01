@@ -6,26 +6,36 @@
 PostgreSQL read/write (A CronJob deployment)
   demand -> product_catalog -> category.facet
   -> backend_catalog_id keyed product Facet mapping artifact
-  -> exact category/taxonomy and complete product profile validation
+  -> exact category/taxonomy and per-Facet product evidence validation
   -> original product Facet baseline
   -> stable positive demand constraints override matching Facets
-  -> unresolved rows only: external Model 2 Worker
+  -> unresolved positive rows only: Cloud Ollama API (Qwen 2.5 7B)
   -> demand.label / demand.processed_at UPDATE
 ```
 
 Each pending Demand starts from the Facet values in the explicit product mapping
 artifact for its actual Backend `catalog_id`, carried in the distinct
 `backend_catalog_id` column. The map's `category_id` must match
-the key used by the corresponding `category.facet` Taxonomy, and it must include
-one row per Taxonomy Facet. `MAPPED` values are validated against that Taxonomy;
-`UNKNOWN` is distinct from `ALL` and cannot be encoded by the current numeric
-label contract. A profile with an unknown Facet therefore remains unprocessed;
-it must not be converted to `ALL`. Missing, conflicting, incomplete, or
-taxonomy-incompatible profiles remain unprocessed;
+the key used by the corresponding `category.facet` Taxonomy. Facet rows may be
+partial. `MAPPED` values are validated against that Taxonomy and become product
+defaults. A missing or `UNKNOWN`/`AMBIGUOUS`/`UNMAPPED` Facet uses code `0`
+(`ALL`) only at that position in the numeric demand label. Here `ALL` means no
+confirmed constraint/value for that label dimension; it does not assert that
+the product has a known `ALL`-valued property. Conflicting duplicate rows,
+invalid mapped values, unsupported statuses, a missing whole product profile,
+or a taxonomy-incompatible category remain unprocessed;
 the runtime does not infer product Facets from product name or description. A
 stable positive `MUST`/`PREFER` interpretation overrides only its own Facet.
 Empty requirements, parser/model failure, ambiguous input, and explicit
 exclusions retain the original product baseline.
+
+The database reader joins `product_catalog.category_id` to `category` and only
+selects catalog items with an assigned Backend category. Products intentionally
+left uncategorized (outside the current Health Functional Food taxonomy scope)
+are not sent through A and cannot make a supported-category batch fail. A
+categorized product whose `category.facet` is missing or malformed remains a
+data/configuration error and fails closed rather than being silently assigned a
+label.
 
 This baseline is not a consumer preference: it represents the original
 selected product. `label_source` in the local run output distinguishes
@@ -54,12 +64,14 @@ python -m moongcheap_ai.data_foundation.runtime_job `
 - `A_TAXONOMY_PATH`: 승인된 Taxonomy artifact 경로
 - `A_PRODUCT_FACETS_PATH`: 필수 Product Facet mapping CSV 경로. 실제 Backend
   `product_catalog.id`만 `backend_catalog_id` 컬럼에 넣고, Taxonomy의 `category_id`,
-  모든 Facet별 `mapping_status`와 `value`를 포함한다. 배치 입력의 상품 ID를
+  Facet별 `mapping_status`와 `value`를 포함한다. 배치 입력의 상품 ID를
   Seed/source ID로 추정하지 않는다. 예시 컬럼 계약은
   `backend_catalog_id,category_id,facet_name,mapping_status,value,value_code`다.
-  `MAPPED`는 Taxonomy의 0보다 큰 값과 일치해야 한다. `UNKNOWN`은 `ALL`과
-  다르며 현재 numeric label로 표현할 수 없으므로 해당 Demand 처리를 보류한다.
-  같은 Facet의 중복·상충 행도 저장을 보류한다.
+  `MAPPED`는 Taxonomy의 0보다 큰 값과 일치해야 한다. 확인되지 않거나
+  생략된 Facet은 그 위치에 `ALL` code 0을 쓴다. 이는 상품의 실제 속성이
+  `ALL`이라고 주장하는 값이 아니라 해당 label 축에 확정값이 없다는 뜻이다.
+  같은 Facet의 중복·상충 행, 잘못된 확정값, 전체 프로필 누락, Category
+  불일치는 저장을 보류한다.
 - `A_RULES_PATH`: A 전용 입력 정책 규칙 파일 경로. 기본값은
   `config/demand_constraint_rules.json`이다.
 - `A_BACKEND_BASE_URL`, `A_BACKEND_INTERNAL_KEY`, `A_LABEL_RESULT_ENDPOINT`:
@@ -120,8 +132,10 @@ Backend API를 거치지 않고 직접 DB에 반영한다.
 - CronJob은 배치 1회 실행 후 종료한다.
 - 운영에서는 DB `category.facet`과 실제 Backend `product_catalog.id`에 매핑된 Product Facet
   artifact를 함께 사용한다. Artifact는 taxonomy와 같은 버전 release로 공급해야 한다.
-  현재 Docker image에는 이 데이터 파일이 포함되어 있지 않으므로, Cloud/build 입력에서
-  `/artifacts/product_facets.csv`를 공급하기 전까지 비어 있지 않은 배치는 fail-closed된다.
+  Git checkout만으로는 이 Git-ignored artifact가 전달되지 않으므로 release pipeline이
+  `/artifacts/product_facets.csv`를 별도로 stage해야 한다. Dockerfile은 파일 누락 시 빌드를
+  실패시킨다. AI는
+  0건 batch에서도 입력 파일 존재·구조를 확인하며, 파일 누락 시 성공으로 기록하지 않는다.
 - DB URL은 Secret으로 주입한다. Backend API 경로를 사용할 때만 Internal Key도
   추가로 주입한다.
 - Model 2 호출은 설정된 횟수만큼 재시도한다. 그래도 실패하면 배치를 반으로

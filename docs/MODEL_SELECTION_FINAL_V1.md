@@ -1,5 +1,9 @@
 # Model 1 / Model 2 비교 및 MVP 선택 결과 V1
 
+> 이 문서는 모델/방식 선택 근거의 기록이다. 아래 Section 4의 체크리스트는
+> 초기 시점의 역사 기록이며 현재 blocker 목록이 아니다. 최신 A runtime·배포
+> 상태는 `docs/A_LABELING_SMOKE_TEST.md`와 현재 Cloud/QA 확인을 기준으로 한다.
+
 ## 1. 결론
 
 현재 MVP에서 사용할 방식은 다음과 같이 확정한다. 이 결정은 프로젝트용 합성·검토 데이터와 제한된 로컬 실행 결과에 근거한 구현 결정이며, 실제 운영 사용자에 대한 일반화 성능을 보증하는 최종 연구 결론은 아니다.
@@ -22,7 +26,7 @@ Model 2: Rule/Alias → 명확하면 즉시 Label
                   → 실패·충돌·근거 부족은 원상품 Facet 기본값 유지
 ```
 
-Qwen fallback은 `A_MODEL2_FALLBACK_ENABLED=false`가 기본값이다. Ollama가 준비된 환경에서만 명시적으로 켜며, 기본 CronJob은 모델 없이도 결정론적인 Rule 경로로 동작한다. 실제 연결 코드는 `runtime_job.py`에 있다. 개별 모델 응답이 실패하거나 검증되지 않으면 그 응답은 적용하지 않고 검증된 원상품 기본 label을 기록한다. 반면 LLM 사용이 활성화됐는데 Ollama 또는 필수 모델이 배치 시작 시 준비되지 않았다면, DB에 접근/기록하기 전에 배치를 실패시켜 재시도한다.
+코드의 Qwen fallback 기본값은 `A_MODEL2_FALLBACK_ENABLED=false`다. 운영에서 선택된 Rule-first Hybrid를 사용하려면 Cloud 설정에서 fallback을 명시적으로 켜야 한다. Cloud는 2026-09-30에 develop에서 Qwen 2.5 7B fallback 활성화와 수동 호출 성공을 보고했다. 개별 모델 응답이 실패하거나 검증되지 않으면 그 응답은 적용하지 않고 검증된 원상품 기본 label을 기록한다. 반면 LLM 사용이 활성화됐는데 Ollama 또는 필수 모델이 배치 시작 시 준비되지 않았다면, DB에 접근/기록하기 전에 배치를 실패시켜 재시도한다.
 
 ## 2. 선택 근거
 
@@ -38,7 +42,7 @@ Kanana는 동일 smoke에서 4회 호출·후보 0건·JSON 실패 4건·180.27�
 
 ### Model 2
 
-Qwen 2.5 7B는 전체 Model-only 품질이 아니라 fallback 개선폭과 재현 가능한 Ollama 실행을 기준으로 채택했다. fallback은 명시적 제외·충돌을 임의로 긍정 조건으로 바꾸지 않으며, 현재 Taxonomy에 완전히 매핑되고 원문 근거가 확인된 양성 constraint만 해당 Facet의 검증된 상품 기본값을 덮어쓴다. 개별 Demand의 분석 응답을 쓸 수 없거나 모호하면 검증된 원상품 기본 label을 유지한다. 활성화된 LLM 서비스/모델 자체가 배치 시작 시 unavailable이면 해당 실행은 DB 기록 없이 실패해 다음 회차에 재시도한다. Product Facet profile 또는 Category/Taxonomy가 없거나 불완전하면 추정 없이 처리 보류한다.
+Qwen 2.5 7B는 전체 Model-only 품질이 아니라 fallback 개선폭과 재현 가능한 Ollama 실행을 기준으로 채택했다. fallback은 명시적 제외·충돌을 임의로 긍정 조건으로 바꾸지 않으며, 현재 Taxonomy에 완전히 매핑되고 원문 근거가 확인된 양성 constraint만 해당 Facet의 검증된 상품 기본값을 덮어쓴다. 개별 Demand의 분석 응답을 쓸 수 없거나 모호하면 검증된 원상품 기본 label을 유지한다. 활성화된 LLM 서비스/모델 자체가 배치 시작 시 unavailable이면 해당 실행은 DB 기록 없이 실패해 다음 회차에 재시도한다. 개별 상품 Facet의 일부 미확인/미제공은 해당 label 위치에 `ALL(0)`을 사용하며 다른 확인된 상품 Facet은 유지한다. 상품 프로필 전체 또는 Category/Taxonomy가 없거나 Category가 불일치하면 추정 없이 처리 보류한다.
 
 ## 3. 현재 산출물 및 검증 상태
 
@@ -47,7 +51,7 @@ Qwen 2.5 7B는 전체 Model-only 품질이 아니라 fallback 개선폭과 재�
 - 상품 Facet mapping 최신 로컬 결과: 2,778 catalog, `MAPPED 1,934`, `UNKNOWN 5,804`, `AMBIGUOUS 269` mapping rows
 - 150건 Gold 검토 결과는 사람 최종 승인 전 후보 데이터다. `READY_FOR_HUMAN_SIGNOFF` 85건과 `EXCLUDED` 65건을 Gold 확정으로 혼동하지 않는다.
 
-## 4. 남은 검증
+## 4. 당시 남은 검증 목록 (역사 기록)
 
 1. 사람이 85개 Gold 후보의 최종 승인·수정·제외를 확정한다.
 2. 확정 Gold와 실제 상품 Facet mapping을 사용해 Rule-only, Hybrid, Model-only를 같은 입력으로 재측정한다.

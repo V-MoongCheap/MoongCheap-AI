@@ -13,7 +13,7 @@
 
 Qwen은 이미 `PARSED` 또는 `NONE`인 Rule 결과를 덮어쓰지 않는다. 명시적 제외나 충돌을 긍정 조건으로 변환하지 않으며, Taxonomy에 없는 Facet/Value를 만들지 않는다. typed constraint를 만들 수 없는 응답도 저장하지 않는다.
 
-개별 Demand의 호출 실패, timeout, 누락 결과, Taxonomy 불일치, 근거 부족은 검증된 원상품 기본 label을 유지한다. 반면 LLM이 활성화된 실행에서 Ollama 자체 또는 필수 모델이 시작 전 확인되지 않으면 배치 전체를 DB 접근/기록 전에 실패시켜 다음 스케줄에 재시도한다. Product Facet profile이 없거나 불완전하거나 Backend Category/Taxonomy가 유효하지 않은 행은 `REVIEW`로 남긴다. `A_MODEL2_FALLBACK_ENABLED` 기본값은 `false`이며, Ollama 서비스가 준비된 환경에서만 `true`로 바꾼다.
+개별 Demand의 호출 실패, timeout, 누락 결과, Taxonomy 불일치, 근거 부족은 검증된 원상품 기본 label을 유지한다. 반면 LLM이 활성화된 실행에서 Ollama 자체 또는 필수 모델이 시작 전 확인되지 않으면 배치 전체를 DB 접근/기록 전에 실패시켜 다음 스케줄에 재시도한다. 일부 Facet 값의 미확인·미제공은 해당 label 위치만 `ALL(0)`으로 두고 다른 확정 Facet을 유지한다. 전체 상품 프로필 누락, 잘못된 확정값, Backend Category/Taxonomy 불일치는 `REVIEW`로 남긴다. 코드의 기본값은 fallback 비활성(`false`)이므로, 선택된 운영 방식을 쓰려면 Cloud 배포 설정에서 명시적으로 활성화해야 한다. Cloud는 2026-09-30에 develop에서 Qwen 2.5 7B fallback 활성 상태라고 보고했으나, 이 설정은 현재 AI IAM 조회 권한으로 독립 확인하지 못했다.
 
 ## 실험 해석
 
