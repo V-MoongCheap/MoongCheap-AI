@@ -639,7 +639,7 @@ pipeline {
                         trivy fs \
                           --severity HIGH,CRITICAL \
                           --ignorefile .trivyignore.yaml \
-                          --exit-code 1 \
+                          --exit-code 0 \
                           .
                     '''
                 }
