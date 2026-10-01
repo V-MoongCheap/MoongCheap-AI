@@ -7,6 +7,7 @@ Only ``demand.label`` and ``demand.processed_at`` are written here.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Iterable, Mapping
 from datetime import datetime
 from types import TracebackType
@@ -75,6 +76,8 @@ def write_label_results(
         label = str(row.get("label", "")).strip()
         if not label:
             raise ValueError(f"label is required for demand_id: {demand_key}")
+        if not re.fullmatch(r"\d+(?:-\d+)*", label):
+            raise ValueError(f"label must be a numeric Facet vector: {demand_key}")
         updates.append({
             "demand_id": demand_key,
             "label": label,

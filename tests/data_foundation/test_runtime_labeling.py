@@ -442,6 +442,49 @@ def test_backend_payload_rejects_non_integer_facet_codes(facet_values) -> None:
         build_label_result_payload(frame, processed_at="2026-10-01T00:00:00Z")
 
 
+@pytest.mark.parametrize("invalid_id", ["0", "-1", "1.0", "9223372036854775808", "abc"])
+def test_backend_payload_rejects_non_backend_integer_ids(invalid_id) -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "demand_id": invalid_id,
+                "catalog_id": "10",
+                "category_id": "c1",
+                "label": "1",
+                "facet_values": '{"form":{"code":1}}',
+                "label_status": "LABELED",
+            }
+        ]
+    )
+
+    with pytest.raises(ValueError, match="Backend ID|positive integers"):
+        build_label_result_payload(frame, processed_at="2026-10-01T00:00:00Z")
+
+
+@pytest.mark.parametrize("timestamp", ["", "not-a-timestamp", "2026-10-01T00:00:00"])
+def test_backend_payload_requires_timezone_aware_timestamp(timestamp) -> None:
+    with pytest.raises(ValueError, match="timezone-aware ISO-8601"):
+        build_label_result_payload(pd.DataFrame(), processed_at=timestamp)
+
+
+def test_backend_payload_rejects_duplicate_facet_json_keys() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "demand_id": "1",
+                "catalog_id": "10",
+                "category_id": "c1",
+                "label": "1",
+                "facet_values": '{"form":{"code":1},"form":{"code":1}}',
+                "label_status": "LABELED",
+            }
+        ]
+    )
+
+    with pytest.raises(ValueError, match="invalid facet_values JSON"):
+        build_label_result_payload(frame, processed_at="2026-10-01T00:00:00Z")
+
+
 def test_unresolved_rows_keep_catalog_defaults_without_llm_retry(
     tmp_path, monkeypatch
 ) -> None:

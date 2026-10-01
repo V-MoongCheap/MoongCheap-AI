@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable, Mapping
+from datetime import datetime
 from typing import Any
 
 import requests
@@ -14,10 +15,34 @@ SCHEMA_VERSION = "demand-label-result.v0.1"
 
 def _identifier(value: object) -> int | str:
     text = str(value).strip()
-    return int(text) if text.isdigit() else text
+    if not text.isdigit():
+        raise ValueError("Backend demand and catalog IDs must be positive integers")
+    identifier = int(text)
+    if identifier <= 0 or identifier > 9_223_372_036_854_775_807:
+        raise ValueError("Backend ID is outside the positive BIGINT range")
+    return identifier
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
 
 
 def build_label_result_payload(labeled: Any, *, processed_at: str) -> dict[str, Any]:
+    if not isinstance(processed_at, str) or not processed_at.strip():
+        raise ValueError("processed_at must be a timezone-aware ISO-8601 timestamp")
+    try:
+        parsed_processed_at = datetime.fromisoformat(processed_at.strip())
+    except ValueError as error:
+        raise ValueError(
+            "processed_at must be a timezone-aware ISO-8601 timestamp"
+        ) from error
+    if parsed_processed_at.tzinfo is None or parsed_processed_at.utcoffset() is None:
+        raise ValueError("processed_at must be a timezone-aware ISO-8601 timestamp")
     required = {
         "demand_id",
         "catalog_id",
@@ -56,8 +81,11 @@ def build_label_result_payload(labeled: Any, *, processed_at: str) -> dict[str, 
         if not re.fullmatch(r"\d+(?:-\d+)*", label):
             raise ValueError(f"completed label is not a numeric Facet vector: {demand_id}")
         try:
-            facet_values = json.loads(str(item.get("facet_values", "")))
-        except (TypeError, json.JSONDecodeError) as error:
+            facet_values = json.loads(
+                str(item.get("facet_values", "")),
+                object_pairs_hook=_unique_json_object,
+            )
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
             raise ValueError(f"completed label has invalid facet_values JSON: {demand_id}") from error
         if not isinstance(facet_values, dict) or not facet_values:
             raise ValueError(f"completed label has no product Facet values: {demand_id}")
@@ -90,7 +118,7 @@ def build_label_result_payload(labeled: Any, *, processed_at: str) -> dict[str, 
         )
     return {
         "schemaVersion": SCHEMA_VERSION,
-        "processedAt": processed_at,
+        "processedAt": processed_at.strip(),
         "results": rows,
     }
 
