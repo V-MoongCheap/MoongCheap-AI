@@ -97,6 +97,32 @@ def test_duplicate_value_codes_are_rejected() -> None:
         TaxonomyLoader(invalid)
 
 
+@pytest.mark.parametrize(
+    ("values", "message"),
+    [
+        ([{"code": -1, "value": "분말"}, {"code": 0, "value": "ALL"}], "non-negative"),
+        ([{"code": 0.5, "value": "ALL"}], "invalid value code"),
+        ([{"code": False, "value": "ALL"}], "invalid value code"),
+        ([{"code": 0, "value": "UNKNOWN"}], "code 0 must be ALL"),
+        ([{"code": 0, "value": "ALL"}, {"code": 1, "value": "ALL"}], "ALL must use code 0"),
+    ],
+)
+def test_taxonomy_rejects_invalid_all_and_negative_codes(
+    values: list[dict[str, object]], message: str
+) -> None:
+    invalid = {
+        "categories": [
+            {
+                "category_id": "C1",
+                "facets": [{"name": "f", "values": values}],
+            }
+        ]
+    }
+
+    with pytest.raises(TaxonomyValidationError, match=message):
+        TaxonomyLoader(invalid)
+
+
 def test_malformed_taxonomy_types_raise_domain_validation_error() -> None:
     for invalid in [
         None,

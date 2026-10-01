@@ -98,7 +98,13 @@ class TaxonomyLoader:
                 raise TaxonomyValidationError(f"invalid or duplicate facet: {name}")
             seen_facets.add(name)
             try:
-                order = int(facet.get("order", index))
+                raw_order = facet.get("order", index)
+                if isinstance(raw_order, bool) or not isinstance(raw_order, (int, str)):
+                    raise TypeError
+                order_text = str(raw_order).strip()
+                if not order_text.isdigit():
+                    raise ValueError
+                order = int(order_text)
             except (KeyError, TypeError, ValueError) as exc:
                 raise TaxonomyValidationError(f"invalid facet order: {name}") from exc
             if order in seen_orders:
@@ -115,16 +121,37 @@ class TaxonomyLoader:
                         f"taxonomy value must be an object: {name}"
                     )
                 try:
-                    code = int(value["code"])
+                    raw_code = value["code"]
+                    if isinstance(raw_code, bool) or not isinstance(
+                        raw_code, (int, str)
+                    ):
+                        raise TypeError
+                    code_text = str(raw_code).strip()
+                    if not re.fullmatch(r"-?\d+", code_text):
+                        raise ValueError
+                    code = int(code_text)
                 except (KeyError, TypeError, ValueError) as exc:
                     raise TaxonomyValidationError(
                         f"invalid value code in facet: {name}"
                     ) from exc
+                if code < 0:
+                    raise TaxonomyValidationError(
+                        f"value code must be non-negative in facet: {name}"
+                    )
                 if code in codes:
                     raise TaxonomyValidationError(
                         f"duplicate value code {code} in facet: {name}"
                     )
                 codes.add(code)
+                value_name = str(value.get("value", "")).strip()
+                if code == 0 and value_name and value_name != "ALL":
+                    raise TaxonomyValidationError(
+                        f"code 0 must be ALL in facet: {name}"
+                    )
+                if code != 0 and value_name == "ALL":
+                    raise TaxonomyValidationError(
+                        f"ALL must use code 0 in facet: {name}"
+                    )
                 has_all = has_all or code == 0
             if not has_all:
                 raise TaxonomyValidationError(f"facet has no ALL(code=0): {name}")

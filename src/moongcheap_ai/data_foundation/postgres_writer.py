@@ -6,9 +6,9 @@ Only ``demand.label`` and ``demand.processed_at`` are written here.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping
 from datetime import datetime
-import math
 from types import TracebackType
 from typing import Any, Protocol, Self
 
@@ -56,9 +56,10 @@ def write_label_results(
         status = str(row.get("label_status", "")).strip().upper()
         if status == "REVIEW":
             continue
-        # A warning-bearing result is diagnostic only.  It must not mark the
-        # demand as processed because the next batch must be able to retry it
-        # after the taxonomy/model policy is improved.
+        # Persistence is controlled by label_status, not diagnostic warnings.
+        # A valid product-baseline label remains writable when consumer text
+        # is unresolved; missing/invalid baselines are emitted as REVIEW and
+        # are skipped below.
         if status != "LABELED":
             raise ValueError(f"unsupported label_status for DB write: {status or '<blank>'}")
         demand_id = row.get("demand_id")
