@@ -127,6 +127,10 @@ class PostgreSQLClusteringInputReaderTest(unittest.TestCase):
         self.assertNotIn('"label" IS NOT NULL', demand_sql)
         self.assertNotIn('"processed_at" IS NOT NULL', demand_sql)
         self.assertIn("INTERVAL '2 days'", demand_sql)
+        self.assertIn(
+            '(d."desire_end_at" IS NULL OR d."desire_end_at" > %(as_of)s)',
+            demand_sql,
+        )
         self.assertNotIn("FOR UPDATE", demand_sql)
         self.assertIn('"sale_end_at" > %(as_of)s', board_sql)
         self.assertIn('JOIN "product_catalog"', board_sql)
