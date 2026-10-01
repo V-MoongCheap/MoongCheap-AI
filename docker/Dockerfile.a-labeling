@@ -41,7 +41,9 @@ COPY --from=builder /build/config/facet_taxonomy_v2_2.json ./config/facet_taxono
 COPY artifacts/ /artifacts/
 RUN test -s /artifacts/product_facets.csv \
     || (echo "ERROR: release input artifacts/product_facets.csv is required to build a deployable A Labeling image" >&2; exit 1) \
-    && sha256sum /artifacts/product_facets.csv
+    && sha256sum /artifacts/product_facets.csv \
+    && chown 65534:65534 /artifacts/product_facets.csv \
+    && chmod 0400 /artifacts/product_facets.csv
 
 USER 65534:65534
 ENTRYPOINT ["a-labeling-batch", "--write-db", "--output", "/tmp/a-labeling-output.csv"]
