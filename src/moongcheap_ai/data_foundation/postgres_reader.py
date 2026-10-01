@@ -26,7 +26,7 @@ SELECT
     d.processed_at
 FROM demand AS d
 JOIN product_catalog AS pc ON pc.id = d.catalog_id
-JOIN category AS c ON c.id = pc.category_id
+LEFT JOIN category AS c ON c.id = pc.category_id
 WHERE d.processed_at IS NULL
   AND d.status = 'UNASSIGNED'
 ORDER BY d.id
@@ -75,7 +75,12 @@ class Cursor(Protocol):
     description: Sequence[Any] | None
 
     def __enter__(self) -> Self: ...
-    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> None: ...
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
     def execute(self, query: str, params: Mapping[str, Any] | None = None) -> Any: ...
     def fetchall(self) -> Sequence[Any]: ...
 
@@ -98,7 +103,9 @@ def _frame_from_cursor(cursor: Cursor) -> pd.DataFrame:
     if cursor.description is None:
         raise RuntimeError("cursor description is required for tuple rows")
     columns = [_column_name(item) for item in cursor.description]
-    return pd.DataFrame([dict(zip(columns, row, strict=True)) for row in rows]).fillna("")
+    return pd.DataFrame([dict(zip(columns, row, strict=True)) for row in rows]).fillna(
+        ""
+    )
 
 
 def _has_product_catalog_category_id(connection: Connection) -> bool:
@@ -106,7 +113,9 @@ def _has_product_catalog_category_id(connection: Connection) -> bool:
         cursor.execute(SCHEMA_PROBE_SQL)
         frame = _frame_from_cursor(cursor)
     if frame.empty or "has_category_id" not in frame.columns:
-        raise RuntimeError("schema probe did not return product_catalog.category_id status")
+        raise RuntimeError(
+            "schema probe did not return product_catalog.category_id status"
+        )
     value = frame.iloc[0]["has_category_id"]
     return value is True or str(value).strip().lower() in {"1", "true", "t", "yes"}
 
@@ -115,7 +124,9 @@ def _load_catalog_category_map(path: Path) -> dict[str, str]:
     try:
         mapping = pd.read_csv(path, dtype=str).fillna("")
     except (OSError, pd.errors.ParserError) as error:
-        raise RuntimeError(f"failed to read catalog/category mapping: {path}") from error
+        raise RuntimeError(
+            f"failed to read catalog/category mapping: {path}"
+        ) from error
     required = {"catalog_id", "category_id"}
     missing = required - set(mapping.columns)
     if missing:
@@ -128,7 +139,9 @@ def _load_catalog_category_map(path: Path) -> dict[str, str]:
         catalog_id = str(row["catalog_id"]).strip()
         category_id = str(row["category_id"]).strip()
         if not catalog_id or not category_id:
-            raise RuntimeError("catalog/category mapping contains an empty catalog_id or category_id")
+            raise RuntimeError(
+                "catalog/category mapping contains an empty catalog_id or category_id"
+            )
         previous = result.get(catalog_id)
         if previous is not None and previous != category_id:
             raise RuntimeError(f"catalog_id has conflicting category IDs: {catalog_id}")
@@ -145,7 +158,9 @@ def _attach_categories_from_mapping(
 ) -> pd.DataFrame:
     catalog_to_category = _load_catalog_category_map(mapping_path)
     frame = demands.copy()
-    frame["category_db_id"] = frame["catalog_id"].astype(str).map(catalog_to_category).fillna("")
+    frame["category_db_id"] = (
+        frame["catalog_id"].astype(str).map(catalog_to_category).fillna("")
+    )
     missing = frame["category_db_id"].eq("")
     if missing.any():
         sample = ", ".join(frame.loc[missing, "catalog_id"].astype(str).head(5))
@@ -158,13 +173,25 @@ def _attach_categories_from_mapping(
         cursor.execute(CATEGORY_FACETS_SQL, {"category_ids": category_ids})
         categories = _frame_from_cursor(cursor)
     if categories.empty:
-        raise RuntimeError("category lookup returned no rows for the supplied Backend category IDs")
-    known = dict(zip(categories["category_db_id"].astype(str), categories["category_facet"], strict=False))
+        raise RuntimeError(
+            "category lookup returned no rows for the supplied Backend category IDs"
+        )
+    known = dict(
+        zip(
+            categories["category_db_id"].astype(str),
+            categories["category_facet"],
+            strict=False,
+        )
+    )
     frame["category_facet"] = frame["category_db_id"].astype(str).map(known).fillna("")
     missing_facets = frame["category_facet"].eq("")
     if missing_facets.any():
-        sample = ", ".join(frame.loc[missing_facets, "category_db_id"].astype(str).unique()[:5])
-        raise RuntimeError(f"category.facet is missing for Backend category IDs (sample: {sample})")
+        sample = ", ".join(
+            frame.loc[missing_facets, "category_db_id"].astype(str).unique()[:5]
+        )
+        raise RuntimeError(
+            f"category.facet is missing for Backend category IDs (sample: {sample})"
+        )
     return frame
 
 
@@ -200,7 +227,14 @@ def read_unprocessed_demands(
                 frame = _frame_from_cursor(cursor)
     if frame.empty:
         return pd.DataFrame(
-            columns=["demand_id", "catalog_id", "category_id", "category_db_id", "category_facet", "extra_requirement"]
+            columns=[
+                "demand_id",
+                "catalog_id",
+                "category_id",
+                "category_db_id",
+                "category_facet",
+                "extra_requirement",
+            ]
         )
     if not custom_query and not has_category_id:
         raw_path = category_mapping_path or (
@@ -238,15 +272,23 @@ def resolve_taxonomy_category_keys(demands: pd.DataFrame) -> pd.DataFrame:
             return str(parsed["category_id"])
         return fallback
 
-    fallback_values = frame["category_db_id"] if "category_db_id" in frame.columns else frame["category_id"]
+    fallback_values = (
+        frame["category_db_id"]
+        if "category_db_id" in frame.columns
+        else frame["category_id"]
+    )
     frame["category_id"] = [
         key_from_facet(facet, fallback)
-        for facet, fallback in zip(frame["category_facet"], fallback_values, strict=True)
+        for facet, fallback in zip(
+            frame["category_facet"], fallback_values, strict=True
+        )
     ]
     return frame
 
 
-def open_read_only_postgres(database_url: str, connect_timeout_seconds: int = 10) -> Any:
+def open_read_only_postgres(
+    database_url: str, connect_timeout_seconds: int = 10
+) -> Any:
     """Open a server-enforced read-only session; credentials stay in the environment."""
     try:
         import psycopg

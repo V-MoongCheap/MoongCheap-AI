@@ -166,7 +166,7 @@ ollama list
 export MODEL2_MODEL=qwen2.5:7b-instruct
 ```
 
-Model 2 실행에는 동일한 Taxonomy, Demand 입력, Product Facet 매핑, Ollama 모델이 필요하다. 제품 기본 Facet 매핑이 없으면 본 보고서와 같이 빈 `product_defaults`를 사용한 비교가 가능하지만, 최종 운영 성능으로 해석하면 안 된다.
+Model 2 실행에는 동일한 Taxonomy, Demand 입력, Product Facet 매핑, Ollama 모델이 필요하다. 이전 실험 중 일부 비교는 Product Facet 매핑이 없어 빈 `product_defaults`로 수행되었다. 그 수치는 모델 출력 비교의 참고일 뿐, 현재 확정한 원상품 기본값 + 소비자 요구 override 정책의 평가나 운영 성능으로 해석하면 안 된다. 현재 정책 평가에는 완전하고 같은 릴리스의 실제 상품 프로필이 필수다.
 
 ## 14. 한계 및 재검토 조건
 

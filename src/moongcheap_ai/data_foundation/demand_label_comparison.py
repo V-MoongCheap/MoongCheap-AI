@@ -29,15 +29,62 @@ def _json_object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[st
 
 
 def _normalise_evidence_text(value: Any) -> str:
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(value)).casefold()).strip()
+    return re.sub(
+        r"\s+", " ", unicodedata.normalize("NFKC", str(value)).casefold()
+    ).strip()
 
 
 _NON_POSITIVE_REQUIREMENT_MARKERS = (
-    "아니", "말고", "말아", "제외", "빼고", "빼줘", "없이", "없는", "않", "안 ",
-    "안들어", "안 든", "싫", "별로", "보다는", "대신", "차라리", "꺼려", "기피",
-    "선호하지", "원하지", "원치", "금지", "피하", "알레르기", "알러지", "비선호", "불가", "못 ",
-    "또는", "혹은", "아니면", "이나", "거나", "중 하나", "둘 다", "상관없", "무관", "제한",
-    "without", "avoid", "except", "exclude", "allergy", "non-", "not ", "not-", "never", "rather than", "instead of",
+    "아니",
+    "말고",
+    "말아",
+    "제외",
+    "빼고",
+    "빼줘",
+    "없이",
+    "없는",
+    "않",
+    "안 ",
+    "안들어",
+    "안 든",
+    "싫",
+    "별로",
+    "보다는",
+    "대신",
+    "차라리",
+    "꺼려",
+    "기피",
+    "선호하지",
+    "원하지",
+    "원치",
+    "금지",
+    "피하",
+    "알레르기",
+    "알러지",
+    "비선호",
+    "불가",
+    "못 ",
+    "또는",
+    "혹은",
+    "아니면",
+    "이나",
+    "거나",
+    "중 하나",
+    "둘 다",
+    "상관없",
+    "무관",
+    "제한",
+    "without",
+    "avoid",
+    "except",
+    "exclude",
+    "allergy",
+    "non-",
+    "not ",
+    "not-",
+    "never",
+    "rather than",
+    "instead of",
 )
 
 
@@ -68,15 +115,25 @@ def ensure_ollama_model_available(endpoint: str, model: str, timeout: int = 10) 
             )
     except LLMLabelingError:
         raise
-    except (OSError, urllib.error.URLError, json.JSONDecodeError, AttributeError, TypeError, ValueError) as exc:
+    except (
+        OSError,
+        urllib.error.URLError,
+        json.JSONDecodeError,
+        AttributeError,
+        TypeError,
+        ValueError,
+    ) as exc:
         raise LLMLabelingError(f"Ollama model preflight failed: {exc}") from exc
 
 
-def _allowed(loader: TaxonomyLoader, category_id: str) -> dict[str, list[dict[str, Any]]]:
+def _allowed(
+    loader: TaxonomyLoader, category_id: str
+) -> dict[str, list[dict[str, Any]]]:
     category = loader.category(category_id)
     return {
         str(facet["name"]): [
-            value for value in facet["values"]
+            value
+            for value in facet["values"]
             if str(value.get("status", "")).upper() != "DEPRECATED"
         ]
         for facet in (category or {}).get("facets", [])
@@ -128,8 +185,12 @@ def _normalise_model_facet_values(raw: Any) -> dict[str, Any]:
             if isinstance(item, dict) and "facet_name" in item:
                 facet_name = str(item["facet_name"])
                 if facet_name in converted:
-                    raise LLMLabelingError(f"Ollama returned duplicate facet: {facet_name}")
-                converted[facet_name] = {key: item[key] for key in ("code", "value") if key in item}
+                    raise LLMLabelingError(
+                        f"Ollama returned duplicate facet: {facet_name}"
+                    )
+                converted[facet_name] = {
+                    key: item[key] for key in ("code", "value") if key in item
+                }
         return converted
     if not isinstance(raw, dict):
         return {}
@@ -142,14 +203,18 @@ def _normalise_model_facet_values(raw: Any) -> dict[str, Any]:
 class OllamaDemandLabeler:
     provider = "ollama"
 
-    def __init__(self, model: str, endpoint: str = "http://localhost:11434", timeout: int = 300) -> None:
+    def __init__(
+        self, model: str, endpoint: str = "http://localhost:11434", timeout: int = 300
+    ) -> None:
         self.model = model
         self.endpoint = endpoint.rstrip("/")
         self.timeout = timeout
         self.call_count = 0
         self.runtime_seconds = 0.0
 
-    def classify(self, rows: list[dict[str, Any]], loader: TaxonomyLoader) -> dict[str, dict[str, Any]]:
+    def classify(
+        self, rows: list[dict[str, Any]], loader: TaxonomyLoader
+    ) -> dict[str, dict[str, Any]]:
         requested_ids = []
         for row in rows:
             if not isinstance(row, dict):
@@ -159,7 +224,9 @@ class OllamaDemandLabeler:
                 raise LLMLabelingError("Ollama request row is missing demand_id")
             category_id = str(row.get("category_id", "")).strip()
             if category_id.casefold() in {"", "none", "nan", "<na>"}:
-                raise LLMLabelingError(f"Ollama request row {demand_id} is missing category_id")
+                raise LLMLabelingError(
+                    f"Ollama request row {demand_id} is missing category_id"
+                )
             requested_ids.append(demand_id)
         expected_ids = set(requested_ids)
         if len(expected_ids) != len(requested_ids):
@@ -185,8 +252,23 @@ class OllamaDemandLabeler:
             },
             "required": ["results"],
         }
-        body = json.dumps({"model": self.model, "prompt": _prompt(rows, loader), "format": schema, "options": {"temperature": 0}, "stream": False, "think": False}, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(f"{self.endpoint}/api/generate", data=body, headers={"Content-Type": "application/json"}, method="POST")
+        body = json.dumps(
+            {
+                "model": self.model,
+                "prompt": _prompt(rows, loader),
+                "format": schema,
+                "options": {"temperature": 0},
+                "stream": False,
+                "think": False,
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            f"{self.endpoint}/api/generate",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 payload = json.loads(
@@ -206,34 +288,66 @@ class OllamaDemandLabeler:
                 raise TypeError("results is not a list")
             output = {}
             for item in results:
-                if not isinstance(item, dict) or "demand_id" not in item or not isinstance(item.get("facet_values"), dict):
+                if (
+                    not isinstance(item, dict)
+                    or "demand_id" not in item
+                    or not isinstance(item.get("facet_values"), dict)
+                ):
                     continue
                 demand_id = str(item["demand_id"])
                 if demand_id not in expected_ids:
-                    raise LLMLabelingError(f"Ollama returned unexpected demand ID: {demand_id}")
+                    raise LLMLabelingError(
+                        f"Ollama returned unexpected demand ID: {demand_id}"
+                    )
                 if demand_id in output:
-                    raise LLMLabelingError(f"Ollama returned duplicate demand ID: {demand_id}")
+                    raise LLMLabelingError(
+                        f"Ollama returned duplicate demand ID: {demand_id}"
+                    )
                 output[demand_id] = _normalise_model_facet_values(item["facet_values"])
             missing_ids = expected_ids - set(output)
             if missing_ids:
                 raise LLMLabelingError(
                     "Ollama omitted demand IDs: " + ", ".join(sorted(missing_ids))
                 )
-        except (OSError, urllib.error.URLError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        except (
+            OSError,
+            urllib.error.URLError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as exc:
             raise LLMLabelingError(str(exc)) from exc
         finally:
             self.runtime_seconds += time.perf_counter() - started
         return output
 
 
-def _rule_result(demands: pd.DataFrame, loader: TaxonomyLoader, product_facet_map: dict[str, list[dict[str, Any]]]) -> pd.DataFrame:
+def _rule_result(
+    demands: pd.DataFrame,
+    loader: TaxonomyLoader,
+    product_facet_map: dict[str, list[dict[str, Any]]],
+) -> pd.DataFrame:
     from .labeling import label_demands
 
     return label_demands(demands, loader, product_facet_map=product_facet_map)
 
 
-def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: TaxonomyLoader, product_rows: list[dict[str, Any]] | None = None) -> tuple[dict[str, dict[str, Any]], list[str]]:
-    defaults, warnings = loader.product_defaults(row["category_id"], product_rows or [])
+def _apply_model_result(
+    row: pd.Series,
+    model_values: dict[str, Any],
+    loader: TaxonomyLoader,
+    product_rows: list[dict[str, Any]] | None = None,
+    *,
+    baseline_values: dict[str, dict[str, Any]] | None = None,
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    if baseline_values is None:
+        defaults, warnings = loader.product_defaults(
+            row["category_id"], product_rows or []
+        )
+    else:
+        defaults = {name: dict(value) for name, value in baseline_values.items()}
+        warnings = []
     allowed = _allowed(loader, row["category_id"])
     ordered_facets = list(allowed)
     selected_codes: dict[str, int] = {}
@@ -241,22 +355,49 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
         facet_key = str(facet_name).strip()
         if ":" in facet_key:
             facet_key = facet_key.rsplit(":", 1)[-1]
-        numeric_match = re.fullmatch(r"(?:facet[_ -]?)?(\d+)(?:\.0)?", facet_key, flags=re.IGNORECASE)
+        numeric_match = re.fullmatch(
+            r"(?:facet[_ -]?)?(\d+)(?:\.0)?", facet_key, flags=re.IGNORECASE
+        )
         if numeric_match and int(numeric_match.group(1)) < len(ordered_facets):
             facet_name = ordered_facets[int(numeric_match.group(1))]
         else:
-            facet_name = next((name for name in ordered_facets if name.casefold() == facet_key.casefold()), facet_key)
+            facet_name = next(
+                (
+                    name
+                    for name in ordered_facets
+                    if name.casefold() == facet_key.casefold()
+                ),
+                facet_key,
+            )
         if raw_code is None:
             warnings.append(f"LLM returned null facet value: {facet_name}")
             continue
         code = raw_code.get("code") if isinstance(raw_code, dict) else raw_code
-        if isinstance(raw_code, dict) and code is None and raw_code.get("value") is None:
+        if (
+            isinstance(raw_code, dict)
+            and code is None
+            and raw_code.get("value") is None
+        ):
             warnings.append(f"LLM returned empty facet value: {facet_name}")
             continue
-        matched = [value for value in allowed.get(facet_name, []) if str(value.get("code", "")) == str(code)]
+        matched = [
+            value
+            for value in allowed.get(facet_name, [])
+            if str(value.get("code", "")) == str(code)
+        ]
         if not matched:
-            text = str(raw_code.get("value", "") if isinstance(raw_code, dict) else raw_code).strip()
-            matched = [value for value in allowed.get(facet_name, []) if text.casefold() in {str(value.get("value", "")).casefold(), *(str(alias).casefold() for alias in value.get("aliases", []))}]
+            text = str(
+                raw_code.get("value", "") if isinstance(raw_code, dict) else raw_code
+            ).strip()
+            matched = [
+                value
+                for value in allowed.get(facet_name, [])
+                if text.casefold()
+                in {
+                    str(value.get("value", "")).casefold(),
+                    *(str(alias).casefold() for alias in value.get("aliases", [])),
+                }
+            ]
         values = matched
         if not values:
             warnings.append(f"LLM code not found in taxonomy: {facet_name}={code}")
@@ -268,7 +409,12 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
             warnings.append(f"LLM returned conflicting values for facet: {facet_name}")
             continue
         selected_codes[facet_name] = selected_code
-        defaults[facet_name] = {"code": selected_code, "value": value.get("value", ""), "matched_alias": "LLM"}
+        if selected_code > 0:
+            defaults[facet_name] = {
+                "code": selected_code,
+                "value": value.get("value", ""),
+                "matched_alias": "LLM",
+            }
     requirement = _normalise_evidence_text(row.get("extra_requirement", ""))
     selected = [
         (facet_name, value)
@@ -288,7 +434,10 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
             )
             evidence = {
                 _normalise_evidence_text(taxonomy_value.get("value", "")),
-                *(_normalise_evidence_text(alias) for alias in taxonomy_value.get("aliases", [])),
+                *(
+                    _normalise_evidence_text(alias)
+                    for alias in taxonomy_value.get("aliases", [])
+                ),
             }
             if not any(token and token in requirement for token in evidence):
                 unsupported.append(facet_name)
@@ -301,7 +450,10 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
                     token and token in requirement
                     for token in {
                         _normalise_evidence_text(item.get("value", "")),
-                        *(_normalise_evidence_text(alias) for alias in item.get("aliases", [])),
+                        *(
+                            _normalise_evidence_text(alias)
+                            for alias in item.get("aliases", [])
+                        ),
                     }
                 )
             }
@@ -319,21 +471,49 @@ def _apply_model_result(row: pd.Series, model_values: dict[str, Any], loader: Ta
     return defaults, warnings
 
 
-def compare_labeling_methods(demands: pd.DataFrame, loader: TaxonomyLoader, product_facet_map: dict[str, list[dict[str, Any]]], llm: OllamaDemandLabeler, batch_size: int = 10) -> tuple[pd.DataFrame, pd.DataFrame]:
+def compare_labeling_methods(
+    demands: pd.DataFrame,
+    loader: TaxonomyLoader,
+    product_facet_map: dict[str, list[dict[str, Any]]],
+    llm: OllamaDemandLabeler,
+    batch_size: int = 10,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     rule = _rule_result(demands.fillna(""), loader, product_facet_map)
     model_values: dict[str, dict[str, int]] = {}
     model_errors: dict[str, str] = {}
     for start in range(0, len(demands), batch_size):
-        batch = demands.iloc[start:start + batch_size]
+        batch = demands.iloc[start : start + batch_size]
         payload = []
         for _, row in batch.iterrows():
-            defaults, _ = loader.product_defaults(row["category_id"], product_facet_map.get(str(row["catalog_id"]), []))
-            payload.append({"demand_id": row["demand_id"], "category_id": row["category_id"], "extra_requirement": row["extra_requirement"], "product_defaults": defaults})
-        try:
-            model_values.update(llm.classify(payload, loader))
-        except LLMLabelingError as exc:
-            for demand_id in batch["demand_id"]:
-                model_errors[str(demand_id)] = str(exc)
+            product_rows = product_facet_map.get(str(row["catalog_id"]), [])
+            defaults, profile_warnings = loader.product_defaults(
+                row["category_id"], product_rows
+            )
+            expected_facets = {
+                str(facet.get("name", ""))
+                for facet in (loader.categories.get(str(row["category_id"])) or {}).get(
+                    "facets", []
+                )
+            }
+            if not product_rows or profile_warnings or set(defaults) != expected_facets:
+                model_errors[str(row["demand_id"])] = (
+                    "PRODUCT_FACET_PROFILE_MISSING_OR_INVALID"
+                )
+                continue
+            payload.append(
+                {
+                    "demand_id": row["demand_id"],
+                    "category_id": row["category_id"],
+                    "extra_requirement": row["extra_requirement"],
+                    "product_defaults": defaults,
+                }
+            )
+        if payload:
+            try:
+                model_values.update(llm.classify(payload, loader))
+            except LLMLabelingError as exc:
+                for item in payload:
+                    model_errors[str(item["demand_id"])] = str(exc)
     rows: list[dict[str, Any]] = []
     for position, (_, source) in enumerate(demands.fillna("").iterrows()):
         rule_row = rule.iloc[position]
@@ -350,19 +530,73 @@ def compare_labeling_methods(demands: pd.DataFrame, loader: TaxonomyLoader, prod
         }
         model = model_values.get(str(source["demand_id"]))
         if model is not None:
-            values, warnings = _apply_model_result(source, model, loader, product_facet_map.get(str(source["catalog_id"]), []))
-            model_label = loader.encode(values)
-            model_status = "LABELED" if not warnings else "LABELED_WITH_REVIEW"
+            product_rows = product_facet_map.get(str(source["catalog_id"]), [])
+            values, warnings = _apply_model_result(source, model, loader, product_rows)
+            expected_facets = {
+                str(facet.get("name", ""))
+                for facet in (
+                    loader.categories.get(str(source["category_id"])) or {}
+                ).get("facets", [])
+            }
+            if set(values) != expected_facets or any(
+                warning.startswith("product Facet") for warning in warnings
+            ):
+                model_label, model_status = "", "MODEL_FAILURE"
+                warnings.append("PRODUCT_FACET_PROFILE_MISSING_OR_INVALID")
+            else:
+                model_label = loader.encode(values)
+                model_status = "LABELED" if not warnings else "LABELED_WITH_REVIEW"
         else:
-            model_label, model_status, warnings = "", "MODEL_FAILURE", [model_errors.get(str(source["demand_id"]), "missing LLM result")]
-        hybrid_label = model_label if model_status != "MODEL_FAILURE" and rule_row["label_status"] != "LABELED" else rule_row["label"]
-        hybrid_status = model_status if model_status != "MODEL_FAILURE" and rule_row["label_status"] != "LABELED" else rule_row["label_status"]
-        rows.append({**base, "model_label": model_label, "model_status": model_status, "model_warnings": json.dumps(warnings, ensure_ascii=False), "hybrid_label": hybrid_label, "hybrid_status": hybrid_status})
+            model_label, model_status, warnings = (
+                "",
+                "MODEL_FAILURE",
+                [model_errors.get(str(source["demand_id"]), "missing LLM result")],
+            )
+        use_model = (
+            str(rule_row.get("interpretation_status", "")) == "UNRESOLVED"
+            and model_status == "LABELED"
+        )
+        hybrid_label = model_label if use_model else rule_row["label"]
+        hybrid_status = model_status if use_model else rule_row["label_status"]
+        rows.append(
+            {
+                **base,
+                "model_label": model_label,
+                "model_status": model_status,
+                "model_warnings": json.dumps(warnings, ensure_ascii=False),
+                "hybrid_label": hybrid_label,
+                "hybrid_status": hybrid_status,
+            }
+        )
     result = pd.DataFrame(rows)
-    summary = pd.DataFrame([
-        {"method": "RULE_ONLY", "rows": len(result), "labeled": int((result.rule_status == "LABELED").sum()), "review": int((result.rule_status != "LABELED").sum()), "model_calls": 0},
-        {"method": "MODEL_ONLY", "rows": len(result), "labeled": int((result.model_status == "LABELED").sum()), "review": int((result.model_status != "LABELED").sum()), "model_calls": llm.call_count},
-        {"method": "RULE_AND_MODEL", "rows": len(result), "labeled": int((result.hybrid_status == "LABELED").sum()), "review": int((result.hybrid_status != "LABELED").sum()), "model_calls": llm.call_count},
-    ])
-    summary["rule_model_label_agreement"] = [1.0, None, float((result.rule_label == result.hybrid_label).mean())]
+    summary = pd.DataFrame(
+        [
+            {
+                "method": "RULE_ONLY",
+                "rows": len(result),
+                "labeled": int((result.rule_status == "LABELED").sum()),
+                "review": int((result.rule_status != "LABELED").sum()),
+                "model_calls": 0,
+            },
+            {
+                "method": "MODEL_ONLY",
+                "rows": len(result),
+                "labeled": int((result.model_status == "LABELED").sum()),
+                "review": int((result.model_status != "LABELED").sum()),
+                "model_calls": llm.call_count,
+            },
+            {
+                "method": "RULE_AND_MODEL",
+                "rows": len(result),
+                "labeled": int((result.hybrid_status == "LABELED").sum()),
+                "review": int((result.hybrid_status != "LABELED").sum()),
+                "model_calls": llm.call_count,
+            },
+        ]
+    )
+    summary["rule_model_label_agreement"] = [
+        1.0,
+        None,
+        float((result.rule_label == result.hybrid_label).mean()),
+    ]
     return result, summary
