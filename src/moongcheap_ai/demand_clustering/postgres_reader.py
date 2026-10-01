@@ -32,7 +32,7 @@ WHERE d."status" = %(status)s
   AND d."demand_board_id" IS NULL
   AND d."pay_method_id" IS NOT NULL
   AND d."created_at" > %(as_of)s - INTERVAL '2 days'
-  AND d."desire_end_at" > %(as_of)s
+  AND (d."desire_end_at" IS NULL OR d."desire_end_at" > %(as_of)s)
 ORDER BY d."catalog_id", d."id"
 """.strip()
 
