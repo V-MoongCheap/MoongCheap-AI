@@ -89,6 +89,11 @@ def _label(loader: TaxonomyLoader, category_id: str, constraints: list[dict[str,
         values[name] = {"code": 0, "value": all_value.get("value", "ALL")}
     grouped: dict[str, set[tuple[int, str]]] = {}
     for item in constraints:
+        if str(item.get("constraintType", "")).upper() not in {"MUST", "PREFER"}:
+            # The compact label is a positive grouping key. Keep EXCLUDE in
+            # the typed contract, but never encode an excluded value as if
+            # the consumer wanted it.
+            continue
         facet_key = item["facetKey"]
         if facet_key in values:
             grouped.setdefault(facet_key, set()).add(

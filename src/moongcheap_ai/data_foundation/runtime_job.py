@@ -19,6 +19,7 @@ from .demand_label_comparison import (
     LLMLabelingError,
     OllamaDemandLabeler,
     _apply_model_result,
+    _has_non_positive_requirement_marker,
     ensure_ollama_model_available,
 )
 from .labeling import (
@@ -57,6 +58,14 @@ def _llm_pages(target: pd.DataFrame, page_size: int) -> list[pd.DataFrame]:
         return []
     size = page_size if page_size > 0 else len(target)
     return [target.iloc[start : start + size] for start in range(0, len(target), size)]
+
+
+def _labeling_status_counts(labeled: pd.DataFrame) -> dict[str, int]:
+    """Return stable status counts for batch logs without exposing demand text."""
+    if "label_status" not in labeled.columns:
+        return {}
+    counts = labeled["label_status"].fillna("").astype(str).str.upper().value_counts()
+    return {str(status): int(count) for status, count in sorted(counts.items())}
 
 
 def run_batch(
@@ -108,6 +117,8 @@ def run_batch(
         processed_at=timestamp,
         skip_processed=False,
     )
+    if "extra_requirement" not in labeled.columns:
+        labeled["extra_requirement"] = ""
     labeled["label_status"] = labeled["status"].map({
         "PARSED": "LABELED",
         "NONE": "LABELED",
@@ -150,6 +161,12 @@ def run_batch(
                 {"REVIEW", "CONFLICT", "PASSTHROUGH", "LABELED_WITH_REVIEW"}
             )
             & labeled["demand_id"].astype(str).isin(source_by_id)
+            & ~labeled["effectiveRequirementMode"].astype(str).str.upper().isin({"EXCLUDE", "CONFLICT"})
+            & ~labeled["extra_requirement"].map(_has_non_positive_requirement_marker)
+            & ~labeled.get("reasonCodes", pd.Series("", index=labeled.index))
+            .fillna("").astype(str).str.contains(
+                "MULTIPLE_VALUES_SAME_FACET_UNRESOLVED", regex=False
+            )
             # The first fallback already validated these rows. A second
             # invocation must not override its REVIEW/UNAVAILABLE decision.
             & labeled.get("fallback_status", pd.Series("", index=labeled.index)).eq("")
@@ -224,7 +241,6 @@ def run_batch(
                             str(item["name"])
                             for item in (loader.category(str(source.get("category_id", ""))) or {}).get("facets", [])
                         }
-                        negative_markers = ("피하고", "제외", "금지", "없는", "않", "안 ")
                         requirement = str(source.get("extra_requirement", ""))
                         supplied = {str(key) for key in raw_values}
                         if allowed_facets - supplied:
@@ -233,8 +249,6 @@ def run_batch(
                             int(value.get("code", 0) or 0) != 0 for value in defaults.values()
                         ):
                             warnings.append("LLM returned only ALL for a non-empty requirement")
-                        if any(marker in requirement for marker in negative_markers):
-                            warnings.append("negative constraints remain parser-owned")
                         target_index = row_index[0]
                         if warnings:
                             labeled.at[target_index, "llm_status"] = "REVIEW"
@@ -286,8 +300,29 @@ def _apply_model2_fallback(
         & extra_requirement.fillna("").astype(str).str.strip().ne("")
         & ~result["effectiveRequirementMode"].astype(str).str.upper().isin({"EXCLUDE", "CONFLICT"})
     )
-    candidates = result[candidate_mask]
-    summary = {"enabled": True, "calls": 0, "accepted": 0, "review": len(candidates)}
+    multi_value_unresolved = result.get(
+        "reasonCodes", pd.Series("", index=result.index)
+    ).fillna("").astype(str).str.contains(
+        "MULTIPLE_VALUES_SAME_FACET_UNRESOLVED", regex=False
+    )
+    non_positive_candidates = candidate_mask & extra_requirement.map(_has_non_positive_requirement_marker)
+    multi_value_candidates = candidate_mask & multi_value_unresolved
+    result.loc[non_positive_candidates, "fallback_status"] = "REVIEW"
+    result.loc[non_positive_candidates, "fallback_warning"] = (
+        "negative or contrastive constraints remain parser-owned"
+    )
+    result.loc[multi_value_candidates, "fallback_status"] = "REVIEW"
+    result.loc[multi_value_candidates, "fallback_warning"] = (
+        "multiple values in one facet cannot be represented by a single label"
+    )
+    blocked_candidates = non_positive_candidates | multi_value_candidates
+    candidates = result[candidate_mask & ~blocked_candidates]
+    summary = {
+        "enabled": True,
+        "calls": 0,
+        "accepted": 0,
+        "review": len(candidates) + int(blocked_candidates.sum()),
+    }
     if candidates.empty:
         return result, summary
     labeler = OllamaDemandLabeler(model, endpoint=endpoint, timeout=timeout)
@@ -319,6 +354,19 @@ def _apply_model2_fallback(
             if values is None:
                 result.at[index, "fallback_status"] = "REVIEW"
                 result.at[index, "fallback_warning"] = "MODEL_RESULT_MISSING"
+                continue
+            category = loader.category(str(row["category_id"])) or {}
+            expected_facets = {
+                str(facet.get("name", ""))
+                for facet in category.get("facets", [])
+                if str(facet.get("name", "")).strip()
+            }
+            supplied_facets = {str(name).strip() for name in values}
+            if supplied_facets != expected_facets:
+                result.at[index, "fallback_status"] = "REVIEW"
+                result.at[index, "fallback_warning"] = (
+                    "LLM facet keys do not match the category taxonomy"
+                )
                 continue
             mapped, warnings = _apply_model_result(row, values, loader, [])
             non_all = [item for item in mapped.values() if int(item.get("code", 0)) != 0]
@@ -403,11 +451,16 @@ def main(argv: list[str] | None = None) -> int:
         default="http://localhost:11434",
     )
     if llm_model:
-        ensure_ollama_model_available(
-            llm_endpoint,
-            llm_model,
-            timeout=int(_first_env(source, "A_LLM_PREFLIGHT_TIMEOUT_SECONDS", default="10")),
-        )
+        try:
+            preflight_timeout = int(
+                _first_env(source, "A_LLM_PREFLIGHT_TIMEOUT_SECONDS", default="10")
+            )
+            if preflight_timeout <= 0:
+                raise ValueError("A_LLM_PREFLIGHT_TIMEOUT_SECONDS must be positive")
+            ensure_ollama_model_available(llm_endpoint, llm_model, timeout=preflight_timeout)
+        except (LLMLabelingError, ValueError) as error:
+            print(json.dumps({"status": "FAILED", "error": str(error)}, ensure_ascii=False), file=sys.stderr)
+            return 1
 
     connection = None
     write_to_database = args.write_db or source.get("A_WRITE_DATABASE", "").strip().lower() in {"1", "true", "yes"}
@@ -481,7 +534,16 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             response = {"status": "DRY_RUN"}
-        print(json.dumps({"status": "COMPLETED", "rows": len(labeled), "output": str(args.output), "model2Fallback": labeled.attrs.get("model2_fallback", {}), "backend": response}, ensure_ascii=False))
+        status_counts = _labeling_status_counts(labeled)
+        print(json.dumps({
+            "status": "COMPLETED",
+            "rows": len(labeled),
+            "labelingStatusCounts": status_counts,
+            "reviewCount": status_counts.get("REVIEW", 0),
+            "output": str(args.output),
+            "model2Fallback": labeled.attrs.get("model2_fallback", {}),
+            "backend": response,
+        }, ensure_ascii=False))
         return 0
     except (LLMLabelingError, ValueError, RuntimeError, OSError) as error:
         print(json.dumps({"status": "FAILED", "error": str(error)}, ensure_ascii=False), file=sys.stderr)

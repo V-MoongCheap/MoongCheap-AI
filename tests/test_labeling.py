@@ -187,14 +187,27 @@ def test_model_single_facet_object_is_converted_to_mapping() -> None:
     assert result == {"form": {"value": "정제"}}
 
 
-def test_llm_empty_or_category_prefixed_facet_is_safe() -> None:
+def test_llm_category_prefixed_facet_does_not_hide_a_null_duplicate() -> None:
     loader = TaxonomyLoader({"categories": [{"category_id": "C1", "facets": [
         {"name": "form", "order": 1, "values": [{"code": 0, "value": "ALL"}, {"code": 1, "value": "정제"}]},
     ]}]})
     row = pd.Series({"category_id": "C1"})
     values, warnings = _apply_model_result(row, {"health:C1:form": 1, "form": None}, loader)
     assert values["form"]["code"] == 1
-    assert not warnings
+    assert warnings == ["LLM returned null facet value: form"]
+
+
+def test_llm_conflicting_category_prefixed_facet_values_are_reviewed() -> None:
+    loader = TaxonomyLoader({"categories": [{"category_id": "C1", "facets": [
+        {"name": "form", "order": 1, "values": [
+            {"code": 0, "value": "ALL"}, {"code": 1, "value": "정제"}, {"code": 2, "value": "분말"},
+        ]},
+    ]}]})
+    row = pd.Series({"category_id": "C1", "extra_requirement": "정제"})
+
+    _, warnings = _apply_model_result(row, {"health:C1:form": 1, "form": 2}, loader)
+
+    assert warnings == ["LLM returned conflicting values for facet: form"]
 
 
 def test_hybrid_model_override_keeps_unmentioned_product_defaults() -> None:

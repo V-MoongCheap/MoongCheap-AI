@@ -1,22 +1,27 @@
 # A Labeling DB schema compatibility
 
-## Current Backend schema
+## Runtime behavior
 
-The current Backend migration does **not** define `product_catalog.category_id`.
-The category cannot be inferred safely from a product name or from the numeric
-IDs, so the A batch must not issue a hard-coded join on that column.
+Backend migration history and deployed database state may differ between environments.
+Do not assume `product_catalog.category_id` exists (or is populated) based only on a
+migration file, and never infer a Catalog–Category relationship from names or numeric IDs.
 
-At runtime, A first probes the schema:
+Before reading the pending batch, A probes the connected database schema:
 
-- If `product_catalog.category_id` exists, the batch uses the direct
-  `product_catalog -> category` join.
-- If it does not exist, the batch requires an authoritative CSV mapping and
-  loads `category.facet` using the real Backend category IDs.
+- If `product_catalog.category_id` exists, A joins `product_catalog.category_id` to
+  the actual `category.id` and reads the full `category.facet` text.
+- If the column is absent, A requires an authoritative mapping CSV and uses its actual
+  Backend `catalog_id` and `category_id` values to read `category.facet`.
+- If a required mapping, Category row, or `facet` value is missing or conflicting, A
+  stops before labeling; it does not guess or mark those Demands processed.
 
-## Mapping file
+The schema probe and both query paths are covered by automated tests. Confirm the
+specific dev/prod database state separately when diagnosing deployment issues.
 
-Set `A_CATALOG_CATEGORY_MAP_PATH` to a UTF-8 CSV mounted into the A job. The
-file must contain exactly these identifying columns:
+## Mapping file (legacy schema only)
+
+Set `A_CATALOG_CATEGORY_MAP_PATH` to a UTF-8 CSV mounted into the A job. It must include
+these columns; additional columns are ignored:
 
 ```csv
 catalog_id,category_id
@@ -27,7 +32,8 @@ catalog_id,category_id
 - `category_id` must be the actual `category.id` in the target DB.
 - AI taxonomy keys such as `health-functional-food:probiotics` must not be put
   in `category_id`.
+- Every Catalog referenced by the current pending batch must have exactly one
+  unambiguous Category mapping.
 
-The batch fails with a diagnostic error when the mapping is missing, incomplete,
-conflicting, or points to a category without `facet`. It never guesses a
-relationship from names or sequential IDs.
+Conflicting duplicate mappings, missing Catalog mappings, or Categories without
+`facet` cause an explicit error. Identical duplicate rows are harmless.

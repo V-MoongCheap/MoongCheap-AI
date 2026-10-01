@@ -15,7 +15,37 @@
 - 배포 이미지에서 합성 입력(제형 요구/빈 요구/배송 요구)으로 PARSED 저장 실패를 재현했다.
   첫 fallback이 보류한 배송 요구를 두 번째 호출이 제형으로 채택하는 사례도 발견했다.
   이미 fallback이 검증한 행은 중복 호출하지 않으며, 호출/채택/실패 요약은 첫 경로까지 합산한다.
-- 위 두 코드 수정은 기존 배포 이미지에 포함되지 않으므로 병합·이미지 재빌드·배포 후 확인이 필요하다.
+- 모델이 Taxonomy Value를 선택했지만 원문에 해당 Value/alias 근거가 없으면 `REVIEW`로 보류한다.
+  모델이 고른 각 Value에 대해 그 Value 또는 해당 Value의 alias가 원문에 있는지 확인한다.
+  배송 요구를 제형으로 잘못 반환한 실제 Ollama 응답과, 다른 Facet 값만 언급된 문장을 보류하는 것을 확인했다.
+- `EXCLUDE` 값은 typed constraints에 보존하지만 긍정 압축 `label`에는 넣지 않는다.
+  부정·대조·대안 문장은 LLM 호출 후보에서 제외하고, 모델 결과의 중복/누락/예상 밖 Demand ID,
+  Taxonomy Facet 누락, 한 Facet의 복수 후보는 실패 또는 `REVIEW`로 처리한다.
+- 추가 극단 입력 점검에서 같은 Facet의 서로 다른 값이 함께 언급된 조건을
+  규칙 파서에 의해 반대 값으로 확정될 수 있음을 재현했다. A 전용 입력 정책에서 해당 문장을
+  `MULTIPLE_VALUES_SAME_FACET_UNRESOLVED` / `REVIEW`로 보류하며, `processed_at`은 비워 재처리 가능하게 한다.
+  명시적인 단일 `EXCLUDE`는 계속 typed constraints에 보존하고 압축 label에는 긍정값으로 넣지 않는다.
+- 단일 Facet 다중값 부정·대조·비교·긍정 입력 9종 회귀 테스트와 단일 제외 조건 테스트 통과.
+- Job 완료 로그에 `labelingStatusCounts`와 `reviewCount`를 남겨, REVIEW가 포함된 실행을
+  단순 성공 건수와 구분한다. 요구 원문은 로그에 출력하지 않는다.
+- REVIEW는 자동 label이나 `processed_at`으로 위장하지 않는다. 현재 스키마에는 A의 보류 상태를
+  지속 저장하는 별도 칼럼/테이블이 없어 매 실행에서 다시 조회된다. 사람 검수를 운영하지 않는다면
+  반복 실행을 막을 영속 보류 상태 저장소가 추가로 필요하다.
+- 최종 코드로 실제 Ollama 호출 및 RDS 세션 임시 테이블 검증:
+  배송 요구 `REVIEW`/미저장, 빈 요구 `ALL` 저장, 저장 1건, 재저장 0건.
+- 실제 Ollama/RDS 검증은 `moongcheap-ai-test`의 세션 전용 임시 테이블을 사용했으며,
+  공용 `demand` 데이터는 변경하지 않았다.
+- 현재 배포 중인 CronJob 이미지에는 이 PR의 수정이 아직 포함되지 않았다.
+  병합 후 이미지 재빌드·배포가 필요하며, 운영 CronJob의 마지막 확인 실행은 rows 0이라
+  새 실제 수요를 대상으로 한 비영(非零) 처리 결과는 아직 확인되지 않았다.
+- 2026-10-01 검증: A 집중 회귀 `75 passed`; 변경 파일 Ruff와 `git diff --check` 통과.
+  전체 회귀는 샌드박스에서 실행 시 seller-awarding mock HTTP 서버의 localhost bind 권한이 없어
+  11개 테스트가 setup error로 종료됨 (`1085 passed, 31 skipped, 11 errors`). 이 11건은
+  애플리케이션 assertion 실패가 아니라 실행환경 제약이며, 전체 테스트 성공으로 간주하지 않는다.
+  소켓 bind가 필요한 seller-awarding mock 테스트 파일을 제외한 나머지 저장소 테스트는
+  `1076 passed, 31 skipped`로 통과했다.
+- 2026-10-01 EKS 재확인은 현재 환경에서 Cluster API hostname DNS 조회가 실패해 완료하지 못했다.
+  따라서 이 날짜의 배포 이미지 및 비어 있지 않은 운영 batch 결과는 확인된 것으로 간주하지 않는다.
 
 아래 9월 14일 결과는 당시 구현의 과거 기록이다. REVIEW 저장 정책, 이미지 구성 및 미수행 항목은 현재 운영 정책으로 해석하지 않는다.
 

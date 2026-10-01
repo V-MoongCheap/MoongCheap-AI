@@ -124,9 +124,10 @@ Cloud의 fallback 활성화 값이 `false`이면 A는 Rule/Alias만 실행하고
 Model 2 호출은 현재 Ollama `/api/generate` 계약을 사용한다. vLLM/OpenAI
 호환 endpoint로 변경하려면 별도 Adapter와 계약 검증이 필요하다.
 
-Cloud develop의 현재 예시에는 `A_MODEL2_FALLBACK_ENABLED=false`와
-`A_MODEL2_OLLAMA_BASE_URL=http://ollama:11434`가 남아 있다. A 런타임은 이 이름을
-과도기 호환하며, 배포 시 모델 사용을 활성화해야 한다.
+Cloud GitOps가 모델 활성화 값을 소유한다. Cloud는 2026-09-30 기준으로
+`qwen2.5:7b-instruct` 적재와 A Model 2 fallback 활성화를 보고했다. AI IAM 계정은
+develop ConfigMap 조회 권한이 없어 이 문서에서는 현재 flag의 실제 값을 단정하지 않는다.
+저장소 base manifest의 미설정/기본값을 실제 Cloud overlay 설정으로 간주하지 않는다.
 
 실제 Dev 반영 시 Cloud가 다음 placeholder를 교체한다.
 
