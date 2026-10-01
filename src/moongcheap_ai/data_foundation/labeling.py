@@ -16,6 +16,15 @@ class TaxonomyValidationError(ValueError):
     pass
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise TaxonomyValidationError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
 def _text(value: Any) -> str:
     """Convert scalar input safely, including pandas missing scalars."""
     if value is None:
@@ -68,7 +77,7 @@ class TaxonomyLoader:
                 raise TaxonomyValidationError("taxonomy category must be an object")
             category_id = str(category.get("category_id", "")).strip()
             if not category_id:
-                continue
+                raise TaxonomyValidationError("taxonomy category_id is required")
             if category_id in self.categories:
                 raise TaxonomyValidationError(f"duplicate category_id: {category_id}")
             self._validate_category(category)
@@ -77,7 +86,10 @@ class TaxonomyLoader:
     @classmethod
     def from_path(cls, path: Path) -> TaxonomyLoader:
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload = json.loads(
+                path.read_text(encoding="utf-8"),
+                object_pairs_hook=_unique_json_object,
+            )
         except (OSError, json.JSONDecodeError) as exc:
             raise TaxonomyValidationError(f"invalid taxonomy JSON: {path}") from exc
         if not isinstance(payload, dict):
@@ -151,6 +163,17 @@ class TaxonomyLoader:
                 if code != 0 and value_name == "ALL":
                     raise TaxonomyValidationError(
                         f"ALL must use code 0 in facet: {name}"
+                    )
+                if code != 0 and not value_name:
+                    raise TaxonomyValidationError(
+                        f"taxonomy value name is required for nonzero code in facet: {name}"
+                    )
+                aliases = value.get("aliases", [])
+                if not isinstance(aliases, list) or any(
+                    not isinstance(alias, str) for alias in aliases
+                ):
+                    raise TaxonomyValidationError(
+                        f"taxonomy aliases must be a list of strings in facet: {name}"
                     )
                 has_all = has_all or code == 0
             if not has_all:
@@ -337,18 +360,18 @@ def taxonomy_from_category_facet_rows(frame: pd.DataFrame) -> dict[str, Any]:
     if "category_facet" not in frame.columns:
         raise TaxonomyValidationError("database rows do not contain category_facet")
     for _, row in frame.iterrows():
-        raw = str(row.get("category_facet", "") or "").strip()
+        raw = _text(row.get("category_facet", "")).strip()
         if not raw:
             continue
         try:
-            parsed = json.loads(raw)
+            parsed = json.loads(raw, object_pairs_hook=_unique_json_object)
         except json.JSONDecodeError as exc:
             raise TaxonomyValidationError(
                 "category.facet contains invalid JSON"
             ) from exc
-        category_id = str(row.get("category_id", "") or "").strip()
+        category_id = _text(row.get("category_id", "")).strip()
         if isinstance(parsed, dict):
-            category_id = str(parsed.get("category_id", category_id)).strip()
+            category_id = _text(parsed.get("category_id", "")).strip() or category_id
             facets = parsed.get("facets", [])
         elif isinstance(parsed, list):
             facets = parsed

@@ -14,6 +14,7 @@ from moongcheap_ai.data_foundation.labeling import (
     TaxonomyValidationError,
     build_product_facet_map,
     label_demands,
+    taxonomy_from_category_facet_rows,
 )
 
 TAXONOMY = {
@@ -132,6 +133,86 @@ def test_malformed_taxonomy_types_raise_domain_validation_error() -> None:
     ]:
         with pytest.raises(TaxonomyValidationError):
             TaxonomyLoader(invalid)
+
+
+def test_taxonomy_rejects_missing_category_id_and_malformed_aliases() -> None:
+    for taxonomy in [
+        {"categories": [{"facets": []}]},
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {
+                            "name": "form",
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": "분말", "aliases": "파우더"},
+                            ],
+                        }
+                    ],
+                }
+            ]
+        },
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {
+                            "name": "form",
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": "분말", "aliases": [None]},
+                            ],
+                        }
+                    ],
+                }
+            ]
+        },
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {"name": "form", "values": [{"code": 0, "value": "ALL"}, {"code": 1}]}
+                    ],
+                }
+            ]
+        },
+    ]:
+        with pytest.raises(TaxonomyValidationError):
+            TaxonomyLoader(taxonomy)
+
+
+def test_taxonomy_json_duplicate_keys_are_rejected(tmp_path) -> None:
+    path = tmp_path / "duplicate-taxonomy.json"
+    path.write_text(
+        '{"categories": [], "categories": [{"category_id": "C1", "facets": []}]}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(TaxonomyValidationError, match="duplicate JSON key"):
+        TaxonomyLoader.from_path(path)
+
+
+def test_category_facet_rejects_duplicate_json_keys_and_handles_missing_scalar() -> None:
+    with pytest.raises(TaxonomyValidationError, match="duplicate JSON key"):
+        taxonomy_from_category_facet_rows(
+            pd.DataFrame(
+                [
+                    {
+                        "category_id": "C1",
+                        "category_facet": '{"category_id":"C1","category_id":"C2","facets":[]}',
+                    }
+                ]
+            )
+        )
+
+    with pytest.raises(TaxonomyValidationError, match="no usable"):
+        taxonomy_from_category_facet_rows(
+            pd.DataFrame([{"category_id": pd.NA, "category_facet": pd.NA}])
+        )
 
 
 def test_non_contiguous_facet_orders_are_rejected() -> None:

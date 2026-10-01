@@ -30,12 +30,9 @@ Current behavior supersedes the historical REVIEW persistence statements below:
 
 ## 2026-10-01 local regression verification
 
-- Full repository regression excluding
-  `tests/seller_matching/test_awarding_test_drive.py`: `1099 passed, 31 skipped`.
-- The excluded test module starts a localhost mock server. The current sandbox
-  denies socket bind (`PermissionError`), so its 11 setup errors are an
-  environment limitation, not passed tests; rerun it in an environment that
-  permits loopback sockets.
+- Full repository regression: `1128 passed, 31 skipped`.
+- The seller-awarding localhost mock tests were included in this run; loopback
+  socket access was available.
 - Ruff and `git diff --check` passed. Docker image build was not verified
   because the local Docker daemon was unavailable.
 - `kubectl kustomize k8s/base/a-labeling-job` rendered successfully; the base
