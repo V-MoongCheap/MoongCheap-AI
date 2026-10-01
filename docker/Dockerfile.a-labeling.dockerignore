@@ -12,5 +12,8 @@
 !config/demand_constraint_aliases.json
 !config/demand_constraint_rules.json
 !config/facet_taxonomy_v2_2.json
+!artifacts/
+!artifacts/README.md
+!artifacts/product_facets.csv
 **/__pycache__/
 **/*.py[cod]

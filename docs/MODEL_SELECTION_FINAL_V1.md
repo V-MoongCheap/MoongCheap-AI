@@ -19,10 +19,10 @@ Model 1: Rule/통계 → Qwen3 4B 후보 보조 → Evidence 검증 → Human Re
 Model 2: Rule/Alias → 명확하면 즉시 Label
                   → 미해결 양성 요청만 Qwen 2.5 7B
                   → Taxonomy/typed constraint 검증
-                  → 실패·충돌·근거 부족은 REVIEW
+                  → 실패·충돌·근거 부족은 원상품 Facet 기본값 유지
 ```
 
-Qwen fallback은 `A_MODEL2_FALLBACK_ENABLED=false`가 기본값이다. Ollama가 준비된 환경에서만 명시적으로 켜며, 기본 CronJob은 모델 없이도 결정론적인 Rule 경로로 동작한다. 실제 연결 코드는 `runtime_job.py`에 있고, 실패한 모델 응답은 DB로 전송하지 않는다.
+Qwen fallback은 `A_MODEL2_FALLBACK_ENABLED=false`가 기본값이다. Ollama가 준비된 환경에서만 명시적으로 켜며, 기본 CronJob은 모델 없이도 결정론적인 Rule 경로로 동작한다. 실제 연결 코드는 `runtime_job.py`에 있다. 개별 모델 응답이 실패하거나 검증되지 않으면 그 응답은 적용하지 않고 검증된 원상품 기본 label을 기록한다. 반면 LLM 사용이 활성화됐는데 Ollama 또는 필수 모델이 배치 시작 시 준비되지 않았다면, DB에 접근/기록하기 전에 배치를 실패시켜 재시도한다.
 
 ## 2. 선택 근거
 
@@ -38,7 +38,7 @@ Kanana는 동일 smoke에서 4회 호출·후보 0건·JSON 실패 4건·180.27�
 
 ### Model 2
 
-Qwen 2.5 7B는 전체 Model-only 품질이 아니라 fallback 개선폭과 재현 가능한 Ollama 실행을 기준으로 채택했다. fallback은 명시적 제외·충돌을 임의로 긍정 조건으로 바꾸지 않으며, 현재 Taxonomy에 완전히 매핑되고 typed constraint를 만들 수 있을 때만 Label을 갱신한다. 그 외에는 `REVIEW`로 남긴다.
+Qwen 2.5 7B는 전체 Model-only 품질이 아니라 fallback 개선폭과 재현 가능한 Ollama 실행을 기준으로 채택했다. fallback은 명시적 제외·충돌을 임의로 긍정 조건으로 바꾸지 않으며, 현재 Taxonomy에 완전히 매핑되고 원문 근거가 확인된 양성 constraint만 해당 Facet의 검증된 상품 기본값을 덮어쓴다. 개별 Demand의 분석 응답을 쓸 수 없거나 모호하면 검증된 원상품 기본 label을 유지한다. 활성화된 LLM 서비스/모델 자체가 배치 시작 시 unavailable이면 해당 실행은 DB 기록 없이 실패해 다음 회차에 재시도한다. Product Facet profile 또는 Category/Taxonomy가 없거나 불완전하면 추정 없이 처리 보류한다.
 
 ## 3. 현재 산출물 및 검증 상태
 

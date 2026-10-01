@@ -1,21 +1,22 @@
-"""Part A Consumer Demand runtime for the V2.2 Backend handoff.
+"""Part A consumer-text parser for the V2.2 Backend handoff.
 
-This module deliberately stops at demand parsing.  It does not create boards,
-clusters, embeddings, seller matches, or call an LLM.
+This module deliberately stops at typed demand parsing. It does not finalize
+``label`` or ``processed_at`` because those require the selected product's
+Facet profile. It also does not create boards, clusters, embeddings, seller
+matches, or call an LLM.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-from ..demand_constraints import DemandConstraintParser
 from ..demand_clustering.part_a_integration import build_part_b_parser
+from ..demand_constraints import DemandConstraintParser
 from .labeling import TaxonomyLoader
 from .part_a_input_policy import PartAConstraintInputPolicy
 
@@ -47,10 +48,30 @@ def _substitution_consent(value: object) -> bool | None:
 def _category_map(frame: pd.DataFrame) -> dict[str, str]:
     if "category_id" not in frame.columns:
         return {}
-    id_column = "id" if "id" in frame.columns else "catalog_seed_id" if "catalog_seed_id" in frame.columns else None
+    id_column = (
+        "id"
+        if "id" in frame.columns
+        else "catalog_seed_id"
+        if "catalog_seed_id" in frame.columns
+        else None
+    )
     if not id_column:
         return {}
-    return dict(zip(frame[id_column].astype(str), frame["category_id"].astype(str)))
+    result: dict[str, str] = {}
+    for raw_catalog_id, raw_category_id in frame[
+        [id_column, "category_id"]
+    ].fillna("").itertuples(index=False, name=None):
+        catalog_id = str(raw_catalog_id).strip()
+        category_id = str(raw_category_id).strip()
+        if not catalog_id or not category_id:
+            continue
+        previous = result.get(catalog_id)
+        if previous is not None and previous != category_id:
+            raise ValueError(
+                f"catalog ID has conflicting category IDs: {catalog_id}"
+            )
+        result[catalog_id] = category_id
+    return result
 
 
 def _facet_index(loader: TaxonomyLoader, category_id: str) -> dict[str, dict[str, Any]]:
@@ -81,35 +102,6 @@ def _contract_constraints(loader: TaxonomyLoader, category_id: str, result: Mapp
     return constraints
 
 
-def _label(loader: TaxonomyLoader, category_id: str, constraints: list[dict[str, Any]]) -> tuple[str, dict[str, dict[str, Any]]]:
-    facets = _facet_index(loader, category_id)
-    values: dict[str, dict[str, Any]] = {}
-    for name, facet in facets.items():
-        all_value = next((item for item in facet.get("values", []) if int(item.get("code", -1)) == 0), {"value": "ALL"})
-        values[name] = {"code": 0, "value": all_value.get("value", "ALL")}
-    grouped: dict[str, set[tuple[int, str]]] = {}
-    for item in constraints:
-        if str(item.get("constraintType", "")).upper() not in {"MUST", "PREFER"}:
-            # The compact label is a positive grouping key. Keep EXCLUDE in
-            # the typed contract, but never encode an excluded value as if
-            # the consumer wanted it.
-            continue
-        facet_key = item["facetKey"]
-        if facet_key in values:
-            grouped.setdefault(facet_key, set()).add(
-                (int(item["valueCode"]), str(item["canonicalValue"]))
-            )
-    for facet_key, candidates in grouped.items():
-        # A fixed-width label can represent one selected value per Facet. An
-        # alternative group or contradictory values remains in constraints and
-        # keeps ALL here for B's compatibility logic to handle explicitly.
-        if len(candidates) == 1:
-            code, value = next(iter(candidates))
-            values[facet_key] = {"code": code, "value": value}
-    ordered = sorted(facets.items(), key=lambda pair: int(pair[1].get("order", 0)))
-    return "-".join(str(values[name]["code"]) for name, _ in ordered), values
-
-
 def run_part_a_batch(
     demands: pd.DataFrame,
     taxonomy_path: Path | None,
@@ -118,7 +110,6 @@ def run_part_a_batch(
     *,
     taxonomy_payload: Mapping[str, Any] | None = None,
     compatibility_alias_registry_path: Path | None = None,
-    processed_at: str | None = None,
     skip_processed: bool = True,
     catalog: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -169,7 +160,6 @@ def run_part_a_batch(
         source = source[source["processed_at"].astype(str).str.strip().eq("")].copy()
     catalog_map = _category_map(catalog) if catalog is not None else None
     rows: list[dict[str, Any]] = []
-    now = processed_at or datetime.now(UTC).isoformat()
     for raw in source.to_dict(orient="records"):
         row = dict(raw)
         try:
@@ -260,9 +250,7 @@ def run_part_a_batch(
             status = str(result["status"])
             if status not in STATUSES:
                 status = "REVIEW"
-            completed = status in {"PARSED", "NONE", "NOT_APPLICABLE"}
             constraints = _contract_constraints(taxonomy, category_id, result)
-            label, facet_values = _label(taxonomy, category_id, constraints)
             reason_codes = list(result.get("warnings", []))
             if result.get("diagnostic_code"):
                 reason_codes.insert(0, str(result["diagnostic_code"]))
@@ -280,10 +268,14 @@ def run_part_a_batch(
                 "preferenceGroups": json.dumps(result.get("preference_groups", []), ensure_ascii=False, separators=(",", ":")),
                 "passthroughText": requirement if status == "PASSTHROUGH" else None,
                 "reasonCodes": json.dumps(reason_codes, ensure_ascii=False, separators=(",", ":")),
-                "label": label,
-                "facet_values": json.dumps(facet_values, ensure_ascii=False, separators=(",", ":")),
+                # This stage only interprets consumer text. A final numeric
+                # label requires the selected product's complete Facet profile
+                # and is created by the labeling runtime after that is joined.
+                "label": "",
+                "facet_values": "{}",
                 "parserVersion": RUNTIME_VERSION,
-                "processed_at": now if completed else "",
+                # Parsing success is not final Demand labeling completion.
+                "processed_at": "",
             })
         except (KeyError, TypeError, ValueError, IndexError) as error:
             row.update({

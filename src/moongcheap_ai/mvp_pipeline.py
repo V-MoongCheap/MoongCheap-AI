@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,6 @@ from .data_foundation.labeling import (
     load_taxonomy,
 )
 from .demand_clustering.baseline import cluster_demands, summarize_clusters
-
 
 DEFAULT_TAXONOMY = Path("config/facet_taxonomy_v2_2.json")
 DEFAULT_ALIAS_REGISTRY = Path("config/model1_aliases_reviewed_v2.json")
@@ -76,6 +75,12 @@ def _apply_aliases(
     corrected_hits = 0
     row_conflicts: list[bool] = []
     for index, row in output.iterrows():
+        # Alias interpretation may overlay a complete, validated product
+        # baseline only. It must not turn a missing-profile REVIEW row into a
+        # partial-looking label.
+        if str(row.get("label_status", "")).upper() != "LABELED":
+            row_conflicts.append(False)
+            continue
         matches = matcher.resolve(
             str(row.get("category_id", "")), row.get("extra_requirement", "")
         )
@@ -93,6 +98,9 @@ def _apply_aliases(
                 current_row_conflict = True
                 continue
             chosen_by_facet[match["facet_name"]] = match
+        if current_row_conflict:
+            row_conflicts.append(True)
+            continue
         current = json.loads(str(row.get("facet_values", "{}") or "{}"))
         for facet_name, match in chosen_by_facet.items():
             current[facet_name] = {
@@ -105,7 +113,7 @@ def _apply_aliases(
         output.at[index, "facet_values"] = json.dumps(
             current, ensure_ascii=False, separators=(",", ":")
         )
-        row_conflicts.append(current_row_conflict)
+        row_conflicts.append(False)
         # The taxonomy loader already encoded the canonical facet order. Replace only
         # the affected code positions through the existing label where possible.
         label_parts = str(row.get("label", "")).split("-")
@@ -145,14 +153,16 @@ def label_batch(
         pending, loader, product_facet_map=_load_product_facets(product_facets_path)
     )
     matcher = ReviewedAliasMatcher(alias_registry_path)
-    labeled, alias_hits, corrected_hits, alias_conflicts = _apply_aliases(
+    labeled, alias_hits, corrected_hits, _alias_conflicts = _apply_aliases(
         labeled, matcher
     )
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     statuses: list[str] = []
     for _, row in labeled.iterrows():
         warnings = json.loads(str(row.get("label_warnings", "[]") or "[]"))
-        if bool(row.get("_alias_conflict", False)):
+        if str(row.get("label_status", "")).upper() != "LABELED":
+            statuses.append("UNRESOLVED")
+        elif bool(row.get("_alias_conflict", False)):
             statuses.append("CONFLICT")
         elif warnings:
             statuses.append("PARTIALLY_RESOLVED")
@@ -254,7 +264,7 @@ def run_local_e2e(
     cluster_summary = {
         "processed": 0 if label_only else len(eligible),
         "joined_existing": 0,
-        "created_new": 0 if label_only else int(len(clusters)),
+        "created_new": 0 if label_only else len(clusters),
         "substitute_joined": 0
         if label_only
         else int(

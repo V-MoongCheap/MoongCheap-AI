@@ -1,6 +1,52 @@
 # Part A Labeling Smoke Test
 
-## 2026-09-30 EKS/RDS 검증 및 현재 저장 정책
+## 2026-10-01 product-baseline policy update
+
+Current behavior supersedes the historical REVIEW persistence statements below:
+
+- The reader loads the actual selected Backend catalog's Category taxonomy and
+  looks up its explicit Product Facet profile by `backend_catalog_id`, which
+  contains the actual Backend `product_catalog.id`.
+- Profile rows must cover every Taxonomy Facet and match the Taxonomy category;
+  missing, conflicting, or incompatible profiles are not marked processed.
+- The runtime does not infer product Facets from `name`, `spec_summary`, or
+  `description`. An explicit `UNKNOWN` profile value must remain distinct from
+  `ALL` and keep the Demand unprocessed under the current numeric-label contract.
+- Empty requirements, ambiguous/failed analysis, and explicit exclusions retain
+  the product baseline. A stable positive consumer constraint overrides only
+  its own Facet.
+- When the configured Ollama service/model is unavailable at batch preflight,
+  the run fails before DB access/write so the next schedule can retry. This is
+  distinct from a per-demand interpretation failure, which retains the product
+  baseline as specified above.
+- A valid complete category/product baseline is a completed label and is
+  persisted; a missing/incomplete product profile or Category/taxonomy remains
+  retryable. Parser `status` is diagnostic; `label_status` controls persistence.
+- This code change has only been locally tested so far. A rebuilt image and a
+  non-zero dev batch are required before claiming deployment verification.
+- The current local build context does not contain the required product Facet
+  CSV, and the deployed image's contents were not inspected in this run. A new
+  image built from this worktree needs a taxonomy-aligned, actual-Backend-ID
+  artifact at `/artifacts/product_facets.csv`; without it, non-empty batches
+  intentionally fail closed.
+- The older 5,000-row smoke results below predate this product-baseline policy
+  and do not verify the current rule that product Facets seed each label.
+
+## 2026-10-01 local regression verification
+
+- Full repository regression: `1156 passed, 31 skipped`.
+- The seller-awarding localhost mock tests were included in this run; loopback
+  socket access was available.
+- Ruff and `git diff --check` passed. Docker image build was not verified
+  because the local Docker daemon was unavailable.
+- The A-labeling lockfile check passed. Wheel build could not be verified
+  because this environment could not resolve PyPI DNS for the isolated build
+  dependency (`hatchling`).
+- `kubectl kustomize k8s/base/a-labeling-job` rendered successfully; the base
+  CronJob remains suspended and points to the required runtime profile path.
+- No live database or Kubernetes write test was run after this code change.
+
+## 2026-09-30 EKS/RDS 검증 (당시 저장 정책의 역사 기록)
 
 - 배포 이미지 `labeling-develop-f1222f4`의 수동 Job 정상 종료 확인.
 - 배치 로그: 입력 27건, LLM 요약 calls 2 / applied 0 / failed 0, DB updatedCount 0.
@@ -38,12 +84,10 @@
 - 현재 배포 중인 CronJob 이미지에는 이 PR의 수정이 아직 포함되지 않았다.
   병합 후 이미지 재빌드·배포가 필요하며, 운영 CronJob의 마지막 확인 실행은 rows 0이라
   새 실제 수요를 대상으로 한 비영(非零) 처리 결과는 아직 확인되지 않았다.
-- 2026-10-01 검증: A 집중 회귀 `75 passed`; 변경 파일 Ruff와 `git diff --check` 통과.
-  전체 회귀는 샌드박스에서 실행 시 seller-awarding mock HTTP 서버의 localhost bind 권한이 없어
-  11개 테스트가 setup error로 종료됨 (`1085 passed, 31 skipped, 11 errors`). 이 11건은
-  애플리케이션 assertion 실패가 아니라 실행환경 제약이며, 전체 테스트 성공으로 간주하지 않는다.
-  소켓 bind가 필요한 seller-awarding mock 테스트 파일을 제외한 나머지 저장소 테스트는
-  `1076 passed, 31 skipped`로 통과했다.
+- 2026-10-01 검증: A 집중 회귀와 변경 파일 Ruff, `git diff --check` 통과.
+  전체 저장소 테스트에서 seller-awarding mock HTTP 서버의 localhost bind가
+  `PermissionError`로 막혀 setup 단계 11건이 실행되지 않았다. 해당 파일을 제외한
+  저장소 전체 회귀 수치는 아래 최신 로컬 검증 항목을 참조한다.
 - 2026-10-01 EKS 재확인은 현재 환경에서 Cluster API hostname DNS 조회가 실패해 완료하지 못했다.
   따라서 이 날짜의 배포 이미지 및 비어 있지 않은 운영 batch 결과는 확인된 것으로 간주하지 않는다.
 

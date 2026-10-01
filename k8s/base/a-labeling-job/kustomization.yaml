@@ -8,6 +8,8 @@ resources:
 configMapGenerator:
   - name: a-labeling-config
     literals:
+      # The matching Backend-ID product Facet release must be supplied at this path.
+      - A_PRODUCT_FACETS_PATH=/artifacts/product_facets.csv
       - A_ALIAS_REGISTRY_PATH=/app/config/model1_aliases_reviewed_v2.json
       - A_RULES_PATH=/app/config/demand_constraint_rules.json
       - A_BACKEND_HTTP_TIMEOUT_SECONDS=15

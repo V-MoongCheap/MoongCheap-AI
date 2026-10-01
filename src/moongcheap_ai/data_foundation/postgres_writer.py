@@ -6,9 +6,10 @@ Only ``demand.label`` and ``demand.processed_at`` are written here.
 
 from __future__ import annotations
 
+import math
+import re
 from collections.abc import Iterable, Mapping
 from datetime import datetime
-import math
 from types import TracebackType
 from typing import Any, Protocol, Self
 
@@ -56,21 +57,27 @@ def write_label_results(
         status = str(row.get("label_status", "")).strip().upper()
         if status == "REVIEW":
             continue
-        # A warning-bearing result is diagnostic only.  It must not mark the
-        # demand as processed because the next batch must be able to retry it
-        # after the taxonomy/model policy is improved.
+        # Persistence is controlled by label_status, not diagnostic warnings.
+        # A valid product-baseline label remains writable when consumer text
+        # is unresolved; missing/invalid baselines are emitted as REVIEW and
+        # are skipped below.
         if status != "LABELED":
             raise ValueError(f"unsupported label_status for DB write: {status or '<blank>'}")
         demand_id = row.get("demand_id")
         if demand_id is None or (isinstance(demand_id, float) and math.isnan(demand_id)) or str(demand_id).strip().casefold() in {"", "nan", "none"}:
             raise ValueError("demand_id is required for direct DB labeling")
         demand_key = str(demand_id).strip()
-        if demand_key in seen_ids:
+        normalized_demand_key = (
+            str(int(demand_key)) if demand_key.isdigit() else demand_key
+        )
+        if normalized_demand_key in seen_ids:
             raise ValueError(f"duplicate demand_id in DB labeling batch: {demand_key}")
-        seen_ids.add(demand_key)
+        seen_ids.add(normalized_demand_key)
         label = str(row.get("label", "")).strip()
         if not label:
             raise ValueError(f"label is required for demand_id: {demand_key}")
+        if not re.fullmatch(r"\d+(?:-\d+)*", label):
+            raise ValueError(f"label must be a numeric Facet vector: {demand_key}")
         updates.append({
             "demand_id": demand_key,
             "label": label,

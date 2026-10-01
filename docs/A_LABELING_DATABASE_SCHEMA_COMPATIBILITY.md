@@ -8,12 +8,16 @@ migration file, and never infer a Catalog–Category relationship from names or 
 
 Before reading the pending batch, A probes the connected database schema:
 
-- If `product_catalog.category_id` exists, A joins `product_catalog.category_id` to
-  the actual `category.id` and reads the full `category.facet` text.
+- If `product_catalog.category_id` exists, A uses a `LEFT JOIN` from the actual
+  `product_catalog.id`/`category.id` relation and reads the full `category.facet`
+  text. A pending Demand whose Catalog has a null/missing Category stays visible
+  in the batch and is held individually without a label or `processed_at`; valid
+  rows in the same batch can continue.
 - If the column is absent, A requires an authoritative mapping CSV and uses its actual
   Backend `catalog_id` and `category_id` values to read `category.facet`.
-- If a required mapping, Category row, or `facet` value is missing or conflicting, A
-  stops before labeling; it does not guess or mark those Demands processed.
+- In the legacy mapping path, missing or conflicting Catalog mappings stop the batch
+  before labeling. A category with invalid `facet` JSON also fails validation rather
+  than being guessed. No path infers the relation from product names or numeric IDs.
 
 The schema probe and both query paths are covered by automated tests. Confirm the
 specific dev/prod database state separately when diagnosing deployment issues.

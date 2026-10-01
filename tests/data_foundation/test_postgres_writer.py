@@ -1,21 +1,30 @@
 from __future__ import annotations
 
-from typing import Any
+from types import TracebackType
+from typing import Any, Self
 
 import pytest
 
-from moongcheap_ai.data_foundation.postgres_writer import UPDATE_LABEL_SQL, write_label_results
+from moongcheap_ai.data_foundation.postgres_writer import (
+    UPDATE_LABEL_SQL,
+    write_label_results,
+)
 
 
 class FakeCursor:
-    def __init__(self, connection: "FakeConnection") -> None:
+    def __init__(self, connection: FakeConnection) -> None:
         self.connection = connection
         self.rowcount = 0
 
-    def __enter__(self) -> "FakeCursor":
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         return None
 
     def execute(self, query: str, params: dict[str, Any] | None = None) -> None:
@@ -69,6 +78,27 @@ def test_writer_updates_only_completed_rows_and_commits() -> None:
     assert columns == {"label", "processed_at"}
 
 
+def test_writer_persists_completed_product_baseline_with_diagnostic_warning() -> None:
+    connection = FakeConnection()
+
+    count = write_label_results(
+        connection,
+        [
+            {
+                "demand_id": "1",
+                "label": "2-1",
+                "label_status": "LABELED",
+                "label_warnings": '["consumer requirement unresolved; retained product baseline"]',
+            }
+        ],
+        processed_at="2026-10-01T00:00:00+00:00",
+    )
+
+    assert count == 1
+    assert connection.committed is True
+    assert len(connection.executed) == 1
+
+
 def test_writer_rolls_back_when_a_write_fails() -> None:
     connection = FakeConnection(fail=True)
 
@@ -95,6 +125,7 @@ def test_writer_requires_demand_id() -> None:
 def test_writer_rejects_invalid_completed_rows() -> None:
     for row, message in [
         ({"demand_id": "1", "label": "", "label_status": "LABELED"}, "label is required"),
+        ({"demand_id": "1", "label": "1--2", "label_status": "LABELED"}, "numeric Facet vector"),
         ({"demand_id": "1", "label": "1", "label_status": "UNKNOWN"}, "unsupported label_status"),
         ({"demand_id": "1", "label": "1", "label_status": "LABELED_WITH_REVIEW"}, "unsupported label_status"),
         ({"demand_id": float("nan"), "label": "1", "label_status": "LABELED"}, "demand_id"),
@@ -108,15 +139,16 @@ def test_writer_rejects_invalid_completed_rows() -> None:
 
 
 def test_writer_rejects_duplicate_demand_ids() -> None:
-    with pytest.raises(ValueError, match="duplicate demand_id"):
-        write_label_results(
-            FakeConnection(),
-            [
-                {"demand_id": "1", "label": "1", "label_status": "LABELED"},
-                {"demand_id": "1", "label": "2", "label_status": "LABELED"},
-            ],
-            processed_at="2026-09-14T00:00:00+00:00",
-        )
+    for duplicate_ids in [("1", "1"), ("001", "1")]:
+        with pytest.raises(ValueError, match="duplicate demand_id"):
+            write_label_results(
+                FakeConnection(),
+                [
+                    {"demand_id": duplicate_ids[0], "label": "1", "label_status": "LABELED"},
+                    {"demand_id": duplicate_ids[1], "label": "2", "label_status": "LABELED"},
+                ],
+                processed_at="2026-09-14T00:00:00+00:00",
+            )
 
 
 def test_writer_returns_database_affected_count() -> None:

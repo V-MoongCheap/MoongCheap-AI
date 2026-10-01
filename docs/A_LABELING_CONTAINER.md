@@ -5,11 +5,13 @@
 파트 A Labeling은 HTTP Service가 아니라 PostgreSQL 직접 저장형 CronJob이다.
 
 ```text
-CronJob
+  CronJob
   → 미처리 demand 조회
-  → product_catalog.category_id 조회
+  → product_catalog.category_id (또는 legacy mapping) 및 category.facet 조회
+  → `backend_catalog_id` 기준 상품 Facet 매핑 artifact 조회
   → category.facet 전체 JSON 조회·Python parsing
-  → extra_requirement Rule/Alias Labeling
+  → 원상품의 명시적 Facet 값으로 기본 label 구성
+  → 안정적으로 파싱된 긍정 extra_requirement만 해당 Facet을 override
   → demand.label / demand.processed_at UPDATE
 ```
 
@@ -46,16 +48,18 @@ A_MODEL2_FALLBACK_TIMEOUT_SECONDS=300
 A_MODEL2_FALLBACK_BATCH_SIZE=5
 ```
 
-LLM을 활성화한 실행은 DB 처리 전에 Ollama `/api/tags`에서 위 모델의 존재를 확인한다.
-모델이 없거나 Ollama가 준비되지 않았으면 실패 종료하며 `demand.processed_at`을 기록하지
-않는다. 따라서 다음 스케줄 실행에서 해당 Demand가 다시 조회된다.
+LLM을 활성화한 실행은 시작 시 Ollama `/api/tags`에서 위 모델의 존재를 확인한다.
+모델이 없거나 Ollama가 준비되지 않았으면 배치를 실패 종료하며 DB를 읽거나 쓰지 않는다.
+이는 다음 CronJob에서 재시도할 수 있도록 하기 위함이다. Ollama가 준비된 상태에서
+개별 Demand 해석에 실패·모호·근거 부족이 발생한 경우에는 완전하고 유효한 원상품
+Facet profile을 결과로 사용한다. 상품 profile이 없거나 불완전한 Demand는 미처리 상태로 둔다.
 
-fallback은 Rule 결과를 대체하지 않고 `PASSTHROUGH`, `TAXONOMY_AMBIGUOUS`,
-또는 명시적 제외/충돌이 아닌 `REVIEW`만 대상으로 한다. 응답이 현재 Taxonomy의
-Facet/Value로 완전히 검증되고 typed constraint를 만들 수 있을 때만 `PARSED`로
-승격한다. 호출 실패, 누락 결과, Taxonomy 밖 값, 정보가 없는 결과는 기존 결과를
-유지하고 `REVIEW`로 남긴다. 따라서 Ollama가 없는 환경에서도 기본 CronJob은
-정상적으로 Rule-only로 동작한다.
+Model 2는 안정적으로 해석되지 않은 비어 있지 않은 긍정 후보만 보조한다.
+명시적 제외·충돌·복수값·모호한 요청은 재해석하지 않고 상품 기본 Facet을 유지한다.
+모델 결과는 Taxonomy와 원문 근거를 검증한 양성 Value만 해당 Facet의 기본값을
+덮어쓴다. 모델 호출 실패·누락·Taxonomy 밖 결과는 이미 구성된 상품 기본 label을
+유지한다. 유효한 Catalog/Category가 확인된 행은 이 기본 label을 저장하며,
+미매핑 Category는 처리하지 않고 재시도 대상으로 둔다.
 
 ## CI/CD handoff
 

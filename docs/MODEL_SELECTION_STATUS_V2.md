@@ -6,14 +6,14 @@
 최종 Taxonomy나 Label의 자동 승인 근거로 사용하지 않는다.
 
 - Model 1: `qwen3:4b`를 후보 생성 보조 모델로 사용한다. Rule/통계 근거가 승격 gate이고, LLM 후보는 Human Review 전까지 후보로만 둔다. Kanana는 비교·재현용 후보로 유지한다.
-- Model 2: `Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 명확한 행은 Rule/Alias가 처리하고, `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 `qwen2.5:7b-instruct` 모델 런타임으로 보조한다. 실제 배포 위치는 Cloud 설정에 따르며, 통신 기준은 Ollama API다.
+- Model 2: `상품 Facet 기본값 + Rule-first Hybrid`를 서버 운영 방식으로 확정한다. 원상품 Facet을 기본 label로 만들고, 안정적으로 해석한 긍정 요구만 해당 Facet을 덮어쓴다. 미해결 긍정 요구에는 `qwen2.5:7b-instruct`를 보조로 쓸 수 있다. 실제 배포 위치는 Cloud 설정에 따르며, 통신 기준은 Ollama API다.
 - LLM 단독 결과를 운영 Label 또는 최종 Taxonomy로 자동 승인하지 않는다.
 
 ## 안전한 fallback 경계
 
 Qwen은 이미 `PARSED` 또는 `NONE`인 Rule 결과를 덮어쓰지 않는다. 명시적 제외나 충돌을 긍정 조건으로 변환하지 않으며, Taxonomy에 없는 Facet/Value를 만들지 않는다. typed constraint를 만들 수 없는 응답도 저장하지 않는다.
 
-호출 실패, timeout, 누락 결과, Taxonomy 불일치, 정보가 없는 결과는 `REVIEW`로 남긴다. `A_MODEL2_FALLBACK_ENABLED` 기본값은 `false`이며, Ollama 서비스가 준비된 환경에서만 `true`로 바꾼다.
+개별 Demand의 호출 실패, timeout, 누락 결과, Taxonomy 불일치, 근거 부족은 검증된 원상품 기본 label을 유지한다. 반면 LLM이 활성화된 실행에서 Ollama 자체 또는 필수 모델이 시작 전 확인되지 않으면 배치 전체를 DB 접근/기록 전에 실패시켜 다음 스케줄에 재시도한다. Product Facet profile이 없거나 불완전하거나 Backend Category/Taxonomy가 유효하지 않은 행은 `REVIEW`로 남긴다. `A_MODEL2_FALLBACK_ENABLED` 기본값은 `false`이며, Ollama 서비스가 준비된 환경에서만 `true`로 바꾼다.
 
 ## 실험 해석
 
@@ -105,11 +105,11 @@ Qwen 3 4B의 200건 결과는 Mac GPU 실행이라 Kubernetes CPU 처리량을 �
 
 따라서 최종 Model 2 운영 방식은 다음과 같다.
 
-1. Rule/Alias 기반 Labeling을 기본 서버 경로로 사용한다.
-2. `REVIEW`/`CONFLICT`/`PASSTHROUGH` 행만 모델 런타임으로 보낸다.
-3. LLM 결과는 Taxonomy 검증과 Evidence Gate를 통과한 경우에만 적용한다.
-4. 부정 조건은 Rule Parser가 최종 판정하며, LLM은 부정 조건을 덮어쓰지 않는다.
-5. Qwen 2.5 7B Q4를 현재 모델 후보로 유지한다. 실제 모델 실행 위치,
+1. 원상품의 명시적 Facet을 기본 label로 구성한다.
+2. 안정적으로 해석된 긍정 요구는 해당 Facet의 원상품 기본값만 덮어쓴다.
+3. 미해결 긍정 요구만 모델 런타임으로 보낸다. 분석 실패·모호·부정·충돌은 상품 기본값을 유지한다.
+4. LLM 결과는 Product Facet profile, Taxonomy 검증과 Evidence Gate를 통과한 경우에만 적용한다.
+5. Qwen 2.5 7B Q4를 현재 모델로 사용한다. 실제 모델 실행 위치,
    Service endpoint, 리소스 및 프로토콜은 Cloud 배포 방식 확정 후 반영한다.
 
 ## 다음 실행 순서
@@ -136,8 +136,8 @@ PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
 기본값이다. 서버 런타임에서는 Ollama endpoint가 공급되는 환경에
 `A_LLM_ENABLED=true`와 `A_LLM_MODEL=qwen2.5:7b-instruct`를 주입한다.
 `A_LLM_MAX_ROWS`는 기본 `0`(무제한)이며, 양수여도 페이지 분할로 전체 미확정 행을
-처리하고 누락하지 않는다. 검증 실패·부정·충돌·Taxonomy 외부 결과는 `REVIEW`로 남기며
-Backend/DB 완료 처리 대상에서 제외한다.
+처리하고 누락하지 않는다. 검증 실패·부정·충돌·Taxonomy 외부 결과는 검증된 원상품 기본 label을
+유지한다. Product Facet profile 누락/불일치 또는 Backend Category/Taxonomy 자체가 유효하지 않은 행은 DB 완료 처리에서 제외한다.
 오프라인 실험에서는 `--enable-llm-fallback`을 명시한다.
 
 실제 모델 가중치·Ollama/Hugging Face/API 환경이 없는 경우에는 모델을 실행한 것처럼 처리하지 않고, 해당 후보를 `NOT_RUN`으로 기록한다.

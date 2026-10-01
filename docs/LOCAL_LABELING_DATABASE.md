@@ -39,7 +39,7 @@ PYTHONPATH=src \
   --write-db
 ```
 
-실행 시 `processed_at IS NULL`인 Demand를 읽고, 완료된 Label만 `demand.label`과 `demand.processed_at`에 저장한다. `REVIEW` 결과는 저장하지 않는다.
+실행 시 `processed_at IS NULL`인 Demand와 Category Taxonomy를 읽고, 실제 Backend `catalog_id` 기준 Product Facet mapping CSV를 사용한다. 안정적으로 해석한 긍정 요구만 해당 Facet을 덮어쓴 뒤 `demand.label`과 `demand.processed_at`에 저장한다. 파싱 실패·모호함은 원상품 기본값을 유지한다. Product mapping이 없거나 불완전·충돌하면 추정값을 저장하지 않고 해당 Demand를 미처리 상태로 둔다.
 
 ## 재실행 검증
 

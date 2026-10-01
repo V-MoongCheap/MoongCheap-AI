@@ -1,6 +1,5 @@
 import pandas as pd
 
-from moongcheap_ai.data_foundation.facet import repeated_terms, taxonomy_v0
 from moongcheap_ai.data_foundation.catalog import (
     normalize_barcode,
     normalize_name,
@@ -8,6 +7,7 @@ from moongcheap_ai.data_foundation.catalog import (
     source_category_path_from_file,
 )
 from moongcheap_ai.data_foundation.category import build_aihub_category_hierarchy
+from moongcheap_ai.data_foundation.facet import repeated_terms, taxonomy_v0
 from moongcheap_ai.data_foundation.labeling import label_demand
 from moongcheap_ai.data_foundation.preprocess import category_path, clean_title
 
@@ -91,17 +91,32 @@ def test_taxonomy_is_deterministic_and_all_is_zero():
     assert first["facets"][0]["values"][0]["code"] == 0
 
 
-def test_demand_labeling_defaults_to_all_and_does_not_write_db():
+def test_demand_labeling_uses_original_product_facets_and_does_not_write_db():
     taxonomy = {
-        "facets": [
+        "categories": [
             {
-                "name": "form",
-                "values": [
-                    {"code": 0, "value": "ALL", "aliases": []},
-                    {"code": 1, "value": "powder", "aliases": ["분말"]},
+                "category_id": "C1",
+                "facets": [
+                    {
+                        "name": "form",
+                        "order": 1,
+                        "values": [
+                            {"code": 0, "value": "ALL", "aliases": []},
+                            {"code": 1, "value": "powder", "aliases": ["분말"]},
+                        ],
+                    }
                 ],
             }
         ]
     }
-    assert label_demand(1, 2, "분말", taxonomy)["label"] == "1"
-    assert label_demand(1, 2, "", taxonomy)["label"] == "0"
+    product_facets = [
+        {
+            "category_id": "C1",
+            "facet_name": "form",
+            "mapping_status": "MAPPED",
+            "value": "powder",
+        }
+    ]
+    assert label_demand(1, 2, "분말", taxonomy, "C1", product_facets)["label"] == "1"
+    assert label_demand(1, 2, "", taxonomy, "C1", product_facets)["label"] == "1"
+    assert label_demand(1, 2, "", taxonomy, "C1")["label_status"] == "REVIEW"

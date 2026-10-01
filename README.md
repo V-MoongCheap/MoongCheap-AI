@@ -7,6 +7,7 @@
 1. **상품 Facet Discovery 및 Demand Labeling**
    - 상품 원문에서 Facet/Value/Alias 후보를 도출하고 Human Review 후 taxonomy를 확정
    - Backend가 저장한 Demand의 `extra_requirement`를 승인된 Facet Value와 Label로 변환
+   - 실제 Backend `catalog_id`에 연결된 명시적 상품 Facet profile을 기본값으로 사용하고, 안정적으로 해석된 소비자 요구만 해당 Facet을 덮어씀
    - 자연어 처리는 실시간 요청이 아닌 비동기 Batch를 기본으로 함
 
 2. **Demand Clustering**
@@ -26,7 +27,7 @@
 - AI는 인증·권한, 원본 데이터, 수요·응찰·낙찰 상태를 관리하지 않습니다.
 - AI 전용 DB, 임의의 테이블/컬럼/상태 추가를 전제로 하지 않습니다.
 - Consumer RAG 챗봇은 현재 MVP에서 제외합니다.
-- Model 1은 Rule/통계 Evidence를 주 경로로 하고 `kakaocorp/kanana-nano-2.1b-instruct`를 후보 생성 보조로 사용합니다. Model 2는 Rule-first Hybrid를 기본으로 하며 `qwen2.5:7b-instruct`는 미해결 양성 요구에 대한 선택적 fallback입니다. 두 모델 모두 Taxonomy 검증과 Human Review 경계를 통과하지 않은 결과를 자동 확정하지 않습니다.
+- Model 1은 Rule/통계 Evidence를 주 경로로 하고 `qwen3:4b`를 후보 생성 보조로 사용합니다. Model 2는 실제 Backend ID로 조회하는 명시적 원상품 Facet profile + Rule-first Hybrid를 사용하며 `qwen2.5:7b-instruct`는 미해결 양성 요구에 대한 선택적 fallback입니다. 프로필이 없거나 잘못되면 추정하지 않고 저장을 보류합니다. 모델 분석 실패·모호·부정·충돌 시에는 검증된 원상품 기본값을 유지합니다.
 - Embedding과 Vector DB는 Model 1/2의 필수 구성으로 확정하지 않았으며, B/C의 Clustering·Seller Matching 실험 범위에서 별도 검토합니다.
 
 수요 클러스터링(B파트)은 Demand·DemandBoard·거절 이력을 읽기 전용으로 조회하고,
