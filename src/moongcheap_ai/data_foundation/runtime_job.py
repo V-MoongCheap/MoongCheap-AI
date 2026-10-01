@@ -116,7 +116,7 @@ def _has_complete_product_baseline(
             for item in facets[facet_name].get("values", [])
             if str(item.get("status", "")).upper() != "DEPRECATED"
         }
-        if code <= 0 or allowed.get(code) != str(value.get("value", "")):
+        if code < 0 or allowed.get(code) != str(value.get("value", "")):
             return False
     return True
 
@@ -220,6 +220,12 @@ def run_batch(
     llm_retries: int = 2,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     timestamp = processed_at or datetime.now(UTC).isoformat()
+    if product_facets_path is not None and product_facet_map is not None:
+        raise ValueError("provide product_facets_path or product_facet_map, not both")
+    if product_facets_path is not None:
+        # Validate release inputs even for an empty database batch. Otherwise a
+        # missing runtime artifact can be hidden by a successful zero-row run.
+        product_facet_map = _load_runtime_product_facet_map(product_facets_path)
     if demands.empty:
         empty = demands.copy()
         for column in (
@@ -239,10 +245,6 @@ def run_batch(
         }
     if taxonomy_payload is None and taxonomy_path is None:
         raise ValueError("taxonomy_path or taxonomy_payload is required")
-    if product_facets_path is not None and product_facet_map is not None:
-        raise ValueError("provide product_facets_path or product_facet_map, not both")
-    if product_facets_path is not None:
-        product_facet_map = _load_runtime_product_facet_map(product_facets_path)
     labeled, _ = run_part_a_batch(
         demands,
         taxonomy_path,
@@ -289,36 +291,30 @@ def run_batch(
         supplied_facets = {
             str(row.get("facet_name", "")).strip() for row in product_rows
         }
-        missing_facets = expected_facets - supplied_facets
         unexpected_facets = supplied_facets - expected_facets
         profile_categories = {
             str(row.get("category_id", "")).strip() for row in product_rows
         }
         unresolved_profile_statuses = {
             str(row.get("mapping_status", "")).strip().upper() for row in product_rows
-        } - {"MAPPED"}
+        } - {"MAPPED", "UNKNOWN", "AMBIGUOUS", "UNMAPPED", "UNMATCHED"}
         defaults, warnings = loader.product_defaults(category_id, product_rows)
         invalid_values = bool(warnings)
         if (
             not defaults
             or not product_rows
-            or missing_facets
             or unexpected_facets
             or profile_categories != {category_id}
             or unresolved_profile_statuses
             or invalid_values
         ):
-            # Never substitute inferred text or category-wide ALL for a missing
-            # product profile: that would falsely complete a product baseline.
+            # Do not infer product facts or cross category boundaries. A
+            # present, category-matched profile may have unknown individual
+            # Facets; product_defaults encodes only those slots as ALL.
             if not product_rows:
                 warnings = [
                     f"product Facet profile not found for catalog_id={catalog_id}"
                 ]
-            elif missing_facets:
-                warnings.append(
-                    "product Facet profile is incomplete: "
-                    + ", ".join(sorted(missing_facets))
-                )
             if unexpected_facets:
                 warnings.append(
                     "product Facet profile has unknown facets: "
@@ -832,7 +828,18 @@ def main(argv: list[str] | None = None) -> int:
     taxonomy_path = args.taxonomy or Path(
         source.get("A_TAXONOMY_PATH", "config/facet_taxonomy_v2_2.json")
     )
-
+    write_to_database = args.write_db or source.get(
+        "A_WRITE_DATABASE", ""
+    ).strip().lower() in {"1", "true", "yes"}
+    if args.dry_run and write_to_database:
+        raise SystemExit(
+            "--dry-run cannot be combined with --write-db or A_WRITE_DATABASE=true"
+        )
+    product_facets_path = args.product_facets or (
+        Path(source["A_PRODUCT_FACETS_PATH"])
+        if source.get("A_PRODUCT_FACETS_PATH", "").strip()
+        else None
+    )
     model2_fallback_enabled = source.get(
         "A_MODEL2_FALLBACK_ENABLED", "false"
     ).strip().lower() in {"1", "true", "yes"}
@@ -891,14 +898,31 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
 
-    connection = None
-    write_to_database = args.write_db or source.get(
-        "A_WRITE_DATABASE", ""
-    ).strip().lower() in {"1", "true", "yes"}
-    if args.dry_run and write_to_database:
-        raise SystemExit(
-            "--dry-run cannot be combined with --write-db or A_WRITE_DATABASE=true"
+    try:
+        if write_to_database and product_facets_path is None:
+            raise ValueError(
+                "A_PRODUCT_FACETS_PATH or --product-facets is required for every "
+                "database labeling run, including zero-row batches"
+            )
+        product_facet_map = (
+            _load_runtime_product_facet_map(product_facets_path)
+            if product_facets_path is not None
+            else None
         )
+    except (OSError, ValueError, RuntimeError) as error:
+        print(
+            json.dumps(
+                {
+                    "status": "FAILED",
+                    "error": f"product Facet release preflight failed: {error}",
+                },
+                ensure_ascii=False,
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    connection = None
     try:
         if args.input:
             demands = pd.read_csv(args.input, dtype=str)
@@ -918,16 +942,6 @@ def main(argv: list[str] | None = None) -> int:
             and not taxonomy_path.is_file()
         ):
             raise SystemExit(f"taxonomy file not found: {taxonomy_path}")
-        product_facets_path = args.product_facets or (
-            Path(source["A_PRODUCT_FACETS_PATH"])
-            if source.get("A_PRODUCT_FACETS_PATH", "").strip()
-            else None
-        )
-        if not demands.empty and product_facets_path is None:
-            raise ValueError(
-                "A_PRODUCT_FACETS_PATH or --product-facets is required for a non-empty batch; "
-                "the original product Facet profile must be supplied"
-            )
         primary_alias_registry = args.alias_registry or Path(
             source.get(
                 "A_ALIAS_REGISTRY_PATH", "config/model1_aliases_reviewed_v2.json"
@@ -949,7 +963,7 @@ def main(argv: list[str] | None = None) -> int:
             demands,
             taxonomy_path,
             taxonomy_payload=taxonomy_payload,
-            product_facets_path=product_facets_path,
+            product_facet_map=product_facet_map,
             alias_registry_path=primary_alias_registry,
             rules_path=args.rules
             or Path(source.get("A_RULES_PATH", "config/demand_constraint_rules.json")),

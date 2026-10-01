@@ -942,7 +942,7 @@ def test_product_baseline_rejects_deprecated_taxonomy_value() -> None:
         ],
     )
 
-    assert values == {}
+    assert values["form"]["code"] == 0
     assert warnings == ["deprecated product Facet value is not valid: form=옛정제"]
 
 

@@ -29,6 +29,9 @@ Runtime entrypoint는 `a-labeling-batch --write-db --output /tmp/a-labeling-outp
 `facet_taxonomy_v2_2.json`을 포함한다. DB 실행에서는 `category.facet`을 사용하고,
 번들 Taxonomy는 파일 입력 검증용이다. Dockerfile의 COPY 목록을 변경할 때는
 `Dockerfile.a-labeling.dockerignore`의 허용 목록도 함께 갱신한다.
+`artifacts/product_facets.csv`는 Git에서 제외되는 release input이므로 CI가 별도 공급해야
+한다. 이 파일이 없거나 비어 있으면 A 이미지 빌드는 실패하며, 성공한 빌드 로그에
+CSV SHA-256이 기록된다. 배포 전에는 이미지 내부 파일의 SHA-256과 release 전달값을 대조한다.
 
 Jenkins 보안 검사 단계는 전용 Trivy/Gitleaks 컨테이너를 자체 Pod 설정으로
 선언한다. Cloud의 기본 `python-builder`에 이 컨테이너들이 있다고 가정하지 않는다.
@@ -51,8 +54,11 @@ A_MODEL2_FALLBACK_BATCH_SIZE=5
 LLM을 활성화한 실행은 시작 시 Ollama `/api/tags`에서 위 모델의 존재를 확인한다.
 모델이 없거나 Ollama가 준비되지 않았으면 배치를 실패 종료하며 DB를 읽거나 쓰지 않는다.
 이는 다음 CronJob에서 재시도할 수 있도록 하기 위함이다. Ollama가 준비된 상태에서
-개별 Demand 해석에 실패·모호·근거 부족이 발생한 경우에는 완전하고 유효한 원상품
-Facet profile을 결과로 사용한다. 상품 profile이 없거나 불완전한 Demand는 미처리 상태로 둔다.
+개별 Demand 해석에 실패·모호·근거 부족이 발생한 경우에는 유효한 원상품
+Facet profile을 결과로 사용한다. profile 안에서 일부 Facet만 확인된 경우에는 확인된 값만
+기본값으로 사용하고, 나머지 label 위치에는 `ALL(0)`을 둔다. 이는 미확인 상품 속성을
+`ALL`이라는 사실값으로 주장하지 않는다. 전체 상품 profile이 없거나 잘못된 값·Category가
+불일치하는 Demand는 미처리 상태로 둔다.
 
 Model 2는 안정적으로 해석되지 않은 비어 있지 않은 긍정 후보만 보조한다.
 명시적 제외·충돌·복수값·모호한 요청은 재해석하지 않고 상품 기본 Facet을 유지한다.
@@ -132,6 +138,11 @@ Cloud GitOps가 모델 활성화 값을 소유한다. Cloud는 2026-09-30 기준
 `qwen2.5:7b-instruct` 적재와 A Model 2 fallback 활성화를 보고했다. AI IAM 계정은
 develop ConfigMap 조회 권한이 없어 이 문서에서는 현재 flag의 실제 값을 단정하지 않는다.
 저장소 base manifest의 미설정/기본값을 실제 Cloud overlay 설정으로 간주하지 않는다.
+
+Cloud 측 보고 기준으로 A는 Ollama API를 호출하고 Ollama·Qwen은 A 이미지에 포함하지 않는다.
+Cloud가 관리하는 Ollama 일정·노드 배치와 A CronJob의 수명주기는 별도다. 저장소 코드의
+기본 flag가 `false`인 것은 로컬·안전 기본값이며, 배포에서 선택한 Hybrid 경로를 사용하려면
+Cloud 설정에서 명시적으로 활성화해야 한다.
 
 실제 Dev 반영 시 Cloud가 다음 placeholder를 교체한다.
 

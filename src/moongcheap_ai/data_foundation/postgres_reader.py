@@ -26,12 +26,14 @@ SELECT
     d.processed_at
 FROM demand AS d
 JOIN product_catalog AS pc ON pc.id = d.catalog_id
-LEFT JOIN category AS c ON c.id = pc.category_id
+JOIN category AS c ON c.id = pc.category_id
 WHERE d.processed_at IS NULL
   AND d.status = 'UNASSIGNED'
 ORDER BY d.id
 """.strip()
 
+# Categories are an inner join by design: products without an assigned Backend
+# category are outside A's supported taxonomy scope and must not poison a batch.
 # Legacy Backend schemas may not have product_catalog.category_id.
 # Keep the base query free of that column so a supplied, authoritative
 # catalog-to-category mapping can be used on that schema.

@@ -6,8 +6,8 @@
 
 | 주제 | 현재 기준 | 의미 |
 |---|---|---|
-| AI 범위 | `README.md` | Model 1/2, Clustering, Seller Matching, Seller Analysis의 MVP 범위 |
-| 모델 선택 | `MODEL_SELECTION_FINAL_V1.md` | Model 1 Qwen3 4B 보조 + Evidence Gate, Model 2 Rule-first Hybrid + 선택적 Qwen fallback |
+| AI 범위 | `README.md` | Seller Analysis 코드 존재와 제품/MVP 범위 승인을 구분해 표기 |
+| 모델 선택 근거 | `MODEL_SELECTION_FINAL_V1.md` | 모델/방식 선택 근거의 기록. 문서 내 후속 체크리스트는 현재 blocker 목록이 아님 |
 | 데이터 계보 | `DATA_LINEAGE.md` | 원천 데이터, Category 매핑, Facet Evidence와 산출물 관계 |
 | 데이터 상태 | `DATA_ARTIFACT_STATUS.md` | Seed, Evidence, Taxonomy, 평가 데이터의 사용 가능 범위 |
 | Model 1 입력 | `MODEL1_MULTISOURCE_INPUTS_V1.md`, `MODEL1_MULTISOURCE_SOURCE_POLICY_V1.md` | 상품·판매자·명시적 Category Evidence의 역할과 제외 경계 |

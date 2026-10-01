@@ -1133,7 +1133,7 @@ def test_product_defaults_use_only_explicit_known_product_facets() -> None:
             }
         ],
     )
-    assert values == {}
+    assert values["form"]["code"] == 0
     assert warnings == ["product facet code does not match taxonomy: form=캅셀"]
 
 
@@ -1184,7 +1184,7 @@ def test_conflicting_product_facet_mapping_does_not_become_all() -> None:
     ]
 
 
-def test_unknown_product_facet_is_not_converted_to_all() -> None:
+def test_unknown_product_facet_uses_all_slot_without_losing_known_facets() -> None:
     loader = TaxonomyLoader(
         {
             "categories": [
@@ -1192,13 +1192,21 @@ def test_unknown_product_facet_is_not_converted_to_all() -> None:
                     "category_id": "c1",
                     "facets": [
                         {
-                            "name": "form",
+                            "name": "ingredient",
                             "order": 1,
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": "유산균"},
+                            ],
+                        },
+                        {
+                            "name": "form",
+                            "order": 2,
                             "values": [
                                 {"code": 0, "value": "ALL"},
                                 {"code": 1, "value": "분말"},
                             ],
-                        }
+                        },
                     ],
                 }
             ]
@@ -1210,6 +1218,12 @@ def test_unknown_product_facet_is_not_converted_to_all() -> None:
         [
             {
                 "category_id": "c1",
+                "facet_name": "ingredient",
+                "mapping_status": "MAPPED",
+                "value": "유산균",
+            },
+            {
+                "category_id": "c1",
                 "facet_name": "form",
                 "mapping_status": "UNKNOWN",
                 "value": "",
@@ -1217,8 +1231,10 @@ def test_unknown_product_facet_is_not_converted_to_all() -> None:
         ],
     )
 
-    assert values == {}
-    assert warnings == ["product facet is not known: form (UNKNOWN)"]
+    assert list(values) == ["ingredient", "form"]
+    assert values["ingredient"]["code"] == 1
+    assert values["form"]["code"] == 0
+    assert warnings == []
 
 
 def test_all_taxonomy_value_cannot_be_mapped_as_a_product_value() -> None:
@@ -1254,7 +1270,7 @@ def test_all_taxonomy_value_cannot_be_mapped_as_a_product_value() -> None:
         ],
     )
 
-    assert values == {}
+    assert values["form"]["code"] == 0
     assert warnings == ["ALL is not a product Facet value: form=ALL"]
 
 
@@ -1343,7 +1359,7 @@ def test_runtime_does_not_complete_demand_without_original_product_profile() -> 
     assert payload["results"] == []
 
 
-def test_model_fallback_cannot_complete_demand_without_complete_product_profile(
+def test_model_fallback_accepts_profile_with_unconfirmed_product_facet(
     monkeypatch,
 ) -> None:
     taxonomy = {
@@ -1377,7 +1393,7 @@ def test_model_fallback_cannot_complete_demand_without_complete_product_profile(
                 "demand_id": "1",
                 "catalog_id": "1990",
                 "category_id": "c1",
-                "extra_requirement": "편하게 먹고 싶어요",
+                "extra_requirement": "딸기 맛을 원해요",
             }
         ]
     )
@@ -1392,12 +1408,19 @@ def test_model_fallback_cannot_complete_demand_without_complete_product_profile(
         output["facet_values"] = "{}"
         return output, {}
 
-    class UnexpectedLabeler:
+    class StubLabeler:
+        call_count = 1
+
         def __init__(self, *args, **kwargs):
-            raise AssertionError("Model 2 cannot run without a complete baseline")
+            pass
+
+        def classify(self, rows, _loader):
+            assert rows[0]["product_defaults"]["form"]["code"] == 1
+            assert rows[0]["product_defaults"]["taste"]["code"] == 0
+            return {"1": {"form": 0, "taste": 1}}
 
     monkeypatch.setattr(runtime_job, "run_part_a_batch", parser_output)
-    monkeypatch.setattr(runtime_job, "OllamaDemandLabeler", UnexpectedLabeler)
+    monkeypatch.setattr(runtime_job, "OllamaDemandLabeler", StubLabeler)
     partial_product_profile = {
         "1990": [
             {
@@ -1418,10 +1441,10 @@ def test_model_fallback_cannot_complete_demand_without_complete_product_profile(
         model2_fallback_enabled=True,
     )
 
-    assert labeled.loc[0, "label_status"] == "REVIEW"
-    assert labeled.loc[0, "label"] == ""
-    assert labeled.loc[0, "processed_at"] == ""
-    assert payload["results"] == []
+    assert labeled.loc[0, "label_status"] == "LABELED"
+    assert labeled.loc[0, "label"] == "1-1"
+    assert labeled.loc[0, "processed_at"]
+    assert payload["results"][0]["label"] == "1-1"
 
 
 def test_product_baseline_label_order_is_taxonomy_order_not_csv_order() -> None:
@@ -1476,20 +1499,28 @@ def test_product_baseline_label_order_is_taxonomy_order_not_csv_order() -> None:
     assert warnings == []
 
 
-def test_runtime_does_not_convert_unknown_product_facet_to_all() -> None:
+def test_runtime_uses_confirmed_facet_and_all_for_unknown_slot() -> None:
     taxonomy = {
         "categories": [
             {
                 "category_id": "c1",
                 "facets": [
                     {
-                        "name": "form",
+                        "name": "ingredient",
                         "order": 1,
+                        "values": [
+                            {"code": 0, "value": "ALL"},
+                            {"code": 1, "value": "유산균"},
+                        ],
+                    },
+                    {
+                        "name": "form",
+                        "order": 2,
                         "values": [
                             {"code": 0, "value": "ALL"},
                             {"code": 1, "value": "캡슐"},
                         ],
-                    }
+                    },
                 ],
             }
         ]
@@ -1509,6 +1540,13 @@ def test_runtime_does_not_convert_unknown_product_facet_to_all() -> None:
             {
                 "backend_catalog_id": "1990",
                 "category_id": "c1",
+                "facet_name": "ingredient",
+                "mapping_status": "MAPPED",
+                "value": "유산균",
+            },
+            {
+                "backend_catalog_id": "1990",
+                "category_id": "c1",
                 "facet_name": "form",
                 "mapping_status": "UNKNOWN",
                 "value": "",
@@ -1520,10 +1558,10 @@ def test_runtime_does_not_convert_unknown_product_facet_to_all() -> None:
         demand, None, taxonomy_payload=taxonomy, product_facet_map=unknown_profile
     )
 
-    assert labeled.loc[0, "label_status"] == "REVIEW"
-    assert labeled.loc[0, "label"] == ""
-    assert labeled.loc[0, "processed_at"] == ""
-    assert payload["results"] == []
+    assert labeled.loc[0, "label_status"] == "LABELED"
+    assert labeled.loc[0, "label"] == "1-0"
+    assert labeled.loc[0, "processed_at"]
+    assert payload["results"][0]["label"] == "1-0"
 
 
 def test_empty_requirement_and_ambiguous_requirement_preserve_product_default(
@@ -1916,6 +1954,41 @@ def test_empty_runtime_batch_is_a_successful_noop(tmp_path) -> None:
     assert labeled.empty
     assert payload["results"] == []
     assert payload["processedAt"] == "2026-01-01T00:00:00+00:00"
+
+
+def test_empty_runtime_batch_does_not_hide_missing_product_facet_artifact(
+    tmp_path,
+) -> None:
+    taxonomy = {"categories": [{"category_id": "c1", "facets": []}]}
+    missing_artifact = tmp_path / "product_facets.csv"
+
+    with pytest.raises(FileNotFoundError, match="product Facet mapping file not found"):
+        _run_batch(
+            pd.DataFrame(
+                columns=["demand_id", "catalog_id", "category_id", "extra_requirement"]
+            ),
+            None,
+            taxonomy_payload=taxonomy,
+            product_facets_path=missing_artifact,
+        )
+
+
+def test_database_job_fails_before_connecting_if_release_artifact_is_missing(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    missing_artifact = tmp_path / "missing-product-facets.csv"
+    monkeypatch.setenv("A_WRITE_DATABASE", "true")
+    monkeypatch.setenv("A_PRODUCT_FACETS_PATH", str(missing_artifact))
+    monkeypatch.setenv("A_LLM_ENABLED", "false")
+    monkeypatch.setenv("A_MODEL2_FALLBACK_ENABLED", "false")
+
+    def unexpected_database_connection(*_args, **_kwargs):
+        raise AssertionError("DB must not be opened before artifact preflight")
+
+    monkeypatch.setattr(runtime_job, "open_postgres", unexpected_database_connection)
+
+    assert runtime_job.main([]) == 1
+    assert '"status": "FAILED"' in capsys.readouterr().err
 
 
 def test_taxonomy_can_be_built_from_database_category_facet() -> None:

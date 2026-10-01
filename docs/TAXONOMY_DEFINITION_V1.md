@@ -42,8 +42,11 @@ Taxonomy
 
 - 모든 Facet에서 `ALL`은 `code=0`이다.
 - `ALL`은 Demand가 해당 Facet을 언급하지 않았다는 뜻이다.
-- 상품 또는 판매자 정보에서 Facet을 확인할 수 없는 `UNKNOWN`은 `ALL`과 다르다.
-  현재 Demand Label codebook에 임의의 `UNKNOWN` code를 추가하지 않는다.
+- 상품/판매자 속성의 증거 상태 `UNKNOWN`은 실제 값이 미확인이라는 뜻이며,
+  도메인상 `ALL`과 같지 않다. 다만 Demand Label은 상품의 확정된 Facet 값만
+  기본값으로 쓰고, 미확인 축은 벡터 형식을 위해 해당 위치를 `ALL(0)`으로
+  직렬화한다. 이 `ALL(0)`은 상품 사실값이 아니라 해당 Demand label 축에
+  확정값/조건이 없다는 표시다. 별도 `UNKNOWN` code는 추가하지 않는다.
 - Value code와 Facet order는 결정론적으로 정렬한다. Taxonomy 버전이 바뀌지
   않으면 같은 입력에서 같은 code가 나온다.
 - 가격, 수량, MOQ, 배송조건은 Taxonomy Facet이 아니라 별도 정형 조건이다.

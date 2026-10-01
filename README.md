@@ -19,6 +19,7 @@
    - Seller Offer는 `product`, 매칭 결과는 `product_award_evaluation`을 사용
    - 최종 매칭은 재현 가능한 Rule/Score 기반으로 처리하며 LLM의 임의 판단에 맡기지 않음
    - 수요 분석 수치는 SQL/Python 집계가 원천이며 LLM은 선택적 설명만 담당
+   - Seller Demand Analysis 구현·테스트·컨테이너 코드는 저장소에 존재하지만, 현재 제품 범위와 배포 포함 여부는 PM 확정 대기 (`docs/SELLER_ANALYSIS_CONTAINER.md` 참고)
 
 ## 시스템 담당 범위
 
