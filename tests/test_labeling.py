@@ -85,6 +85,131 @@ def test_batch_keeps_required_output_columns() -> None:
     assert result.iloc[0]["quantity"] == "2"
 
 
+@pytest.mark.parametrize(
+    "requirement",
+    [
+        "무설탕 말아 주세요",
+        "무설탕을 원하지 않아요",
+        "무설탕보다는 설탕",
+        "무설탕이 별로예요",
+        "무설탕이나 저당 중 하나",
+    ],
+)
+def test_direct_rule_labeling_does_not_turn_non_positive_text_into_override(
+    requirement: str,
+) -> None:
+    loader = TaxonomyLoader(
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {
+                            "name": "sweetener",
+                            "order": 1,
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": "sugar", "aliases": ["설탕"]},
+                                {
+                                    "code": 2,
+                                    "value": "sugar_free",
+                                    "aliases": ["무설탕"],
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+    product_facets = {
+        "P1": [
+            {
+                "category_id": "C1",
+                "facet_name": "sweetener",
+                "mapping_status": "MAPPED",
+                "value": "설탕",
+                "value_code": "1",
+            }
+        ]
+    }
+
+    result = label_demands(
+        pd.DataFrame(
+            [
+                {
+                    "demand_id": "D1",
+                    "catalog_id": "P1",
+                    "category_id": "C1",
+                    "extra_requirement": requirement,
+                }
+            ]
+        ),
+        loader,
+        product_facet_map=product_facets,
+    )
+
+    assert result.iloc[0]["label"] == "1"
+    assert result.iloc[0]["interpretation_status"] == "UNRESOLVED"
+    assert "non-positive requirement retained product Facet baseline" in result.iloc[0][
+        "label_warnings"
+    ]
+
+
+def test_direct_rule_labeling_still_applies_clear_positive_override() -> None:
+    loader = TaxonomyLoader(
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {
+                            "name": "sweetener",
+                            "order": 1,
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": "sugar", "aliases": ["설탕"]},
+                                {
+                                    "code": 2,
+                                    "value": "sugar_free",
+                                    "aliases": ["무설탕"],
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+    result = label_demands(
+        pd.DataFrame(
+            [
+                {
+                    "demand_id": "D1",
+                    "catalog_id": "P1",
+                    "category_id": "C1",
+                    "extra_requirement": "무설탕을 원해요",
+                }
+            ]
+        ),
+        loader,
+        product_facet_map={
+            "P1": [
+                {
+                    "category_id": "C1",
+                    "facet_name": "sweetener",
+                    "mapping_status": "MAPPED",
+                    "value": "설탕",
+                    "value_code": "1",
+                }
+            ]
+        },
+    )
+
+    assert result.iloc[0]["label"] == "2"
+    assert result.iloc[0]["interpretation_status"] == "PARSED"
+
+
 def test_duplicate_value_codes_are_rejected() -> None:
     invalid = {
         "categories": [

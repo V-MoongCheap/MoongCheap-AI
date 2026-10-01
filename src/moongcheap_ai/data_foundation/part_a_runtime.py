@@ -48,10 +48,30 @@ def _substitution_consent(value: object) -> bool | None:
 def _category_map(frame: pd.DataFrame) -> dict[str, str]:
     if "category_id" not in frame.columns:
         return {}
-    id_column = "id" if "id" in frame.columns else "catalog_seed_id" if "catalog_seed_id" in frame.columns else None
+    id_column = (
+        "id"
+        if "id" in frame.columns
+        else "catalog_seed_id"
+        if "catalog_seed_id" in frame.columns
+        else None
+    )
     if not id_column:
         return {}
-    return dict(zip(frame[id_column].astype(str), frame["category_id"].astype(str)))
+    result: dict[str, str] = {}
+    for raw_catalog_id, raw_category_id in frame[
+        [id_column, "category_id"]
+    ].fillna("").itertuples(index=False, name=None):
+        catalog_id = str(raw_catalog_id).strip()
+        category_id = str(raw_category_id).strip()
+        if not catalog_id or not category_id:
+            continue
+        previous = result.get(catalog_id)
+        if previous is not None and previous != category_id:
+            raise ValueError(
+                f"catalog ID has conflicting category IDs: {catalog_id}"
+            )
+        result[catalog_id] = category_id
+    return result
 
 
 def _facet_index(loader: TaxonomyLoader, category_id: str) -> dict[str, dict[str, Any]]:

@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from moongcheap_ai.data_foundation.part_a_runtime import run_part_a_batch
+from moongcheap_ai.data_foundation.part_a_runtime import _category_map, run_part_a_batch
 from moongcheap_ai.data_foundation.runtime_job import run_batch
 from moongcheap_ai.demand_constraints.service import DemandConstraintParser
 
@@ -42,6 +42,26 @@ def _fixtures(tmp_path):
         json.dumps({"aliases": []}, ensure_ascii=False), encoding="utf-8"
     )
     return taxonomy_path, rules_path, alias_path
+
+
+def test_local_catalog_category_map_ignores_null_ids_and_rejects_conflicts():
+    mapping = pd.DataFrame(
+        [
+            {"id": "1", "category_id": "c1"},
+            {"id": pd.NA, "category_id": "c2"},
+            {"id": "3", "category_id": pd.NA},
+        ]
+    )
+    assert _category_map(mapping) == {"1": "c1"}
+
+    conflicting = pd.DataFrame(
+        [
+            {"id": "1", "category_id": "c1"},
+            {"id": "1", "category_id": "c2"},
+        ]
+    )
+    with pytest.raises(ValueError, match="conflicting category IDs"):
+        _category_map(conflicting)
 
 
 def test_part_a_returns_backend_contract_without_clustering(tmp_path):

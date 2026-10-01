@@ -64,6 +64,64 @@ NO_REQUIREMENT_PHRASES = {
     "무관",
 }
 
+NON_POSITIVE_REQUIREMENT_MARKERS = (
+    "아니",
+    "말고",
+    "말아",
+    "제외",
+    "빼고",
+    "빼줘",
+    "없이",
+    "없는",
+    "않",
+    "안 ",
+    "안들어",
+    "안 든",
+    "싫",
+    "별로",
+    "보다는",
+    "대신",
+    "차라리",
+    "꺼려",
+    "기피",
+    "선호하지",
+    "원하지",
+    "원치",
+    "금지",
+    "피하",
+    "알레르기",
+    "알러지",
+    "비선호",
+    "불가",
+    "못 ",
+    "또는",
+    "혹은",
+    "아니면",
+    "이나",
+    "거나",
+    "중 하나",
+    "둘 다",
+    "상관없",
+    "무관",
+    "제한",
+    "without",
+    "avoid",
+    "except",
+    "exclude",
+    "allergy",
+    "non-",
+    "not ",
+    "not-",
+    "never",
+    "rather than",
+    "instead of",
+)
+
+
+def has_non_positive_requirement_marker(value: Any) -> bool:
+    normalized = _normalise(value)
+    return any(marker in normalized for marker in NON_POSITIVE_REQUIREMENT_MARKERS)
+
 
 class TaxonomyLoader:
     def __init__(self, taxonomy: dict[str, Any]) -> None:
@@ -543,29 +601,8 @@ def label_demands(
                         for warning in request_warnings
                         if warning.startswith("ambiguous requirement for facet:")
                     }
-                    non_positive_markers = (
-                        "아니",
-                        "말고",
-                        "제외",
-                        "빼고",
-                        "없이",
-                        "않",
-                        "안 ",
-                        "싫",
-                        "피하",
-                        "알레르기",
-                        "알러지",
-                        "금지",
-                        "without",
-                        "avoid",
-                        "except",
-                        "exclude",
-                        "allergy",
-                        "not ",
-                    )
-                    has_non_positive = any(
-                        marker in _normalise(requirement)
-                        for marker in non_positive_markers
+                    has_non_positive = has_non_positive_requirement_marker(
+                        requirement
                     )
                     overrides: dict[str, dict[str, Any]] = {}
                     if no_requirement:
