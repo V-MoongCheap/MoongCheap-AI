@@ -147,95 +147,40 @@ def test_ollama_model_preflight_rejects_missing_model(monkeypatch) -> None:
         ensure_ollama_model_available("http://ollama:11434", "qwen2.5:7b-instruct")
 
 
-def test_main_continues_with_catalog_defaults_when_model_preflight_fails(
+def test_main_fails_before_processing_when_required_model_preflight_fails(
     monkeypatch, tmp_path, capsys
 ) -> None:
     monkeypatch.setenv("A_LLM_ENABLED", "true")
     monkeypatch.setenv("A_LLM_MODEL", "qwen2.5:7b-instruct")
+    monkeypatch.setenv("A_DATABASE_URL", "postgresql://unused")
 
     def fail_preflight(*args, **kwargs):
         raise LLMLabelingError("Ollama model is not available")
 
     monkeypatch.setattr(runtime_job, "ensure_ollama_model_available", fail_preflight)
-    taxonomy = {
-        "version": "v2.2",
-        "categories": [
-            {
-                "category_id": "c1",
-                "facets": [
-                    {
-                        "name": "form",
-                        "order": 1,
-                        "values": [
-                            {"code": 0, "value": "ALL"},
-                            {"code": 1, "value": "캡슐"},
-                        ],
-                    }
-                ],
-            }
-        ],
-    }
-    taxonomy_path = tmp_path / "taxonomy.json"
-    taxonomy_path.write_text(json.dumps(taxonomy, ensure_ascii=False), encoding="utf-8")
-    aliases_path = tmp_path / "aliases.json"
-    aliases_path.write_text(
-        '{"version": "test-v1", "taxonomy_version": "v2.2", "aliases": []}',
-        encoding="utf-8",
+    monkeypatch.setattr(
+        runtime_job,
+        "open_postgres",
+        lambda *_args, **_kwargs: pytest.fail("DB must not be opened after failed preflight"),
     )
-    input_path = tmp_path / "demand.csv"
-    pd.DataFrame(
-        [
-            {
-                "demand_id": "1",
-                "catalog_id": "10",
-                "category_id": "c1",
-                "extra_requirement": "",
-                "product_name": "캡슐형 제품",
-            }
-        ]
-    ).to_csv(input_path, index=False)
-    product_facets_path = tmp_path / "product_facets.csv"
-    pd.DataFrame(
-        [
-            {
-                "backend_catalog_id": "10",
-                "category_id": "c1",
-                "facet_name": "form",
-                "mapping_status": "MAPPED",
-                "value": "캡슐",
-            }
-        ]
-    ).to_csv(product_facets_path, index=False)
     output_path = tmp_path / "result.csv"
 
     code = runtime_job.main(
         [
-            "--input",
-            str(input_path),
-            "--taxonomy",
-            str(taxonomy_path),
-            "--product-facets",
-            str(product_facets_path),
-            "--alias-registry",
-            str(aliases_path),
-            "--compatibility-alias-registry",
-            str(aliases_path),
-            "--dry-run",
+            "--write-db",
             "--output",
             str(output_path),
         ]
     )
 
     captured = capsys.readouterr()
-    assert code == 0, f"stdout={captured.out}; stderr={captured.err}"
+    assert code == 1, f"stdout={captured.out}; stderr={captured.err}"
+    assert captured.out == ""
     assert json.loads(captured.err) == {
-        "status": "MODEL_UNAVAILABLE_USING_PRODUCT_DEFAULTS",
-        "warning": "Ollama model is not available",
+        "status": "FAILED",
+        "error": "required Ollama model preflight failed: Ollama model is not available",
     }
-    assert json.loads(captured.out)["status"] == "COMPLETED"
-    result = pd.read_csv(output_path, dtype=str)
-    assert result.loc[0, "label"] == "1"
-    assert result.loc[0, "label_source"] == "PRODUCT_DEFAULT"
+    assert not output_path.exists()
 
 
 @pytest.mark.parametrize(

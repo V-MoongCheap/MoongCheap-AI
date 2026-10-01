@@ -49,9 +49,10 @@ A_MODEL2_FALLBACK_BATCH_SIZE=5
 ```
 
 LLM을 활성화한 실행은 시작 시 Ollama `/api/tags`에서 위 모델의 존재를 확인한다.
-모델이 없거나 Ollama가 준비되지 않았으면 LLM 보조만 비활성화하고, 완전하고 유효한
-원상품 Facet profile이 있는 Demand는 그 기본값으로 계속 Labeling한다. 상품 profile이
-없거나 불완전하면 해당 Demand를 미처리 상태로 두고 재시도한다.
+모델이 없거나 Ollama가 준비되지 않았으면 배치를 실패 종료하며 DB를 읽거나 쓰지 않는다.
+이는 다음 CronJob에서 재시도할 수 있도록 하기 위함이다. Ollama가 준비된 상태에서
+개별 Demand 해석에 실패·모호·근거 부족이 발생한 경우에는 완전하고 유효한 원상품
+Facet profile을 결과로 사용한다. 상품 profile이 없거나 불완전한 Demand는 미처리 상태로 둔다.
 
 Model 2는 안정적으로 해석되지 않은 비어 있지 않은 긍정 후보만 보조한다.
 명시적 제외·충돌·복수값·모호한 요청은 재해석하지 않고 상품 기본 Facet을 유지한다.

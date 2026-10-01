@@ -78,8 +78,9 @@ python -m moongcheap_ai.data_foundation.runtime_job `
 - `A_LLM_TIMEOUT_SECONDS`: LLM 요청 timeout. 기본 300초
 - `A_LLM_PREFLIGHT_TIMEOUT_SECONDS`: 배치 시작 시 `/api/tags` 모델 존재 확인 timeout. 기본 10초.
   `A_LLM_ENABLED=true` 또는 `A_MODEL2_FALLBACK_ENABLED=true`일 때 확인한다. 모델이
-  없거나 Ollama에 연결할 수 없으면 LLM만 비활성화하고, 유효한 상품 Facet profile이 있는
-  Demand는 그 기본값으로 Labeling을 계속한다. 설정 오류인 0 이하 timeout은 실패 처리한다.
+  없거나 Ollama에 연결할 수 없으면 배치가 DB 접근/기록 전에 실패 종료하여 다음 회차에
+  재시도한다. 단, Ollama 호출 후 개별 Demand의 해석이 실패·모호·근거 부족한 경우에는
+  완전하고 유효한 원상품 Facet profile을 사용한다. 설정 오류인 0 이하 timeout도 실패 처리한다.
 - `A_LLM_BATCH_SIZE`: 한 번에 보낼 행 수. 기본 5
 - `A_LLM_MAX_ROWS`: 한 페이지에 보낼 행 수를 제한하는 선택적 운영 설정이다.
   `0` 또는 미설정이면 미해결 행 전체를 한 실행에서 처리한다. 양수를 설정해도

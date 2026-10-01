@@ -44,6 +44,17 @@ def _normalise(value: Any) -> str:
     ).strip()
 
 
+def _ordered_facets(facets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return facets in their validated explicit order, preserving defaults."""
+    return [
+        facet
+        for _, facet in sorted(
+            enumerate(facets, start=1),
+            key=lambda item: int(item[1].get("order", item[0])),
+        )
+    ]
+
+
 NO_REQUIREMENT_PHRASES = {
     "조건 없음",
     "조건없음",
@@ -62,12 +73,13 @@ class TaxonomyLoader:
         self.categories: dict[str, dict[str, Any]] = {}
         self.root_category: dict[str, Any] | None = None
         if taxonomy.get("facets"):
+            root_facets = taxonomy["facets"]
             self._validate_category(
-                {"category_id": "__root__", "facets": taxonomy["facets"]}
+                {"category_id": "__root__", "facets": root_facets}
             )
             self.root_category = {
                 "category_id": "__root__",
-                "facets": taxonomy["facets"],
+                "facets": _ordered_facets(root_facets),
             }
         categories = taxonomy.get("categories", [])
         if not isinstance(categories, list):
@@ -81,7 +93,10 @@ class TaxonomyLoader:
             if category_id in self.categories:
                 raise TaxonomyValidationError(f"duplicate category_id: {category_id}")
             self._validate_category(category)
-            self.categories[category_id] = category
+            self.categories[category_id] = {
+                **category,
+                "facets": _ordered_facets(category["facets"]),
+            }
 
     @classmethod
     def from_path(cls, path: Path) -> TaxonomyLoader:
@@ -287,12 +302,12 @@ class TaxonomyLoader:
             if not raw_value:
                 warnings.append(f"mapped product facet has no value: {facet_name}")
                 continue
-            matches = []
+            all_matches = []
             for value in facet.get("values", []):
                 aliases = [value.get("value", ""), *(value.get("aliases") or [])]
                 if any(_normalise(alias) == _normalise(raw_value) for alias in aliases):
-                    matches.append(value)
-            value_matches = list(matches)
+                    all_matches.append(value)
+            value_matches = list(all_matches)
             declared_code = str(row.get("value_code", "")).strip()
             if declared_code:
                 try:
@@ -302,9 +317,16 @@ class TaxonomyLoader:
                         f"invalid product facet code: {facet_name}={declared_code}"
                     )
                     continue
-                matches = [
-                    value for value in matches if int(value["code"]) == expected_code
+                all_matches = [
+                    value
+                    for value in all_matches
+                    if int(value["code"]) == expected_code
                 ]
+            matches = [
+                value
+                for value in all_matches
+                if str(value.get("status", "")).upper() != "DEPRECATED"
+            ]
             if len(matches) == 1 and int(matches[0]["code"]) > 0:
                 value = matches[0]
                 code = int(value["code"])
@@ -316,6 +338,10 @@ class TaxonomyLoader:
             elif len(matches) == 1:
                 warnings.append(
                     f"ALL is not a product Facet value: {facet_name}={raw_value}"
+                )
+            elif not matches and all_matches:
+                warnings.append(
+                    f"deprecated product Facet value is not valid: {facet_name}={raw_value}"
                 )
             elif not matches:
                 if declared_code and value_matches:

@@ -114,6 +114,7 @@ def _has_complete_product_baseline(
         allowed = {
             int(item.get("code", -1)): str(item.get("value", ""))
             for item in facets[facet_name].get("values", [])
+            if str(item.get("status", "")).upper() != "DEPRECATED"
         }
         if code <= 0 or allowed.get(code) != str(value.get("value", "")):
             return False
@@ -867,21 +868,20 @@ def main(argv: list[str] | None = None) -> int:
                 llm_endpoint, llm_model, timeout=preflight_timeout
             )
         except LLMLabelingError as error:
-            # Explicit product Facet profiles remain a valid fallback when the
-            # optional model worker is unavailable. Disable only model calls.
             print(
                 json.dumps(
                     {
-                        "status": "MODEL_UNAVAILABLE_USING_PRODUCT_DEFAULTS",
-                        "warning": str(error),
+                        "status": "FAILED",
+                        "error": f"required Ollama model preflight failed: {error}",
                     },
                     ensure_ascii=False,
                 ),
                 file=sys.stderr,
             )
-            llm_model = None
-            llm_enabled = False
-            model2_fallback_enabled = False
+            # A globally unavailable configured model is an infrastructure
+            # failure, not a per-demand interpretation failure. Exit before
+            # opening the DB so the selected demands remain retryable.
+            return 1
         except ValueError as error:
             print(
                 json.dumps(

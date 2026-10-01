@@ -13,7 +13,7 @@
 
 Qwen은 이미 `PARSED` 또는 `NONE`인 Rule 결과를 덮어쓰지 않는다. 명시적 제외나 충돌을 긍정 조건으로 변환하지 않으며, Taxonomy에 없는 Facet/Value를 만들지 않는다. typed constraint를 만들 수 없는 응답도 저장하지 않는다.
 
-호출 실패, timeout, 누락 결과, Taxonomy 불일치, 근거 부족 결과는 검증된 원상품 기본 label을 유지한다. Product Facet profile이 없거나 불완전하거나 Backend Category/Taxonomy가 유효하지 않은 행은 `REVIEW`로 남긴다. `A_MODEL2_FALLBACK_ENABLED` 기본값은 `false`이며, Ollama 서비스가 준비된 환경에서만 `true`로 바꾼다.
+개별 Demand의 호출 실패, timeout, 누락 결과, Taxonomy 불일치, 근거 부족은 검증된 원상품 기본 label을 유지한다. 반면 LLM이 활성화된 실행에서 Ollama 자체 또는 필수 모델이 시작 전 확인되지 않으면 배치 전체를 DB 접근/기록 전에 실패시켜 다음 스케줄에 재시도한다. Product Facet profile이 없거나 불완전하거나 Backend Category/Taxonomy가 유효하지 않은 행은 `REVIEW`로 남긴다. `A_MODEL2_FALLBACK_ENABLED` 기본값은 `false`이며, Ollama 서비스가 준비된 환경에서만 `true`로 바꾼다.
 
 ## 실험 해석
 

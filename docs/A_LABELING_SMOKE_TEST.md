@@ -15,6 +15,10 @@ Current behavior supersedes the historical REVIEW persistence statements below:
 - Empty requirements, ambiguous/failed analysis, and explicit exclusions retain
   the product baseline. A stable positive consumer constraint overrides only
   its own Facet.
+- When the configured Ollama service/model is unavailable at batch preflight,
+  the run fails before DB access/write so the next schedule can retry. This is
+  distinct from a per-demand interpretation failure, which retains the product
+  baseline as specified above.
 - A valid complete category/product baseline is a completed label and is
   persisted; a missing/incomplete product profile or Category/taxonomy remains
   retryable. Parser `status` is diagnostic; `label_status` controls persistence.

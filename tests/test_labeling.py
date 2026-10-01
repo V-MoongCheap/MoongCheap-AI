@@ -231,6 +231,82 @@ def test_non_contiguous_facet_orders_are_rejected() -> None:
         TaxonomyLoader(invalid)
 
 
+def test_product_baseline_label_uses_declared_facet_order_not_json_order() -> None:
+    loader = TaxonomyLoader(
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {
+                            "name": "second",
+                            "order": 2,
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 2, "value": "B"},
+                            ],
+                        },
+                        {
+                            "name": "first",
+                            "order": 1,
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": "A"},
+                            ],
+                        },
+                    ],
+                }
+            ]
+        }
+    )
+
+    defaults, warnings = loader.product_defaults(
+        "C1",
+        [
+            {
+                "category_id": "C1",
+                "facet_name": "second",
+                "mapping_status": "MAPPED",
+                "value": "B",
+            },
+            {
+                "category_id": "C1",
+                "facet_name": "first",
+                "mapping_status": "MAPPED",
+                "value": "A",
+            },
+        ],
+    )
+
+    assert not warnings
+    assert list(defaults) == ["first", "second"]
+    assert loader.encode(defaults) == "1-2"
+
+
+def test_root_taxonomy_uses_declared_facet_order() -> None:
+    loader = TaxonomyLoader(
+        {
+            "facets": [
+                {
+                    "name": "second",
+                    "order": 2,
+                    "values": [{"code": 0, "value": "ALL"}],
+                },
+                {
+                    "name": "first",
+                    "order": 1,
+                    "values": [{"code": 0, "value": "ALL"}],
+                },
+            ]
+        }
+    )
+
+    assert [facet["name"] for facet in loader.root_category["facets"]] == [
+        "first",
+        "second",
+    ]
+
+
 def test_unmatched_requirement_is_recorded_as_unresolved() -> None:
     loader = TaxonomyLoader(TAXONOMY)
     profile = {
@@ -615,6 +691,52 @@ def test_llm_result_cannot_reintroduce_deprecated_taxonomy_value() -> None:
 
     assert values["form"]["code"] == 1
     assert warnings
+
+
+def test_product_baseline_rejects_deprecated_taxonomy_value() -> None:
+    loader = TaxonomyLoader(
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {
+                            "name": "form",
+                            "order": 1,
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": "정제"},
+                                {
+                                    "code": 2,
+                                    "value": "옛정제",
+                                    "status": "DEPRECATED",
+                                    "canonical_code": 1,
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    values, warnings = loader.product_defaults(
+        "C1",
+        [
+            {
+                "category_id": "C1",
+                "facet_name": "form",
+                "mapping_status": "MAPPED",
+                "value": "옛정제",
+                "value_code": "2",
+            }
+        ],
+    )
+
+    assert values == {}
+    assert warnings == [
+        "deprecated product Facet value is not valid: form=옛정제"
+    ]
 
 
 def test_llm_numeric_facet_key_is_resolved_by_position() -> None:
