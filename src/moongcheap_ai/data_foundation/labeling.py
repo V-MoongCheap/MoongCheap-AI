@@ -468,7 +468,19 @@ def taxonomy_from_category_facet_rows(frame: pd.DataFrame) -> dict[str, Any]:
             ) from exc
         category_id = _text(row.get("category_id", "")).strip()
         if isinstance(parsed, dict):
-            category_id = _text(parsed.get("category_id", "")).strip() or category_id
+            if "category_id" in parsed:
+                embedded_category_id = parsed["category_id"]
+                if isinstance(embedded_category_id, bool) or not isinstance(
+                    embedded_category_id, (str, int)
+                ):
+                    raise TaxonomyValidationError(
+                        "category.facet category_id must be text or an integer"
+                    )
+                category_id = str(embedded_category_id).strip()
+                if not category_id:
+                    raise TaxonomyValidationError(
+                        "category.facet category_id must not be empty"
+                    )
             facets = parsed.get("facets", [])
         elif isinstance(parsed, list):
             facets = parsed

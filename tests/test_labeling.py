@@ -398,6 +398,23 @@ def test_category_facet_rejects_duplicate_json_keys_and_handles_missing_scalar()
         )
 
 
+@pytest.mark.parametrize(
+    "facet_json",
+    [
+        '{"category_id":null,"facets":[]}',
+        '{"category_id":true,"facets":[]}',
+        '{"category_id":"","facets":[]}',
+    ],
+)
+def test_category_facet_does_not_replace_explicit_invalid_category_key(
+    facet_json: str,
+) -> None:
+    with pytest.raises(TaxonomyValidationError, match="category.facet category_id"):
+        taxonomy_from_category_facet_rows(
+            pd.DataFrame([{"category_id": "42", "category_facet": facet_json}])
+        )
+
+
 def test_non_contiguous_facet_orders_are_rejected() -> None:
     invalid = {
         "categories": [
