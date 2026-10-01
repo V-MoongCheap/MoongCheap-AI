@@ -151,9 +151,10 @@ def test_direct_rule_labeling_does_not_turn_non_positive_text_into_override(
 
     assert result.iloc[0]["label"] == "1"
     assert result.iloc[0]["interpretation_status"] == "UNRESOLVED"
-    assert "non-positive requirement retained product Facet baseline" in result.iloc[0][
-        "label_warnings"
-    ]
+    assert (
+        "non-positive requirement retained product Facet baseline"
+        in result.iloc[0]["label_warnings"]
+    )
 
 
 def test_direct_rule_labeling_still_applies_clear_positive_override() -> None:
@@ -230,7 +231,10 @@ def test_duplicate_value_codes_are_rejected() -> None:
         ([{"code": 0.5, "value": "ALL"}], "invalid value code"),
         ([{"code": False, "value": "ALL"}], "invalid value code"),
         ([{"code": 0, "value": "UNKNOWN"}], "code 0 must be ALL"),
-        ([{"code": 0, "value": "ALL"}, {"code": 1, "value": "ALL"}], "ALL must use code 0"),
+        (
+            [{"code": 0, "value": "ALL"}, {"code": 1, "value": "ALL"}],
+            "ALL must use code 0",
+        ),
     ],
 )
 def test_taxonomy_rejects_invalid_all_and_negative_codes(
@@ -358,7 +362,10 @@ def test_taxonomy_rejects_missing_category_id_and_malformed_aliases() -> None:
                 {
                     "category_id": "C1",
                     "facets": [
-                        {"name": "form", "values": [{"code": 0, "value": "ALL"}, {"code": 1}]}
+                        {
+                            "name": "form",
+                            "values": [{"code": 0, "value": "ALL"}, {"code": 1}],
+                        }
                     ],
                 }
             ]
@@ -379,7 +386,9 @@ def test_taxonomy_json_duplicate_keys_are_rejected(tmp_path) -> None:
         TaxonomyLoader.from_path(path)
 
 
-def test_category_facet_rejects_duplicate_json_keys_and_handles_missing_scalar() -> None:
+def test_category_facet_rejects_duplicate_json_keys_and_handles_missing_scalar() -> (
+    None
+):
     with pytest.raises(TaxonomyValidationError, match="duplicate JSON key"):
         taxonomy_from_category_facet_rows(
             pd.DataFrame(
@@ -934,12 +943,10 @@ def test_product_baseline_rejects_deprecated_taxonomy_value() -> None:
     )
 
     assert values == {}
-    assert warnings == [
-        "deprecated product Facet value is not valid: form=옛정제"
-    ]
+    assert warnings == ["deprecated product Facet value is not valid: form=옛정제"]
 
 
-def test_llm_numeric_facet_key_is_resolved_by_position() -> None:
+def test_llm_numeric_facet_key_is_not_guessed_by_position() -> None:
     loader = TaxonomyLoader(
         {
             "categories": [
@@ -949,9 +956,21 @@ def test_llm_numeric_facet_key_is_resolved_by_position() -> None:
                         {
                             "name": "form",
                             "order": 1,
+                            "facet_id": 1,
                             "values": [
                                 {"code": 0, "value": "ALL"},
                                 {"code": 1, "value": "정제"},
+                                {"code": 2, "value": "분말"},
+                            ],
+                        },
+                        {
+                            "name": "taste",
+                            "order": 2,
+                            "facet_id": 2,
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": "레몬"},
+                                {"code": 2, "value": "딸기"},
                             ],
                         },
                     ],
@@ -960,9 +979,21 @@ def test_llm_numeric_facet_key_is_resolved_by_position() -> None:
         }
     )
     row = pd.Series({"category_id": "C1"})
-    values, warnings = _apply_model_result(row, {" facet_0 ": 1}, loader, FORM_PROFILE)
-    assert values["form"]["code"] == 1
-    assert not warnings
+    baseline = {
+        "form": {"code": 1, "value": "정제", "matched_alias": "product"},
+        "taste": {"code": 1, "value": "레몬", "matched_alias": "product"},
+    }
+
+    values, warnings = _apply_model_result(
+        row,
+        {"facet_1": 2},
+        loader,
+        baseline_values=baseline,
+    )
+
+    assert values["taste"]["value"] == "레몬"
+    assert values["taste"]["matched_alias"] == "product"
+    assert warnings == ["LLM facet key is not an exact taxonomy name: facet_1"]
 
 
 def test_model_single_facet_object_is_converted_to_mapping() -> None:
@@ -970,7 +1001,7 @@ def test_model_single_facet_object_is_converted_to_mapping() -> None:
     assert result == {"form": {"value": "정제"}}
 
 
-def test_llm_category_prefixed_facet_does_not_hide_a_null_duplicate() -> None:
+def test_llm_category_prefixed_facet_is_not_accepted_as_exact_name() -> None:
     loader = TaxonomyLoader(
         {
             "categories": [
@@ -992,13 +1023,16 @@ def test_llm_category_prefixed_facet_does_not_hide_a_null_duplicate() -> None:
     )
     row = pd.Series({"category_id": "C1"})
     values, warnings = _apply_model_result(
-        row, {"health:C1:form": 1, "form": None}, loader, FORM_PROFILE
+        row, {"health:C2:form": 1, "form": None}, loader, FORM_PROFILE
     )
     assert values["form"]["code"] == 1
-    assert warnings == ["LLM returned null facet value: form"]
+    assert warnings == [
+        "LLM facet key is not an exact taxonomy name: health:C2:form",
+        "LLM returned null facet value: form",
+    ]
 
 
-def test_llm_conflicting_category_prefixed_facet_values_are_reviewed() -> None:
+def test_llm_category_prefixed_facet_does_not_override_exact_facet_value() -> None:
     loader = TaxonomyLoader(
         {
             "categories": [
@@ -1019,13 +1053,24 @@ def test_llm_conflicting_category_prefixed_facet_values_are_reviewed() -> None:
             ]
         }
     )
-    row = pd.Series({"category_id": "C1", "extra_requirement": "정제"})
-
-    _, warnings = _apply_model_result(
-        row, {"health:C1:form": 1, "form": 2}, loader, FORM_PROFILE
+    row = pd.Series(
+        {
+            "category_id": "C1",
+            "extra_requirement": "정제",
+        }
     )
 
-    assert warnings == ["LLM returned conflicting values for facet: form"]
+    values, warnings = _apply_model_result(
+        row,
+        {"health:C2:form": 2, "form": 1},
+        loader,
+        baseline_values={
+            "form": {"code": 2, "value": "분말", "matched_alias": "product"}
+        },
+    )
+
+    assert values["form"]["code"] == 1
+    assert warnings == ["LLM facet key is not an exact taxonomy name: health:C2:form"]
 
 
 def test_hybrid_model_override_keeps_unmentioned_product_defaults() -> None:

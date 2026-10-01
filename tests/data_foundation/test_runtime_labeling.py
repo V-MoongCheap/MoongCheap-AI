@@ -161,7 +161,9 @@ def test_main_fails_before_processing_when_required_model_preflight_fails(
     monkeypatch.setattr(
         runtime_job,
         "open_postgres",
-        lambda *_args, **_kwargs: pytest.fail("DB must not be opened after failed preflight"),
+        lambda *_args, **_kwargs: pytest.fail(
+            "DB must not be opened after failed preflight"
+        ),
     )
     output_path = tmp_path / "result.csv"
 
@@ -510,8 +512,9 @@ def test_unresolved_rows_keep_catalog_defaults_without_llm_retry(
     demands = pd.DataFrame(
         [
             {
-                "demand_id": str(i),
-                "catalog_id": str(i),
+                # Backend BIGINT identifiers are positive; zero is not a valid row ID.
+                "demand_id": str(i + 1),
+                "catalog_id": str(i + 1),
                 "category_id": "c1",
                 "extra_requirement": "조건 확인",
             }
@@ -1873,7 +1876,7 @@ def test_runtime_job_uses_part_a_parser_for_explicit_requirement() -> None:
         [
             {
                 "demand_id": "1",
-                "catalog_id": "catalog-1",
+                "catalog_id": "1",
                 "category_id": "health-functional-food:omega_fatty_acid",
                 "extra_requirement": "오메가3 함유 제품을 원해요.",
                 "is_substitutable": "true",

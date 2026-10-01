@@ -293,26 +293,16 @@ def _apply_model_result(
         defaults = {name: dict(value) for name, value in baseline_values.items()}
         warnings = []
     allowed = _allowed(loader, row["category_id"])
-    ordered_facets = list(allowed)
     selected_codes: dict[str, int] = {}
     for facet_name, raw_code in model_values.items():
         facet_key = str(facet_name).strip()
-        if ":" in facet_key:
-            facet_key = facet_key.rsplit(":", 1)[-1]
-        numeric_match = re.fullmatch(
-            r"(?:facet[_ -]?)?(\d+)(?:\.0)?", facet_key, flags=re.IGNORECASE
+        facet_name = next(
+            (name for name in allowed if name.casefold() == facet_key.casefold()),
+            facet_key,
         )
-        if numeric_match and int(numeric_match.group(1)) < len(ordered_facets):
-            facet_name = ordered_facets[int(numeric_match.group(1))]
-        else:
-            facet_name = next(
-                (
-                    name
-                    for name in ordered_facets
-                    if name.casefold() == facet_key.casefold()
-                ),
-                facet_key,
-            )
+        if facet_name not in allowed:
+            warnings.append(f"LLM facet key is not an exact taxonomy name: {facet_key}")
+            continue
         if raw_code is None:
             warnings.append(f"LLM returned null facet value: {facet_name}")
             continue

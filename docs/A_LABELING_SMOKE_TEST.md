@@ -34,11 +34,14 @@ Current behavior supersedes the historical REVIEW persistence statements below:
 
 ## 2026-10-01 local regression verification
 
-- Full repository regression: `1143 passed, 31 skipped`.
+- Full repository regression: `1156 passed, 31 skipped`.
 - The seller-awarding localhost mock tests were included in this run; loopback
   socket access was available.
 - Ruff and `git diff --check` passed. Docker image build was not verified
   because the local Docker daemon was unavailable.
+- The A-labeling lockfile check passed. Wheel build could not be verified
+  because this environment could not resolve PyPI DNS for the isolated build
+  dependency (`hatchling`).
 - `kubectl kustomize k8s/base/a-labeling-job` rendered successfully; the base
   CronJob remains suspended and points to the required runtime profile path.
 - No live database or Kubernetes write test was run after this code change.

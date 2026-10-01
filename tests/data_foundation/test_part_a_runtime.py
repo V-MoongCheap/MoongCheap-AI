@@ -433,17 +433,17 @@ def test_runtime_job_uses_qwen_only_for_unresolved_rows(tmp_path, monkeypatch):
     demands = pd.DataFrame(
         [
             {
-                "demand_id": "parsed",
-                "catalog_id": "p1",
+                "demand_id": "101",
+                "catalog_id": "1",
                 "category_id": "c1",
                 "extra_requirement": "캡슐",
                 "is_substitutable": "true",
             },
             {
-                "demand_id": "fallback",
-                "catalog_id": "p1",
+                "demand_id": "102",
+                "catalog_id": "1",
                 "category_id": "c1",
-            "extra_requirement": "딸기맛",
+                "extra_requirement": "딸기맛",
                 "is_substitutable": "true",
             },
         ]
@@ -453,9 +453,9 @@ def test_runtime_job_uses_qwen_only_for_unresolved_rows(tmp_path, monkeypatch):
         demands,
         taxonomy,
         product_facet_map={
-            "p1": [
+            "1": [
                 {
-                    "catalog_id": "p1",
+                    "catalog_id": "1",
                     "category_id": "c1",
                     "facet_name": "product_form",
                     "mapping_status": "MAPPED",
@@ -472,13 +472,13 @@ def test_runtime_job_uses_qwen_only_for_unresolved_rows(tmp_path, monkeypatch):
     )
 
     assert len(calls) == 1
-    assert calls[0][0]["demand_id"] == "fallback"
-    assert result.set_index("demand_id").loc["parsed", "fallback_status"] == ""
-    assert result.set_index("demand_id").loc["fallback", "status"] == "REVIEW"
-    assert result.set_index("demand_id").loc["fallback", "fallback_status"] == "REVIEW"
+    assert calls[0][0]["demand_id"] == "102"
+    assert result.set_index("demand_id").loc["101", "fallback_status"] == ""
+    assert result.set_index("demand_id").loc["102", "status"] == "REVIEW"
+    assert result.set_index("demand_id").loc["102", "fallback_status"] == "REVIEW"
     assert (
         "lacks matching text evidence"
-        in result.set_index("demand_id").loc["fallback", "fallback_warning"]
+        in result.set_index("demand_id").loc["102", "fallback_warning"]
     )
 
 
@@ -506,8 +506,8 @@ def test_runtime_job_keeps_product_default_when_qwen_is_unavailable(
     demands = pd.DataFrame(
         [
             {
-                "demand_id": "fallback",
-                "catalog_id": "p1",
+                "demand_id": "103",
+                "catalog_id": "1",
                 "category_id": "c1",
                 "extra_requirement": "딸기맛",
                 "is_substitutable": "true",
@@ -518,9 +518,9 @@ def test_runtime_job_keeps_product_default_when_qwen_is_unavailable(
         demands,
         taxonomy,
         product_facet_map={
-            "p1": [
+            "1": [
                 {
-                    "catalog_id": "p1",
+                    "catalog_id": "1",
                     "category_id": "c1",
                     "facet_name": "product_form",
                     "mapping_status": "MAPPED",
