@@ -444,6 +444,59 @@ def test_backend_payload_rejects_completed_label_without_product_facet_values() 
         build_label_result_payload(frame, processed_at="2026-10-01T00:00:00Z")
 
 
+def test_backend_payload_rejects_duplicate_normalized_demand_ids() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "demand_id": "001",
+                "catalog_id": "10",
+                "category_id": "c1",
+                "label": "1",
+                "facet_values": '{"form":{"code":1}}',
+                "label_status": "LABELED",
+            },
+            {
+                "demand_id": "1",
+                "catalog_id": "10",
+                "category_id": "c1",
+                "label": "1",
+                "facet_values": '{"form":{"code":1}}',
+                "label_status": "LABELED",
+            },
+        ]
+    )
+
+    with pytest.raises(ValueError, match="duplicate demand_id"):
+        build_label_result_payload(frame, processed_at="2026-10-01T00:00:00Z")
+
+
+@pytest.mark.parametrize(
+    "facet_values",
+    [
+        '{"form":{"code":true}}',
+        '{"form":{"code":1.5}}',
+        '{"form":{"code":-1}}',
+        '{"form":null}',
+    ],
+)
+def test_backend_payload_rejects_non_integer_facet_codes(facet_values) -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "demand_id": "1",
+                "catalog_id": "10",
+                "category_id": "c1",
+                "label": "1",
+                "facet_values": facet_values,
+                "label_status": "LABELED",
+            }
+        ]
+    )
+
+    with pytest.raises(ValueError, match="invalid Facet codes"):
+        build_label_result_payload(frame, processed_at="2026-10-01T00:00:00Z")
+
+
 def test_unresolved_rows_keep_catalog_defaults_without_llm_retry(
     tmp_path, monkeypatch
 ) -> None:

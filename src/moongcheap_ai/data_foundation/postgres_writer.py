@@ -66,9 +66,12 @@ def write_label_results(
         if demand_id is None or (isinstance(demand_id, float) and math.isnan(demand_id)) or str(demand_id).strip().casefold() in {"", "nan", "none"}:
             raise ValueError("demand_id is required for direct DB labeling")
         demand_key = str(demand_id).strip()
-        if demand_key in seen_ids:
+        normalized_demand_key = (
+            str(int(demand_key)) if demand_key.isdigit() else demand_key
+        )
+        if normalized_demand_key in seen_ids:
             raise ValueError(f"duplicate demand_id in DB labeling batch: {demand_key}")
-        seen_ids.add(demand_key)
+        seen_ids.add(normalized_demand_key)
         label = str(row.get("label", "")).strip()
         if not label:
             raise ValueError(f"label is required for demand_id: {demand_key}")

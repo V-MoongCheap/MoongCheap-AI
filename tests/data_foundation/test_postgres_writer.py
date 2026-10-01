@@ -138,15 +138,16 @@ def test_writer_rejects_invalid_completed_rows() -> None:
 
 
 def test_writer_rejects_duplicate_demand_ids() -> None:
-    with pytest.raises(ValueError, match="duplicate demand_id"):
-        write_label_results(
-            FakeConnection(),
-            [
-                {"demand_id": "1", "label": "1", "label_status": "LABELED"},
-                {"demand_id": "1", "label": "2", "label_status": "LABELED"},
-            ],
-            processed_at="2026-09-14T00:00:00+00:00",
-        )
+    for duplicate_ids in [("1", "1"), ("001", "1")]:
+        with pytest.raises(ValueError, match="duplicate demand_id"):
+            write_label_results(
+                FakeConnection(),
+                [
+                    {"demand_id": duplicate_ids[0], "label": "1", "label_status": "LABELED"},
+                    {"demand_id": duplicate_ids[1], "label": "2", "label_status": "LABELED"},
+                ],
+                processed_at="2026-09-14T00:00:00+00:00",
+            )
 
 
 def test_writer_returns_database_affected_count() -> None:

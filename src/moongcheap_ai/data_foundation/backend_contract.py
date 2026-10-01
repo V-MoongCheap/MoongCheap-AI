@@ -30,6 +30,7 @@ def build_label_result_payload(labeled: Any, *, processed_at: str) -> dict[str, 
     if missing:
         raise ValueError("labeled result missing columns: " + ", ".join(missing))
     rows = []
+    seen_demand_ids: set[tuple[type, str]] = set()
     for item in labeled.fillna("").to_dict(orient="records"):
         # Completed product-baseline labels are writable even when consumer
         # text remains diagnostically REVIEW. Valid positive interpretations
@@ -40,8 +41,18 @@ def build_label_result_payload(labeled: Any, *, processed_at: str) -> dict[str, 
         catalog_id = str(item.get("catalog_id", "")).strip()
         category_id = str(item.get("category_id", "")).strip()
         label = str(item.get("label", "")).strip()
-        if not demand_id or not catalog_id or not category_id:
+        missing_identifiers = {"", "nan", "none", "null", "<na>"}
+        if (
+            demand_id.casefold() in missing_identifiers
+            or catalog_id.casefold() in missing_identifiers
+            or category_id.casefold() in missing_identifiers
+        ):
             raise ValueError("completed label is missing a required Backend identifier")
+        normalized_demand_id = _identifier(demand_id)
+        demand_key = (type(normalized_demand_id), str(normalized_demand_id))
+        if demand_key in seen_demand_ids:
+            raise ValueError(f"duplicate demand_id in Backend label payload: {demand_id}")
+        seen_demand_ids.add(demand_key)
         if not re.fullmatch(r"\d+(?:-\d+)*", label):
             raise ValueError(f"completed label is not a numeric Facet vector: {demand_id}")
         try:
@@ -51,11 +62,17 @@ def build_label_result_payload(labeled: Any, *, processed_at: str) -> dict[str, 
         if not isinstance(facet_values, dict) or not facet_values:
             raise ValueError(f"completed label has no product Facet values: {demand_id}")
         try:
-            codes = [
-                int(value["code"])
-                for value in facet_values.values()
-                if isinstance(value, Mapping)
-            ]
+            codes = []
+            for value in facet_values.values():
+                if not isinstance(value, Mapping):
+                    raise TypeError("Facet value must be an object")
+                raw_code = value["code"]
+                if isinstance(raw_code, bool) or not isinstance(raw_code, (str, int)):
+                    raise TypeError("Facet code must be an integer")
+                code_text = str(raw_code).strip()
+                if not re.fullmatch(r"\d+", code_text):
+                    raise ValueError("Facet code must be a non-negative integer")
+                codes.append(int(code_text))
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError(f"completed label has invalid Facet codes: {demand_id}") from error
         if len(codes) != len(facet_values) or "-".join(map(str, codes)) != label:
