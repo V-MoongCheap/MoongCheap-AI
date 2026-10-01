@@ -34,7 +34,7 @@ Current behavior supersedes the historical REVIEW persistence statements below:
 
 ## 2026-10-01 local regression verification
 
-- Full repository regression: `1133 passed, 31 skipped`.
+- Full repository regression: `1143 passed, 31 skipped`.
 - The seller-awarding localhost mock tests were included in this run; loopback
   socket access was available.
 - Ruff and `git diff --check` passed. Docker image build was not verified
