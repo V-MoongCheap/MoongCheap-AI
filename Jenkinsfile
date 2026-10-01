@@ -446,7 +446,6 @@ pipeline {
                                 uv sync \
                                   --project packaging/a-labeling \
                                   --locked \
-                                  --extra data \
                                   --extra dev
 
                                 PYTHONPATH=. uv run \
@@ -1232,20 +1231,6 @@ pipeline {
         // ============================================================
 
         stage('Update GitOps Repo (Image Tags)') {
-
-            when {
-
-                expression {
-
-                    env.BUILD_LABELING == 'true' ||
-
-                    env.BUILD_AWARDING == 'true' ||
-
-                    env.BUILD_DEMAND_CLUSTERING == 'true' ||
-
-                    env.BUILD_SELLER_ANALYSIS == 'true'
-                }
-            }
 
             agent {
                 kubernetes {
