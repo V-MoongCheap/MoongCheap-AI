@@ -145,7 +145,12 @@ class TaxonomyLoader:
         for category in categories:
             if not isinstance(category, dict):
                 raise TaxonomyValidationError("taxonomy category must be an object")
-            category_id = str(category.get("category_id", "")).strip()
+            raw_category_id = category.get("category_id")
+            if isinstance(raw_category_id, bool) or not isinstance(
+                raw_category_id, (str, int)
+            ):
+                raise TaxonomyValidationError("taxonomy category_id must be text or an integer")
+            category_id = str(raw_category_id).strip()
             if not category_id:
                 raise TaxonomyValidationError("taxonomy category_id is required")
             if category_id in self.categories:
@@ -178,7 +183,10 @@ class TaxonomyLoader:
         for index, facet in enumerate(facets, 1):
             if not isinstance(facet, dict):
                 raise TaxonomyValidationError("taxonomy facet must be an object")
-            name = str(facet.get("name", "")).strip()
+            raw_name = facet.get("name")
+            if not isinstance(raw_name, str):
+                raise TaxonomyValidationError("taxonomy facet name must be text")
+            name = raw_name.strip()
             if not name or name in seen_facets:
                 raise TaxonomyValidationError(f"invalid or duplicate facet: {name}")
             seen_facets.add(name)
@@ -228,8 +236,13 @@ class TaxonomyLoader:
                         f"duplicate value code {code} in facet: {name}"
                     )
                 codes.add(code)
-                value_name = str(value.get("value", "")).strip()
-                if code == 0 and value_name and value_name != "ALL":
+                raw_value_name = value.get("value")
+                if not isinstance(raw_value_name, str):
+                    raise TaxonomyValidationError(
+                        f"taxonomy value name must be text in facet: {name}"
+                    )
+                value_name = raw_value_name.strip()
+                if code == 0 and value_name != "ALL":
                     raise TaxonomyValidationError(
                         f"code 0 must be ALL in facet: {name}"
                     )

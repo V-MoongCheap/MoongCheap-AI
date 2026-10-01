@@ -260,6 +260,64 @@ def test_malformed_taxonomy_types_raise_domain_validation_error() -> None:
             TaxonomyLoader(invalid)
 
 
+def test_taxonomy_rejects_null_contract_names_instead_of_stringifying_them() -> None:
+    malformed = [
+        {"categories": [{"category_id": None, "facets": []}]},
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {
+                            "name": None,
+                            "order": 1,
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": "value"},
+                            ],
+                        }
+                    ],
+                }
+            ]
+        },
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {
+                            "name": "form",
+                            "order": 1,
+                            "values": [
+                                {"code": 0, "value": "ALL"},
+                                {"code": 1, "value": None},
+                            ],
+                        }
+                    ],
+                }
+            ]
+        },
+        {
+            "categories": [
+                {
+                    "category_id": "C1",
+                    "facets": [
+                        {
+                            "name": "form",
+                            "order": 1,
+                            "values": [{"code": 0}],
+                        }
+                    ],
+                }
+            ]
+        },
+    ]
+
+    for taxonomy in malformed:
+        with pytest.raises(TaxonomyValidationError):
+            TaxonomyLoader(taxonomy)
+
+
 def test_taxonomy_rejects_missing_category_id_and_malformed_aliases() -> None:
     for taxonomy in [
         {"categories": [{"facets": []}]},
