@@ -716,6 +716,29 @@ pipeline {
 
                         unstash 'source'
 
+                        withCredentials([
+                            file(
+                                credentialsId: 'ai-product-facets',
+                                variable: 'PRODUCT_FACETS_FILE'
+                            )
+                        ]) {
+                            container('security') {
+                                sh '''
+                                    set -eu
+
+                                    mkdir -p artifacts
+
+                                    cp "$PRODUCT_FACETS_FILE" \
+                                      artifacts/product_facets.csv
+
+                                    echo "508ba2d9b49a48dfad06342ff29384dfc0d8f9d7c6d1974e26a3b57a2c3bef9f  artifacts/product_facets.csv" \
+                                      | sha256sum -c -
+
+                                    echo "A Labeling product_facets.csv 검증 완료"
+                                '''
+                            }
+                        }
+
                         container('kaniko') {
                             sh '''
                                 set -eu
