@@ -1,5 +1,32 @@
 # Part A Labeling Smoke Test
 
+## 2026-10-02 최신 확인 범위
+
+- 전체 로컬 회귀: `1189 passed`, 실패·skip 0건. FastAPI HTTP 의존성을 갖춘
+  환경에서 실행해 과거 HTTP skip도 해소했다. Mock 서버 계약 검증과 실제 서비스
+  품질 평가는 구분한다.
+- 실제 A 배포 이미지: `labeling-develop-567a99e`, image digest
+  `sha256:868276c6a547f61e0a890b39994c13996115bbf2dcd8073f00866258b788c108`.
+- 같은 배포 이미지를 `moongcheap-ai-test`에서 실행해 runtime UID/GID `65534:65534`,
+  `/artifacts/product_facets.csv` 소유자 `65534:65534`, 권한 `0400`, 크기
+  `414665` bytes 및 SHA-256
+  `508ba2d9b49a48dfad06342ff29384dfc0d8f9d7c6d1974e26a3b57a2c3bef9f`를 확인했다.
+  non-root 실행 계정이 실제 파일을 읽고 해시를 계산할 수 있다.
+- 같은 이미지의 batch CLI를 합성 빈 요구사항 1건으로 실행했다:
+  `rows=1`, `LABELED=1`, `label=3-0-0`, `backend=DRY_RUN`.
+  DB 쓰기와 LLM 호출을 비활성화한 원상품 기본값 검사다.
+- 실제 A DB 계정 `ai_labeling`의 demand SELECT와 `label`, `processed_at` UPDATE
+  권한을 확인했다. 이미 처리된 실제 수요는 재조회 적격 0건이며 실제 writer를
+  같은 결과로 호출해 UPDATE 0건과 저장값 불변을 확인했다. 수요를 초기화하거나
+  새 DB 행을 생성하지 않았다.
+- 전날 비영 운영 배치 1건·DB 저장 1건 기록은 과거 실행 기록으로 구분했다.
+  이번 DB 재조회로 해당 label과 처리 시각은 확인했지만 그날의 원본 Job 로그를
+  새로 확보한 것은 아니다. 10월 2일 14:15 KST 최신 확인 Job은 `rows=0`,
+  `updatedCount=0`으로 완료했다. 빈 성공을 새 비영 DB·LLM 연동 시험으로 세지 않는다.
+- 아래 10월 1일 로컬 검증 당시의 '배포 미확인', 'HTTP skip'은 당시 상태다.
+  이미지 포함·읽기 권한 확인은 위 결과로 갱신되었으며 최신 이미지/설정으로
+  다시 배포하면 같은 검사를 반복한다.
+
 ## 2026-10-01 product-baseline policy update
 
 Current behavior supersedes the historical REVIEW persistence statements below:
@@ -30,20 +57,20 @@ Current behavior supersedes the historical REVIEW persistence statements below:
   valid baseline: confirmed values are used and unknown dimensions receive
   `ALL(0)`. A missing whole product profile or Category/taxonomy remains
   retryable. Parser `status` is diagnostic; `label_status` controls persistence.
-- This change has been locally tested and built into a local image. A CI/ECR
-  image built from the reviewed revision and a non-zero dev batch are still
-  required before claiming deployment verification.
+- At the time of this local run, deployment verification was pending. The
+  dated 2026-10-02 section above records subsequent deployed-image and DB checks.
 - A locally prepared artifact is present at `artifacts/product_facets.csv`
   (SHA-256 `508ba2d9b49a48dfad06342ff29384dfc0d8f9d7c6d1974e26a3b57a2c3bef9f`),
   but `.gitignore` excludes it. A Git checkout/Jenkins build therefore will not
   receive it unless it is separately staged in the build input. The deployed
-  image's contents were not inspected in this run; verify this exact artifact
-  hash at `/artifacts/product_facets.csv` inside the image before running
+  image's contents were not inspected in this historical local run; the newer
+  section above confirms the deployed hash. Verify the release artifact
+  hash at `/artifacts/product_facets.csv` inside each new image before running
   any database batch, including an empty batch.
 - The older 5,000-row smoke results below predate this product-baseline policy
   and do not verify the current rule that product Facets seed each label.
 
-## 2026-10-01 local regression verification
+## 2026-10-01 local regression verification (historical)
 
 - A-focused regression (runtime, product mapping, and DB reader): `127 passed`.
 - Full repository regression, rerun with localhost mock-server permission:

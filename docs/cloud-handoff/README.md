@@ -1,6 +1,11 @@
 # 인프라 인계 — 생성형 AI 파트
 
-Cloud 저장소에 직접 올리지 않고, 인프라가 그대로 가져다 쓸 수 있는 형태로 이 폴더에 둔다.
+> **역사 기록 — 2026-09-21 협의 당시 기준.** 아래 '지금', '교체', '확인 요청'은
+> 당시 상황을 뜻하며 현재 미해결 요청이나 배포 지시가 아니다. 이 예시를 현행
+> Cloud 파일에 그대로 덮어쓰지 않는다. 현재 CI는 루트 `Jenkinsfile`에서 네 컴포넌트를
+> 처리하며 ECR 공용 저장소 `moongcheap/ai`의 컴포넌트·환경·SHA 태그를 사용한다.
+
+Cloud 저장소에 직접 올리지 않고, 당시 인계 예시를 이 폴더에 보관한다.
 이 폴더는 과거 Cloud 확인 내용을 보관한 참고 자료다. 현재 B 실행 계약은
 `k8s/README.md`, `docs/DEMAND_CLUSTERING_CONTAINER.md`,
 `docs/ci-cd-demand-clustering-handoff.yml`을 기준으로 한다. Cloud `develop`의
