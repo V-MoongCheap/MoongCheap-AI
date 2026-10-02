@@ -12,7 +12,7 @@
 2. **Demand Clustering**
    - 동일 `catalog_id`를 우선하고 Facet 호환성, 가격, 수량, `is_substitutable`을 비교합니다.
    - Cluster는 `demand_board`로 표현합니다.
-   - V0는 Rule 기반이며 Embedding/Hybrid는 평가 결과가 있을 때만 도입합니다.
+   - 보드 생성·편입은 결정론적 규칙을 사용하며, CPU E5는 PASSTHROUGH 자연어 선호 순위에만 사용합니다. 오프라인 E5 상품 검색 실험과 운영 경로는 구분합니다.
    - 신규 Board는 높은 Price Band의 인접 window부터 결정론적으로 판정합니다.
    - 인접 Band는 낮은 Band 참여자가 높은 Band 참여자 이상일 때 묶고, Board 가격은 낮은 Band를 사용합니다.
    - 기존 Board 자동 편입은 동일 `catalog_id`와 동일 Price Band에만 허용하며, 기존 Board가 없는 Demand만 신규 Board 형성 대상으로 사용합니다.
@@ -36,7 +36,7 @@
 3. **Seller Offer Matching and Seller Demand Analysis**
    - Seller Offer는 `product`, 매칭 결과는 `product_award_evaluation`을 사용합니다.
    - Matching은 Rule/Score 기반으로 재현 가능해야 합니다.
-   - 분석 수치는 SQL/Python 집계가 원천이고, LLM은 필요 시 설명만 생성합니다.
+   - 현재 분석 구현은 SQL/Python 집계와 고정 템플릿 설명을 사용하며 생성 LLM을 호출하지 않습니다.
    - Seller Demand Analysis 구현은 저장소에 남아 있으나 현재 제품 범위와 배포 포함 여부는 PM 확정 전입니다. 구현 존재와 MVP 승인 상태를 혼동하지 않습니다.
 
 ## 담당 범위
@@ -63,7 +63,7 @@
 
 아래는 공통·타 파트의 협의 항목이며, B파트의 현재 실행 계약은 위에 별도로 정리합니다.
 
-- Embedding 사용 여부와 모델
+- 현재 B의 `intfloat/multilingual-e5-small` 선호 점수화 이외의 Embedding 확장
 - Vector DB 및 모델 서버 구성
 - Facet/Label/Cluster/Matching Weight
 - Cluster Threshold와 가격 Compatibility 공식

@@ -1,5 +1,11 @@
 # Backend `product_catalog` Export 연동
 
+> 아래는 최초 `result.csv` 수신 당시의 Export 계약이다. 당시 파일에
+> `category_id`가 없었다는 사실을 현재 DB에도 컬럼이나 매핑이 없다는 뜻으로
+> 해석하지 않는다. 현재 A DB reader는 `product_catalog.category_id → category.facet`
+> 조인을 사용하며 실제 Backend ID 기반 상품 profile을 참조한다. 최신 실행 계약과
+> 확인 범위는 `A_LABELING_RUNTIME_HANDOFF.md`, `A_LABELING_SMOKE_TEST.md`를 따른다.
+
 ## 확인된 Export
 
 `result.csv`는 Backend의 실제 `product_catalog` Export로 확인되었다.
@@ -25,7 +31,7 @@ PYTHONPATH=src .venv/bin/python \
 - `backend_catalog_id_mapping_v1.csv`: Backend 실제 `product_catalog.id`와 AI canonical 상품 연결
 - `backend_catalog_id_mapping_v1.json`: 건수·매칭 방식·제약 보고서
 
-## 중요한 제한
+## 당시 Export의 제한
 
 이 Export에는 `category_id`가 없으므로 `category_key` 또는 AI seed의
 `source_category_id`를 Backend `category.id`로 사용하지 않는다. 숫자 범위나

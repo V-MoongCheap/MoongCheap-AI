@@ -13,7 +13,8 @@
 | Model 1 입력 | `MODEL1_MULTISOURCE_INPUTS_V1.md`, `MODEL1_MULTISOURCE_SOURCE_POLICY_V1.md` | 상품·판매자·명시적 Category Evidence의 역할과 제외 경계 |
 | Backend/Part B 연계 | `PART_B_V22_INTEGRATION.md` | V2.2 taxonomy, catalog profile, Labeling 경계 |
 | 로컬 E2E | `MVP_E2E_HANDOFF.md` | CSV 기반 B/C 통합 테스트 흐름 |
-| 배포/인프라 | `A_LABELING_CONTAINER.md`, `DEMAND_CLUSTERING_CONTAINER.md`, `k8s/README.md` | 실제 DB·Secret·EKS 연결 전의 배포 계약 |
+| 배포/인프라 | `A_LABELING_CONTAINER.md`, `DEMAND_CLUSTERING_CONTAINER.md`, `k8s/README.md` | 이미지·환경 변수·Secret·실행 계약. 저장소 base와 실제 Cloud overlay를 구분 |
+| A 실행 검증 | `A_LABELING_SMOKE_TEST.md` | 날짜별 실제 배포·DB 확인과 로컬 회귀 범위. 빈 배치와 비영 배치를 구분 |
 
 ## 역사적·진단용 문서
 
@@ -22,6 +23,7 @@
 - `HEALTH_FOUNDATION_V0.md`: 초기 건강기능식품 foundation 산출물 설명이다.
 - `CODEX_HANDOFF.md`: 현재 저장소로 갱신된 인수인계 문서지만, 경로에 표시된 데이터는 로컬 전용이다.
 - `MODEL_BENCHMARK.md`: 바코드 중복 기반 Proxy 평가 기록이며, 검증된 정답셋의 운영 정확도가 아니다.
+- `cloud-handoff/README.md` 및 같은 폴더의 예시: 2026-09-21 당시 Cloud 협의 기록이며 현재 배포에 그대로 적용하는 교체 지시가 아니다.
 
 파일명에 `V0`, `V1`, `V2.1`이 포함된 것은 산출물 또는 실험 버전이다. 원천기관 공식 버전으로 해석하지 않는다.
 

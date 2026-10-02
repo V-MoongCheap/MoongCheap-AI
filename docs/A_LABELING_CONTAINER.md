@@ -32,10 +32,15 @@ Runtime entrypoint는 `a-labeling-batch --write-db --output /tmp/a-labeling-outp
 `artifacts/product_facets.csv`는 Git에서 제외되는 release input이므로 CI가 별도 공급해야
 한다. 이 파일이 없거나 비어 있으면 A 이미지 빌드는 실패하며, 성공한 빌드 로그에
 CSV SHA-256이 기록된다. 배포 전에는 이미지 내부 파일의 SHA-256과 release 전달값을 대조한다.
+Dockerfile은 CSV 소유자를 runtime UID/GID `65534:65534`로 바꾸고 권한을 `0400`으로
+고정한다. root 소유의 `0400` 파일은 non-root 실행 계정이 읽을 수 없으므로 허용하지
+않는다. 배포 검증은 실행 계정의 `id`, 파일 소유자·권한 및 실제 `sha256sum` 성공을
+함께 확인한다. Pod에서 수동 chmod하는 대신 이미지 빌드에서 이 계약을 유지한다.
 
-Jenkins 보안 검사 단계는 전용 Trivy/Gitleaks 컨테이너를 자체 Pod 설정으로
-선언한다. Cloud의 기본 `python-builder`에 이 컨테이너들이 있다고 가정하지 않는다.
-Python 테스트는 `uv sync --python 3.13.12`로 이미지와 같은 버전을 선택한다.
+CI 단계와 빌드 입력 공급 방식은 저장소 루트 `Jenkinsfile`을 기준으로 한다.
+현재 A 빌드 단계는 별도 CSV 공급과 고정 SHA-256 검증 후 Kaniko로 이미지를 빌드한다.
+보안 검사 컨테이너가 항상 존재한다고 가정하지 않는다. A Python 테스트는
+`uv sync --python 3.13.12`로 이미지와 같은 버전을 선택한다.
 
 ## Model 2 fallback
 
@@ -127,7 +132,7 @@ Cloud의 fallback 활성화 값이 `false`이면 A는 Rule/Alias만 실행하고
 준비된 뒤 다음 값을 배포 환경에 주입한다.
 
 - `A_LLM_ENABLED=true`
-- `A_LLM_MODEL=qwen2.5:7b-instruct` (현재 운영 후보)
+- `A_LLM_MODEL=qwen2.5:7b-instruct` (선택된 Model 2 fallback 모델)
 - `A_LLM_ENDPOINT=http://ollama:11434` (Cloud develop의 Ollama API 기준)
 - A CronJob이 참조하는 `ai-labeling-database` Secret과 `url` key
 
