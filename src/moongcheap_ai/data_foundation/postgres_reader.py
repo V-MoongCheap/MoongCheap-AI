@@ -203,8 +203,11 @@ def read_unprocessed_demands(
     as_of: datetime | None = None,
     query: str | None = None,
     category_mapping_path: Path | None = None,
+    max_rows: int = 10000,
 ) -> pd.DataFrame:
-    """Read labeling inputs without performing database writes."""
+    """Read a bounded snapshot; remaining demands stay pending, never dropped."""
+    if isinstance(max_rows, bool) or not isinstance(max_rows, int) or max_rows < 1:
+        raise ValueError("max_rows must be a positive integer")
     custom_query = query is not None
     query = query or DEFAULT_DEMANDS_SQL
     has_category_id = True
@@ -217,13 +220,14 @@ def read_unprocessed_demands(
         else:
             if has_category_id:
                 cursor.execute(
-                    DEFAULT_DEMANDS_SQL_WITH_CATEGORY,
+                    DEFAULT_DEMANDS_SQL_WITH_CATEGORY + f"\nLIMIT {max_rows}",
                     {"as_of": as_of} if as_of is not None else None,
                 )
                 frame = _frame_from_cursor(cursor)
+                frame["category_snapshot_from_db"] = True
             else:
                 cursor.execute(
-                    DEFAULT_DEMANDS_SQL,
+                    DEFAULT_DEMANDS_SQL + f"\nLIMIT {max_rows}",
                     {"as_of": as_of} if as_of is not None else None,
                 )
                 frame = _frame_from_cursor(cursor)

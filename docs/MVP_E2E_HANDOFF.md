@@ -1,5 +1,13 @@
 # Local MVP E2E Handoff
 
+> **Historical CSV baseline, not current production B QA.** The rules below
+> can form groups with fewer than five members and combine catalogs differently
+> from the current B board planner. Stored 863-group demo results must not be
+> reported as a fresh run satisfying the five-participant board policy.
+> The separate `mvp_pipeline` A stage now uses the current A runtime; its B
+> summary explicitly reports legacy groups and consent, not created boards or
+> accepted substitute joins. See `A_AUDIT_FIXES_20261004.md`.
+
 ## Flow
 
 ```text

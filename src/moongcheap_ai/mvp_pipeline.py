@@ -1,8 +1,9 @@
-"""Operational CSV MVP entry point for the V2.2 A -> B pipeline.
+"""Local A runtime plus a legacy CSV clustering demonstration.
 
 The production adapters remain available in ``data_foundation.runtime_job``
 and ``demand_clustering.runtime_job``.  This entry point provides a repeatable
 local dry-run while Backend/PostgreSQL credentials are not available.
+The clustering stage is NOT the production board/substitution planner.
 """
 
 from __future__ import annotations
@@ -16,11 +17,7 @@ from typing import Any
 
 import pandas as pd
 
-from .data_foundation.labeling import (
-    build_product_facet_map,
-    label_demands,
-    load_taxonomy,
-)
+from .data_foundation.runtime_job import run_batch
 from .demand_clustering.baseline import cluster_demands, summarize_clusters
 
 DEFAULT_TAXONOMY = Path("config/facet_taxonomy_v2_2.json")
@@ -69,68 +66,8 @@ class ReviewedAliasMatcher:
 def _apply_aliases(
     frame: pd.DataFrame, matcher: ReviewedAliasMatcher
 ) -> tuple[pd.DataFrame, int, int, int]:
-    output = frame.copy()
-    alias_hits = 0
-    conflicts = 0
-    corrected_hits = 0
-    row_conflicts: list[bool] = []
-    for index, row in output.iterrows():
-        # Alias interpretation may overlay a complete, validated product
-        # baseline only. It must not turn a missing-profile REVIEW row into a
-        # partial-looking label.
-        if str(row.get("label_status", "")).upper() != "LABELED":
-            row_conflicts.append(False)
-            continue
-        matches = matcher.resolve(
-            str(row.get("category_id", "")), row.get("extra_requirement", "")
-        )
-        if not matches:
-            row_conflicts.append(False)
-            continue
-        chosen_by_facet: dict[str, dict[str, Any]] = {}
-        current_row_conflict = False
-        for match in matches:
-            if (
-                match["facet_name"] in chosen_by_facet
-                and chosen_by_facet[match["facet_name"]]["code"] != match["code"]
-            ):
-                conflicts += 1
-                current_row_conflict = True
-                continue
-            chosen_by_facet[match["facet_name"]] = match
-        if current_row_conflict:
-            row_conflicts.append(True)
-            continue
-        current = json.loads(str(row.get("facet_values", "{}") or "{}"))
-        for facet_name, match in chosen_by_facet.items():
-            current[facet_name] = {
-                "code": match["code"],
-                "value": match["value"],
-                "matched_alias": match["matched_alias"],
-            }
-            alias_hits += 1
-            corrected_hits += int(match["canonical_value"] != "")
-        output.at[index, "facet_values"] = json.dumps(
-            current, ensure_ascii=False, separators=(",", ":")
-        )
-        row_conflicts.append(False)
-        # The taxonomy loader already encoded the canonical facet order. Replace only
-        # the affected code positions through the existing label where possible.
-        label_parts = str(row.get("label", "")).split("-")
-        if len(label_parts) >= len(current):
-            facet_names = list(current)
-            for position, facet_name in enumerate(facet_names):
-                if facet_name in chosen_by_facet:
-                    label_parts[position] = str(chosen_by_facet[facet_name]["code"])
-            output.at[index, "label"] = "-".join(label_parts)
-    output["_alias_conflict"] = row_conflicts
-    return output, alias_hits, corrected_hits, conflicts
-
-
-def _load_product_facets(path: Path | None) -> dict[str, list[dict[str, Any]]] | None:
-    if not path or not path.is_file():
-        return None
-    return build_product_facet_map(pd.read_csv(path, dtype=str).fillna(""))
+    """Deprecated: an unvalidated substring overlay must never mutate labels."""
+    raise RuntimeError("Use data_foundation.runtime_job.run_batch for A interpretation")
 
 
 def label_batch(
@@ -147,30 +84,28 @@ def label_batch(
     pending = source[source["processed_at"].astype(str).str.strip().eq("")].copy()
     skipped = len(source) - len(pending)
     if limit is not None:
+        if limit < 1:
+            raise ValueError("limit must be positive")
         pending = pending.head(limit)
-    loader = load_taxonomy(taxonomy_path)
-    labeled = label_demands(
-        pending, loader, product_facet_map=_load_product_facets(product_facets_path)
-    )
-    matcher = ReviewedAliasMatcher(alias_registry_path)
-    labeled, alias_hits, corrected_hits, _alias_conflicts = _apply_aliases(
-        labeled, matcher
-    )
     now = datetime.now(UTC).isoformat()
+    labeled, _ = run_batch(
+        pending, taxonomy_path, product_facets_path=product_facets_path,
+        alias_registry_path=alias_registry_path, processed_at=now,
+    )
+    taxonomy_version = str(json.loads(taxonomy_path.read_text(encoding="utf-8")).get("version", ""))
+    alias_version = str(json.loads(alias_registry_path.read_text(encoding="utf-8")).get("version", ""))
     statuses: list[str] = []
     for _, row in labeled.iterrows():
         warnings = json.loads(str(row.get("label_warnings", "[]") or "[]"))
         if str(row.get("label_status", "")).upper() != "LABELED":
             statuses.append("UNRESOLVED")
-        elif bool(row.get("_alias_conflict", False)):
-            statuses.append("CONFLICT")
         elif warnings:
             statuses.append("PARTIALLY_RESOLVED")
         else:
             statuses.append("RESOLVED")
     labeled["pipeline_status"] = statuses
-    labeled["taxonomy_version"] = "v2.2"
-    labeled["alias_registry_version"] = matcher.version
+    labeled["taxonomy_version"] = taxonomy_version
+    labeled["alias_registry_version"] = alias_version
     labeled["processed_at"] = (
         labeled["pipeline_status"]
         .isin({"RESOLVED", "PARTIALLY_RESOLVED"})
@@ -185,9 +120,10 @@ def label_batch(
         "unresolved": statuses.count("UNRESOLVED"),
         "conflicts": statuses.count("CONFLICT"),
         "failed": 0,
-        "alias_hits": alias_hits,
-        "corrected_alias_hits": corrected_hits,
-        "taxonomy_version": "v2.2",
+        "alias_hits": 0,
+        "corrected_alias_hits": 0,
+        "alias_metric_note": "Legacy substring-overlay metrics removed; use runtime constraint diagnostics",
+        "taxonomy_version": taxonomy_version,
         "elapsed_seconds": 0.0,
     }
     return labeled, summary
@@ -262,10 +198,13 @@ def run_local_e2e(
         encoding="utf-8-sig",
     )
     cluster_summary = {
+        "execution_mode": "LEGACY_CSV_GROUPING_NOT_PRODUCTION_BOARDS",
         "processed": 0 if label_only else len(eligible),
         "joined_existing": 0,
-        "created_new": 0 if label_only else len(clusters),
-        "substitute_joined": 0
+        "created_new": 0,
+        "group_count": 0 if label_only else len(clusters),
+        "substitute_joined": 0,
+        "substitution_consent_count": 0
         if label_only
         else int(
             eligible.get("is_substitutable", pd.Series(dtype=str))
@@ -281,6 +220,8 @@ def run_local_e2e(
         "elapsed_seconds": round(time.perf_counter() - started, 6),
     }
     result = {
+        "execution_mode": "LOCAL_A_RUNTIME_WITH_LEGACY_B_GROUPING",
+        "production_board_validation": "NOT_PERFORMED",
         "pipeline_status": "COMPLETED",
         "taxonomy_version": "v2.2",
         "labeling": label_summary,

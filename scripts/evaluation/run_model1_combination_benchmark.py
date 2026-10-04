@@ -12,6 +12,7 @@ from typing import Any
 import pandas as pd
 
 from moongcheap_ai.data_foundation.model1 import ModelCallError, parse_model_output
+from moongcheap_ai.data_foundation.model1_consensus import gate_observed_candidates, select_consensus
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.evaluation.run_model1_advanced_technique_benchmark import _summary
 from scripts.evaluation.run_model1_technique_benchmark import (
@@ -32,10 +33,7 @@ def _call(endpoint: str, model: str, instruction: str, category: str, rows: list
 
 
 def _gate(frame: pd.DataFrame, rows: list[dict[str, Any]]) -> pd.DataFrame:
-    if frame.empty:
-        return frame
-    evidence_blob = " ".join(str(value) for row in rows for value in row.values()).casefold()
-    return frame[frame["value"].astype(str).map(lambda value: bool(value.strip()) and value.casefold() in evidence_blob)].copy()
+    return gate_observed_candidates(frame, rows)
 
 
 def main() -> None:
@@ -55,6 +53,11 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     source = [json.loads(line) for line in args.input.read_text(encoding="utf-8").splitlines() if line.strip()][:args.max_categories]
     combinations = tuple(item.strip() for item in args.combinations.split(",") if item.strip())
+    allowed = {"fewshot_gate", "fewshot_summary_gate", "adaptive_gate",
+               "fewshot_consistency_gate", "adaptive_support_gate",
+               "fewshot_summary_consistency_gate", "fewshot_verifier_gate"}
+    if args.repeats < 1 or args.max_categories < 1 or not combinations or set(combinations) - allowed:
+        parser.error("positive repeats/max-categories and known combinations are required")
     records: list[dict[str, Any]] = []
     for repeat in range(1, args.repeats + 1):
         for combination in combinations:
@@ -104,13 +107,7 @@ def main() -> None:
                             attempts.append(_gate(draft, rows))
                         error = error or attempt_error
                     if attempts:
-                        votes: dict[tuple[str, str], int] = {}
-                        for frame in attempts:
-                            for row in frame.to_dict("records"):
-                                key = (str(row.get("name", "")).casefold(), str(row.get("value", "")).casefold())
-                                votes[key] = votes.get(key, 0) + 1
-                        accepted = {key for key, count in votes.items() if count >= 2}
-                        selected = attempts[0][attempts[0].apply(lambda row: (str(row.get("name", "")).casefold(), str(row.get("value", "")).casefold()) in accepted, axis=1)]
+                        selected = select_consensus(attempts, 3)
                 elif combination == "fewshot_verifier_gate":
                     calls += 1
                     draft, error = _call(args.endpoint, args.model, FEWSHOT, category, rows, args.temperature)
@@ -136,13 +133,7 @@ def main() -> None:
                             attempts.append(_gate(draft, rows))
                         error = error or attempt_error
                     if attempts:
-                        votes: dict[tuple[str, str], int] = {}
-                        for frame in attempts:
-                            for row in frame.to_dict("records"):
-                                key = (str(row.get("name", "")).casefold(), str(row.get("value", "")).casefold())
-                                votes[key] = votes.get(key, 0) + 1
-                        accepted = {key for key, count in votes.items() if count >= 2}
-                        selected = attempts[0][attempts[0].apply(lambda row: (str(row.get("name", "")).casefold(), str(row.get("value", "")).casefold()) in accepted, axis=1)]
+                        selected = select_consensus(attempts, 3)
                 failures += int(bool(error))
                 if not selected.empty:
                     successes += 1

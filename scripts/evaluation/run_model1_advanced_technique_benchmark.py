@@ -13,6 +13,7 @@ from typing import Any
 import pandas as pd
 
 from moongcheap_ai.data_foundation.model1 import ModelCallError, parse_model_output
+from moongcheap_ai.data_foundation.model1_consensus import gate_observed_candidates
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -64,6 +65,9 @@ def main() -> None:
     args = parser.parse_args()
     source = [json.loads(line) for line in args.input.read_text(encoding="utf-8").splitlines() if line.strip()][:args.max_categories]
     techniques = tuple(item.strip() for item in args.techniques.split(",") if item.strip())
+    allowed = {"adaptive_fallback", "prompt_ensemble", "category_summary", "two_stage_verifier", "evidence_support_gate"}
+    if args.max_categories < 1 or not techniques or set(techniques) - allowed:
+        parser.error("positive max-categories and known techniques are required")
     results: list[dict[str, Any]] = []
     for technique in techniques:
         started = time.perf_counter()
@@ -110,6 +114,7 @@ def main() -> None:
                     evidence_blob = " ".join(str(value) for row in rows for value in row.values()).casefold()
                     selected = draft[draft["value"].astype(str).map(lambda value: bool(value) and value.casefold() in evidence_blob)]
                 failures += int(bool(error))
+            selected = gate_observed_candidates(selected, rows)
             if not selected.empty:
                 successes += 1
                 accepted.append(selected)

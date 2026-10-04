@@ -2,7 +2,14 @@
 
 ## 10. 실험 결과
 
-본 문서는 기존 `Model & Experiment Plan`의 10번 이후 결과를 최신 실험 기준으로 갱신한 보고서다.
+본 문서는 기존 `Model & Experiment Plan`의 10번 이후를 작성 당시 실험 결과로
+정리한 기록이다. 아래 200건 Rule/Model/Hybrid 비교는 product defaults가 비어 있던
+과거 비교이며 현재 원상품 기본값 정책의 운영 정확도가 아니다. 최신 parser
+재평가는 `MODEL_SELECTION_STATUS_V2.md`, A 배포 검증은
+`A_LABELING_SMOKE_TEST.md`를 따른다. 과거 실험값은 재현 기록으로 유지한다.
+
+2026-10-04의 출력 Schema/생성별 투표 수정 이후 결과와 아래 과거 Model 1
+기록을 혼합하지 않는다. 수정 후 계약은 [A 검증 정책](A_RUNTIME_VALIDATION_POLICY.md)을 따른다.
 
 평가 데이터는 프로젝트용 합성·검토 데이터다. 실제 운영 사용자로부터 수집한 Gold Set이 아니므로, 아래 수치는 모델의 일반화 성능을 증명하는 수치가 아니라 현재 MVP 방식의 상대 비교 결과로 해석한다.
 

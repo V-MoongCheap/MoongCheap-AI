@@ -1,5 +1,14 @@
 # Model 1 고도화 실험 결과 V1
 
+> 2026-10-04 후속 점검: consistency의 생성별 투표와 원본 source별 Evidence Gate를 공용화했다. 검증용 생성 draft는 근거로 인정하지 않는다. 아래 수치는 이 수정 이전 구현의 실행 기록이며, 최신 방식의 의미 정확도나 현재 성능으로 인용하지 않는다. [후속 기준](A_AUDIT_FIXES_20261004.md) 참조.
+
+> 이 문서는 기법별 실험 시점의 보존 결과다. 단독 Category Summary 실험의
+> '미적용' 판단을 후속 조합 실험에도 적용하지 않는다. 2026-10-02 동일 30 Category
+> × 3회 재평가에서 Few-shot + Category Summary + Evidence Gate의 평균 유효 후보
+> 생성률은 88.89%, 값 근거율 100%였으며 Few-shot + Evidence Gate는 각각
+> 84.44%, 97.43%였다. 이는 출력·근거 지표이지 의미적 Precision/Recall이 아니다.
+> 아래 과거 수치는 해당 실행 조건의 기록으로 유지한다.
+
 ## 실험 범위
 
 동일한 1,200개 Domeggook 상품 코퍼스를 기준으로, 현재 저장소에 남아 있는 재현 가능한 Model 1 고도화 결과를 비교했다.
@@ -15,6 +24,12 @@
 | Self-consistency 3회, 2표 이상 채택 | Qwen3 4B | 21/30 (70.0%) | 90 | 7 | 461.0초 |
 
 ### Self-consistency
+
+> 2026-10-04 정정: 과거 비교 스크립트가 evidence 행을 생성별 투표처럼 집계한
+> 문제가 확인되어 수정했다. 아래 과거 self-consistency 수치는 당시 코드의 기록이며,
+> 수정 후 독립 생성별 엄격 과반수 결과로 인용하지 않는다. 일반 prompt의 출력 Schema도
+> 명시하도록 수정했으므로 과거 prompt 비교와 새 실행을 구분한다.
+> 현행 기준은 [A 검증 정책](A_RUNTIME_VALIDATION_POLICY.md)을 따른다.
 
 단일 생성 대비 카테고리 처리 성공률은 56.7%에서 70.0%로 상승했다. 그러나 호출 수는 38회에서 90회, 실행시간은 264.9초에서 461.0초로 증가했다.
 
@@ -142,7 +157,7 @@ Adaptive Fallback은 성공률만 보면 높지만 근거율이 100%가 아니�
 - Model-only Taxonomy 자동 확정: 관찰 증거가 없어 오탐 위험이 크다.
 - Qwen2.5 7B 기본 채택: 동일 성공률에 더 긴 시간과 더 많은 실패가 발생했다.
 - Evidence retrieval 축소: 성공률은 40.0%였고 값 근거율이 83.33%로 낮아 기본 적용하지 않는다.
-- Prompt ensemble, category summary, two-stage verifier: Few-shot + grounding 대비 유의미한 개선이 없어 기본 적용하지 않는다.
+- 당시 단독 Prompt ensemble, category summary, two-stage verifier 실험에서는 Few-shot + grounding 대비 유의미한 개선이 없었다. 후속 Category Summary 조합 실험은 위 최신 기록과 구분한다.
 
 ## 아직 정량 확정할 수 없는 방식
 

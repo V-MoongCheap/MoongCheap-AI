@@ -24,11 +24,15 @@ Qwen은 이미 `PARSED` 또는 `NONE`인 Rule 결과를 덮어쓰지 않는다. 
 | Partition | Row pass |
 | --- | ---: |
 | DEV | 100/100 (100%) |
-| HOLDOUT | 50/50 (100%) |
-| CHALLENGE | 50/50 (100%) |
-| Overall | 200/200 (100%) |
+| HOLDOUT | 31/50 (62%) |
+| CHALLENGE | 15/50 (30%) |
+| Overall | 146/200 (73%) |
 
-이 Gold는 합성·검토 데이터이므로 실제 사용자 정확도의 증명으로 사용하지 않는다. LLM fallback은 이 baseline을 안정적으로 개선하는 경우에만 채택한다.
+2026-10-02 `evaluate_part_a_gold_v2_2.py --partition ALL`의 parser 평가 결과다.
+DEV는 기존 회귀 테스트에 노출된 사례이며 신규 HOLDOUT+CHALLENGE는 46/100이다.
+원상품 기본값과 실제 LLM fallback을 포함한 운영 Label 정확도와 구분한다.
+이 Gold는 합성·검토 데이터이므로 실제 사용자 정확도의 증명으로 사용하지 않는다.
+LLM fallback은 이 baseline을 안정적으로 개선하는 경우에만 채택한다.
 
 ### Model 1 Hybrid smoke
 
@@ -143,6 +147,10 @@ PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
 실제 모델 가중치·Ollama/Hugging Face/API 환경이 없는 경우에는 모델을 실행한 것처럼 처리하지 않고, 해당 후보를 `NOT_RUN`으로 기록한다.
 
 ### Model 1 최종 모델 확정 보충
+
+> 아래 수치는 과거 실행 기록이다. 2026-10-04의 prompt Schema 및 생성별 투표 집계
+> 수정 이후 성능으로 간주하지 않는다. 모델 선정 자체와 신규 코드의 재평가는 별개이며
+> 현행 검증 계약은 [A 검증 정책](A_RUNTIME_VALIDATION_POLICY.md)을 따른다.
 
 기존 Kanana 실행 결과와 동일 조건의 Qwen3 4B 결과를 비교했다.
 

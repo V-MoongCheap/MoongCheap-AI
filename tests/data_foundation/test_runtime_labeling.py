@@ -962,7 +962,10 @@ def test_model_cannot_assign_a_facet_without_matching_text_evidence(
         ],
     )
     assert values["form"]["value"] == "분말"
-    assert any("lacks matching text evidence" in warning for warning in warnings)
+    # An unchanged product baseline is not a model-generated consumer fact.
+    # It must not be rejected solely because the consumer did not repeat it.
+    assert not warnings
+    assert values["form"].get("matched_alias") != "LLM"
 
 
 @pytest.mark.parametrize("model_values", [None, {"code": None, "value": None}])

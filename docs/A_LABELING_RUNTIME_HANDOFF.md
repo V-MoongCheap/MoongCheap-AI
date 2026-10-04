@@ -1,5 +1,7 @@
 # A파트 연결 실행 계약
 
+> 2026-10-04: A 실행 경로 통합, DB chunk checkpoint/시간 예산, Gold 숫자 코드 검증 및 이미지 지문은 [전체 점검 후 A 기준](A_AUDIT_FIXES_20261004.md)을 따른다. DB 쓰기는 이제 전체 배치가 아니라 chunk 단위 원자성이다.
+
 ## 흐름
 
 ```text
@@ -80,19 +82,22 @@ python -m moongcheap_ai.data_foundation.runtime_job `
 - `A_BACKEND_HTTP_TIMEOUT_SECONDS`: 기본 15초
 - `A_LLM_ENABLED`: Model 2 보조를 활성화할 때 `true`로 설정한다. 기존 Cloud 호환 변수인
   `A_MODEL2_FALLBACK_ENABLED=true`도 지원한다. 두 설정이 모두 꺼져 있으면 Rule/Alias만 실행한다.
-- `A_LLM_MODEL`: 사용할 LLM 모델 이름. 현재 후보는
+- `A_LLM_MODEL`: 선택된 Model 2 fallback 모델은
   `qwen2.5:7b-instruct` Q4다.
 - `A_LLM_ENDPOINT`: 현재 표준인 Ollama `/api/generate` endpoint. Cloud develop
   설정의 기본 주소는 `http://ollama:11434`이며, 실제 배치 위치에 따라 주입
   방식은 달라질 수 있다.
 - Cloud develop의 기존 `A_MODEL2_FALLBACK_*`, `A_MODEL2_OLLAMA_BASE_URL` 이름도
   과도기 호환용으로 읽지만, 새 설정의 표준 이름은 `A_LLM_*`다.
+  둘 다 설정하면 `A_LLM_*`가 우선하며, 모델 preflight와 generate는 동일한
+  endpoint/model을 사용한다. 명시적으로 비활성화한 alias는 다시 로드하지 않는다.
 - `A_LLM_TIMEOUT_SECONDS`: LLM 요청 timeout. 기본 300초
 - `A_LLM_PREFLIGHT_TIMEOUT_SECONDS`: 배치 시작 시 `/api/tags` 모델 존재 확인 timeout. 기본 10초.
   `A_LLM_ENABLED=true` 또는 `A_MODEL2_FALLBACK_ENABLED=true`일 때 확인한다. 모델이
   없거나 Ollama에 연결할 수 없으면 배치가 DB 접근/기록 전에 실패 종료하여 다음 회차에
   재시도한다. 단, Ollama 호출 후 개별 Demand의 해석이 실패·모호·근거 부족한 경우에는
-  완전하고 유효한 원상품 Facet profile을 사용한다. 설정 오류인 0 이하 timeout도 실패 처리한다.
+  유효한 원상품 Facet profile의 확인된 값만 사용하고 미확인 label 축은 `0`으로 둔다.
+  모든 Facet이 확정되어야 하는 것은 아니다. 설정 오류인 0 이하 timeout도 실패 처리한다.
 - `A_LLM_BATCH_SIZE`: 한 번에 보낼 행 수. 기본 5
 - `A_LLM_MAX_ROWS`: 한 페이지에 보낼 행 수를 제한하는 선택적 운영 설정이다.
   `0` 또는 미설정이면 미해결 행 전체를 한 실행에서 처리한다. 양수를 설정해도
@@ -107,6 +112,11 @@ B 호환 Alias 파일(`config/demand_constraint_aliases.json`)을 함께 포함�
 CSV dry-run 또는 고정 Artifact 검증에서는 `A_TAXONOMY_PATH`를 사용한다.
 
 Model 2 통신 계약은 현재 Ollama HTTP API를 기준으로 한다.
+
+원상품과 동일한 모델 반환값은 변경이 아니므로 요구 원문에 근거를 재요구하지 않는다.
+변경 값만 원문 근거 검증을 통과해야 한다. 예문·번역·역할 지시문은 구매 요구로
+승격하지 않는다. 상세 release/원자 값/폐기 값 정책은
+[A 검증 정책](A_RUNTIME_VALIDATION_POLICY.md)을 따른다.
 
 - Method: `POST`
 - Path: `/api/generate`

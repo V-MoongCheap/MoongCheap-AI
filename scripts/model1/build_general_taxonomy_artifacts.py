@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 STATUS = "DRAFT_PENDING_HUMAN_REVIEW"
 AUTO_STATUS = "AUTO_APPROVED_BY_STRICT_GATE"
 
@@ -27,16 +26,16 @@ def _normal(value: object) -> str:
 
 
 def build_taxonomy(hybrid: pd.DataFrame) -> dict[str, object]:
-    grounded = hybrid.loc[
-        hybrid["source"].eq("LLM_GROUNDED_AND_RULE_MATCHED")
-    ].copy()
+    grounded = hybrid.loc[hybrid["source"].eq("LLM_GROUNDED_AND_RULE_MATCHED")].copy()
     categories: list[dict[str, object]] = []
     for category_key, category_rows in grounded.groupby("category_key", sort=True):
         facets: list[dict[str, object]] = []
         for facet_index, (facet_name, facet_rows) in enumerate(
             category_rows.groupby("facet_candidate", sort=True), start=1
         ):
-            values = sorted({_normal(value) for value in facet_rows["value"] if _normal(value)})
+            values = sorted(
+                {_normal(value) for value in facet_rows["value"] if _normal(value)}
+            )
             facets.append(
                 {
                     "facet_id": facet_index,
@@ -70,12 +69,24 @@ def build_review_queue(
     hybrid: pd.DataFrame, model_candidates: pd.DataFrame, terms: pd.DataFrame
 ) -> pd.DataFrame:
     model = model_candidates.copy()
-    model["join_key"] = model["category_key"].map(_normal) + "|" + model["value"].map(_normal)
+    model["join_key"] = list(
+        zip(
+            model["category_key"].map(_normal),
+            model["name"].map(_normal),
+            model["value"].map(_normal),
+        )
+    )
     model = model.drop_duplicates("join_key")
     rows: list[dict[str, object]] = []
     for row in hybrid.to_dict(orient="records"):
-        key = _normal(row["category_key"]) + "|" + _normal(row["value"])
-        match = model.loc[model["join_key"].eq(key)]
+        key = (
+            _normal(row["category_key"]),
+            _normal(row["facet_candidate"]),
+            _normal(row["value"]),
+        )
+        match = model.loc[
+            model["join_key"].map(lambda item, expected=key: item == expected)
+        ]
         candidate = match.iloc[0].to_dict() if not match.empty else {}
         is_model = row["source"] == "LLM_GROUNDED_AND_RULE_MATCHED"
         rows.append(
@@ -103,7 +114,9 @@ def build_review_queue(
     return pd.DataFrame(rows)
 
 
-def automatic_gate(hybrid: pd.DataFrame, model_candidates: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def automatic_gate(
+    hybrid: pd.DataFrame, model_candidates: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Approve only grounded, non-self-describing model proposals.
 
     This removes mandatory manual review, but deliberately abstains on ambiguous
@@ -117,20 +130,42 @@ def automatic_gate(hybrid: pd.DataFrame, model_candidates: pd.DataFrame) -> tupl
     candidates["facet_norm"] = candidates["name"].map(_normal)
     candidates["category_norm"] = candidates["category_name"].map(_normal)
     candidates["auto_gate_reason"] = ""
-    candidates.loc[candidates["value_norm"].eq(candidates["facet_norm"]), "auto_gate_reason"] = "facet_name_equals_value"
+    candidates.loc[
+        candidates["value_norm"].eq(candidates["facet_norm"]), "auto_gate_reason"
+    ] = "facet_name_equals_value"
     candidates.loc[
         candidates["facet_norm"].eq(candidates["category_norm"]), "auto_gate_reason"
     ] = "facet_name_equals_category"
-    candidates.loc[
-        candidates["name"].str.strip().eq(""), "auto_gate_reason"
-    ] = "missing_facet_name"
-    candidates["join_key"] = candidates["category_key"].map(_normal) + "|" + candidates["value_norm"]
-    grounded["join_key"] = grounded["category_key"].map(_normal) + "|" + grounded["value"].map(_normal)
-    candidates = candidates.drop_duplicates("join_key")
-    accepted_keys = set(candidates.loc[candidates["auto_gate_reason"].eq(""), "join_key"])
+    candidates.loc[candidates["name"].str.strip().eq(""), "auto_gate_reason"] = (
+        "missing_facet_name"
+    )
+    candidates["join_key"] = list(
+        zip(
+            candidates["category_key"].map(_normal),
+            candidates["facet_norm"],
+            candidates["value_norm"],
+        )
+    )
+    grounded["join_key"] = list(
+        zip(
+            grounded["category_key"].map(_normal),
+            grounded["facet_candidate"].map(_normal),
+            grounded["value"].map(_normal),
+        )
+    )
+    # A disagreeing duplicate must never be resolved by input order.
+    rejected_keys = set(
+        candidates.loc[candidates["auto_gate_reason"].ne(""), "join_key"]
+    )
+    accepted_keys = (
+        set(candidates.loc[candidates["auto_gate_reason"].eq(""), "join_key"])
+        - rejected_keys
+    )
     accepted = grounded.loc[grounded["join_key"].isin(accepted_keys)].copy()
     rejected = candidates.loc[~candidates["join_key"].isin(accepted_keys)].copy()
-    rejected = rejected[["category_key", "category_name", "name", "value", "auto_gate_reason"]]
+    rejected = rejected[
+        ["category_key", "category_name", "name", "value", "auto_gate_reason"]
+    ]
     return accepted.drop(columns=["join_key"]), rejected
 
 
@@ -159,22 +194,34 @@ def main() -> None:
     (args.output_dir / "facet_taxonomy_v1.json").write_text(
         json.dumps(taxonomy, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    queue.to_csv(args.output_dir / "facet_review_queue_v1.csv", index=False, encoding="utf-8-sig")
-    coverage.to_csv(args.output_dir / "product_coverage_v1.csv", index=False, encoding="utf-8-sig")
+    queue.to_csv(
+        args.output_dir / "facet_review_queue_v1.csv", index=False, encoding="utf-8-sig"
+    )
+    coverage.to_csv(
+        args.output_dir / "product_coverage_v1.csv", index=False, encoding="utf-8-sig"
+    )
 
     grounded_count = int(hybrid["source"].eq("LLM_GROUNDED_AND_RULE_MATCHED").sum())
     report = {
         "status": STATUS,
         "model": "qwen3:4b",
         "input_products": len(coverage),
-        "covered_products": int((coverage["coverage_status"] != "NO_RELIABLE_FACET_EVIDENCE").sum()),
-        "unresolved_products": int((coverage["coverage_status"] == "NO_RELIABLE_FACET_EVIDENCE").sum()),
+        "covered_products": int(
+            (coverage["coverage_status"] != "NO_RELIABLE_FACET_EVIDENCE").sum()
+        ),
+        "unresolved_products": int(
+            (coverage["coverage_status"] == "NO_RELIABLE_FACET_EVIDENCE").sum()
+        ),
         "hybrid_rows": len(hybrid),
         "grounded_model_rows": grounded_count,
         "taxonomy_categories": len(taxonomy["categories"]),
-        "taxonomy_facets": sum(len(category["facets"]) for category in taxonomy["categories"]),
+        "taxonomy_facets": sum(
+            len(category["facets"]) for category in taxonomy["categories"]
+        ),
         "review_queue_rows": len(queue),
-        "rule_terms_not_auto_promoted": int((hybrid["source"] == "RULE_EVIDENCE").sum()),
+        "rule_terms_not_auto_promoted": int(
+            (hybrid["source"] == "RULE_EVIDENCE").sum()
+        ),
         "human_review_required": True,
         "notes": [
             "This is a general-product draft, not a health-functional-food-only taxonomy.",
@@ -205,7 +252,9 @@ def main() -> None:
             "accepted_rows": len(accepted),
             "abstained_rows": len(rejected),
             "accepted_categories": len(auto_taxonomy["categories"]),
-            "accepted_facets": sum(len(c["facets"]) for c in auto_taxonomy["categories"]),
+            "accepted_facets": sum(
+                len(c["facets"]) for c in auto_taxonomy["categories"]
+            ),
             "human_review_required": False,
             "abstention_policy": "Ambiguous candidates are excluded from the automatic taxonomy, never silently promoted.",
         }

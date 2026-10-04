@@ -3,6 +3,9 @@
 > 이 문서는 모델/방식 선택 근거의 기록이다. 아래 Section 4의 체크리스트는
 > 초기 시점의 역사 기록이며 현재 blocker 목록이 아니다. 최신 A runtime·배포
 > 상태는 `docs/A_LABELING_SMOKE_TEST.md`와 현재 Cloud/QA 확인을 기준으로 한다.
+> 2026-10-04에 Model 1 출력 Schema와 self-consistency 투표 집계를 수정했다.
+> 아래 과거 기록은 수정 후 성능이 아니며, 현행 계약은
+> [A 검증 정책](A_RUNTIME_VALIDATION_POLICY.md)을 따른다.
 
 ## 1. 결론
 
@@ -44,7 +47,12 @@ Kanana는 동일 smoke에서 4회 호출·후보 0건·JSON 실패 4건·180.27�
 
 Qwen 2.5 7B는 전체 Model-only 품질이 아니라 fallback 개선폭과 재현 가능한 Ollama 실행을 기준으로 채택했다. fallback은 명시적 제외·충돌을 임의로 긍정 조건으로 바꾸지 않으며, 현재 Taxonomy에 완전히 매핑되고 원문 근거가 확인된 양성 constraint만 해당 Facet의 검증된 상품 기본값을 덮어쓴다. 개별 Demand의 분석 응답을 쓸 수 없거나 모호하면 검증된 원상품 기본 label을 유지한다. 활성화된 LLM 서비스/모델 자체가 배치 시작 시 unavailable이면 해당 실행은 DB 기록 없이 실패해 다음 회차에 재시도한다. 개별 상품 Facet의 일부 미확인/미제공은 해당 label 위치에 `ALL(0)`을 사용하며 다른 확인된 상품 Facet은 유지한다. 상품 프로필 전체 또는 Category/Taxonomy가 없거나 Category가 불일치하면 추정 없이 처리 보류한다.
 
-## 3. 현재 산출물 및 검증 상태
+## 3. 당시 산출물 및 검증 상태 (역사 기록)
+
+아래 규모·상태는 초기 비교 시점의 보존 산출물이며 최신 재실행이나 운영 배포 상태가 아니다.
+현재 원상품 기본값 정책과 배포 검증은 `A_LABELING_RUNTIME_HANDOFF.md`,
+`A_LABELING_SMOKE_TEST.md`를 기준으로 한다. 과거 product defaults가 비어 있던
+200건 비교를 현재 운영 Label 정확도로 인용하지 않는다.
 
 - 최신 Part A runtime v2.2.6: 5,000건, `PARSED 3,200`, `NONE 1,000`, `PASSTHROUGH 500`, `CONFLICT 250`, `TAXONOMY_AMBIGUOUS 50`
 - B 전달용 clustering input: 5,000건, `LABELED 4,200`, `LABELED_WITH_REVIEW 800`

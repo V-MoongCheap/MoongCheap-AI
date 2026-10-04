@@ -6,6 +6,8 @@ import argparse
 import json
 import os
 import sys
+import time
+from functools import partial
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -86,6 +88,7 @@ def _has_ambiguous_or_failed_analysis(row: Mapping[str, Any]) -> bool:
         "CONFLICT",
         "PARSER_EXCEPTION",
         "INVALID_IS_SUBSTITUTABLE",
+        "NON_PURCHASE_CONTEXT",
     )
     return any(
         any(marker in str(code).upper() for marker in blocked_markers) for code in codes
@@ -203,7 +206,7 @@ def run_batch(
     taxonomy_payload: dict[str, Any] | None = None,
     product_facets_path: Path | None = None,
     product_facet_map: dict[str, list[dict[str, Any]]] | None = None,
-    alias_registry_path: Path | None = None,
+    alias_registry_path: Path | None = Path("config/model1_aliases_reviewed_v2.json"),
     rules_path: Path = Path("config/demand_constraint_rules.json"),
     compatibility_alias_registry_path: Path | None = None,
     processed_at: str | None = None,
@@ -220,6 +223,16 @@ def run_batch(
     llm_retries: int = 2,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     timestamp = processed_at or datetime.now(UTC).isoformat()
+    if model2_fallback_enabled and (
+        model2_fallback_timeout <= 0 or model2_fallback_batch_size <= 0
+    ):
+        raise ValueError("Model 2 fallback timeout and batch size must be positive")
+    if llm_model and (
+        llm_timeout <= 0 or llm_batch_size <= 0 or llm_retries < 0 or llm_max_rows < 0
+    ):
+        raise ValueError(
+            "LLM timeout/batch size must be positive; retries/page limit must be non-negative"
+        )
     if product_facets_path is not None and product_facet_map is not None:
         raise ValueError("provide product_facets_path or product_facet_map, not both")
     if product_facets_path is not None:
@@ -249,7 +262,7 @@ def run_batch(
         demands,
         taxonomy_path,
         rules_path,
-        alias_registry_path or Path("config/model1_aliases_reviewed_v2.json"),
+        alias_registry_path,
         taxonomy_payload=taxonomy_payload,
         compatibility_alias_registry_path=compatibility_alias_registry_path,
         skip_processed=False,
@@ -278,6 +291,13 @@ def run_batch(
         for _, row in demands.fillna("").iterrows()
         if str(row.get("demand_id", "")).strip()
     }
+    # Preserve database category snapshots even if the parser projects only
+    # its own columns. The writer must reject stale category interpretations.
+    for column in ("category_snapshot_from_db", "category_db_id", "category_facet"):
+        if column in demands.columns:
+            labeled[column] = labeled["demand_id"].astype(str).map(
+                {key: row.get(column) for key, row in source_by_id.items()}
+            )
     product_defaults_by_demand: dict[str, dict[str, dict[str, Any]]] = {}
     product_default_warnings: dict[str, list[str]] = {}
     for result_index, result_row in labeled.iterrows():
@@ -381,7 +401,10 @@ def run_batch(
                 ),
                 None,
             )
-            if allowed is not None:
+            if (
+                allowed is not None
+                and str(allowed.get("status", "")).upper() != "DEPRECATED"
+            ):
                 final_values[facet_name] = {
                     "code": code,
                     "value": allowed.get("value", value_text),
@@ -801,6 +824,89 @@ def _apply_model2_fallback(
     return result, summary
 
 
+def run_checkpointed_batch(
+    demands: pd.DataFrame,
+    taxonomy_path: Path | None,
+    *,
+    connection: Any,
+    chunk_size: int = 5,
+    time_budget_seconds: int = 1500,
+    **kwargs: Any,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Commit completed chunks; unstarted rows remain pending for the next job.
+
+    CSV/model experiments still use run_batch. This wrapper belongs only to
+    the explicit DB-write CLI path, not Backend HTTP or B/C execution.
+    """
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in (chunk_size, time_budget_seconds)):
+        raise ValueError("DB chunk size and time budget must be positive")
+    for name in ("llm_batch_size", "model2_fallback_batch_size", "llm_timeout", "model2_fallback_timeout"):
+        if int(kwargs.get(name, 5 if name.endswith("batch_size") else 300)) < 1:
+            raise ValueError(f"{name} must be positive")
+    if int(kwargs.get("llm_retries", 2)) < 0:
+        raise ValueError("llm_retries must be non-negative")
+    if not demands.empty:
+        if "demand_id" not in demands.columns:
+            raise ValueError("DB snapshot must contain demand_id")
+        ids = demands["demand_id"].astype(str).str.strip()
+        if not ids.str.fullmatch(r"[1-9][0-9]*").all() or ids.duplicated().any():
+            raise ValueError("DB snapshot must contain unique positive demand IDs")
+        if any(int(value) > 9_223_372_036_854_775_807 for value in ids):
+            raise ValueError("DB snapshot demand ID exceeds BIGINT")
+    started = time.monotonic()
+    frames = []
+    payload: dict[str, Any] = {}
+    results = []
+    updated = 0
+    processed = 0
+    fallback_summary: dict[str, Any] = {}
+    timestamp = kwargs.pop("processed_at", None) or datetime.now(UTC).isoformat()
+    for offset in range(0, len(demands), chunk_size):
+        remaining = int(time_budget_seconds - (time.monotonic() - started))
+        retries = int(kwargs.get("llm_retries", 2))
+        row_count = min(chunk_size, len(demands) - offset)
+        # A failed batch recursively bisects down to singleton requests. A
+        # binary forest over n rows has at most 2*n-1 nodes, independent of
+        # page size. Reserve retries for every node, not just initial pages.
+        request_slots = 1
+        if kwargs.get("llm_model"):
+            request_slots += (2 * row_count - 1) * (retries + 1)
+        if kwargs.get("model2_fallback_enabled", False):
+            request_slots += row_count
+        if remaining <= request_slots:
+            break
+        options = dict(kwargs)
+        # Reserve enough time for retries as well as the initial call. One
+        # chunk cannot consume the entire remaining CronJob lifetime.
+        timeout = max(1, (remaining - 1) // request_slots)
+        for name in ("llm_timeout", "model2_fallback_timeout"):
+            options[name] = min(int(options.get(name, 300)), timeout)
+        labeled, current = run_batch(
+            demands.iloc[offset:offset + chunk_size].copy(), taxonomy_path,
+            processed_at=timestamp, **options,
+        )
+        updated += write_label_results(connection, labeled.to_dict(orient="records"), processed_at=timestamp)
+        for key, value in labeled.attrs.get("model2_fallback", {}).items():
+            if isinstance(value, int) and not isinstance(value, bool):
+                fallback_summary[key] = fallback_summary.get(key, 0) + value
+            else:
+                fallback_summary[key] = value
+        frames.append(labeled)
+        results.extend(current["results"])
+        payload = current
+        processed += len(labeled)
+    if not frames:
+        labeled, payload = run_batch(demands.iloc[:0].copy(), taxonomy_path, processed_at=timestamp, **kwargs)
+    else:
+        labeled = pd.concat(frames, ignore_index=True)
+        labeled.attrs["model2_fallback"] = fallback_summary
+    payload = dict(payload)
+    payload["results"] = results
+    payload["checkpointUpdatedCount"] = updated
+    payload["deferredRows"] = len(demands) - processed
+    return labeled, payload
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the A Demand labeling batch")
     parser.add_argument("--env-file", type=Path)
@@ -933,6 +1039,11 @@ def main(argv: list[str] | None = None) -> int:
                 else open_read_only_postgres(_required(source, "A_DATABASE_URL"))
             )
             demands = read_unprocessed_demands(connection)
+            # End the read transaction before potentially slow model calls.
+            # Snapshot guards in the writer protect against intervening edits.
+            rollback = getattr(connection, "rollback", None)
+            if callable(rollback):
+                rollback()
         taxonomy_payload = None
         if not args.input and "category_facet" in demands.columns and not demands.empty:
             taxonomy_payload = taxonomy_from_category_facet_rows(demands)
@@ -959,7 +1070,16 @@ def main(argv: list[str] | None = None) -> int:
         if taxonomy_payload is not None and taxonomy_payload.get("version") != "v2.2":
             primary_alias_registry = None
             compatibility_alias_registry = None
-        labeled, payload = run_batch(
+        process_batch = run_batch
+        if write_to_database:
+            if connection is None:
+                connection = open_postgres(_required(source, "A_DATABASE_URL"))
+            process_batch = partial(
+                run_checkpointed_batch, connection=connection,
+                chunk_size=int(source.get("A_DB_CHUNK_SIZE", "5")),
+                time_budget_seconds=int(source.get("A_BATCH_TIME_BUDGET_SECONDS", "1500")),
+            )
+        labeled, payload = process_batch(
             demands,
             taxonomy_path,
             taxonomy_payload=taxonomy_payload,
@@ -969,17 +1089,23 @@ def main(argv: list[str] | None = None) -> int:
             or Path(source.get("A_RULES_PATH", "config/demand_constraint_rules.json")),
             compatibility_alias_registry_path=compatibility_alias_registry,
             model2_fallback_enabled=model2_fallback_enabled,
-            model2_fallback_model=source.get(
-                "A_MODEL2_FALLBACK_MODEL", "qwen2.5:7b-instruct"
-            ),
-            model2_fallback_endpoint=source.get(
-                "A_MODEL2_OLLAMA_BASE_URL", "http://localhost:11434"
-            ),
+            model2_fallback_model=llm_model or "qwen2.5:7b-instruct",
+            model2_fallback_endpoint=llm_endpoint,
             model2_fallback_timeout=int(
-                source.get("A_MODEL2_FALLBACK_TIMEOUT_SECONDS", "300")
+                _first_env(
+                    source,
+                    "A_LLM_TIMEOUT_SECONDS",
+                    "A_MODEL2_FALLBACK_TIMEOUT_SECONDS",
+                    default="300",
+                )
             ),
             model2_fallback_batch_size=int(
-                source.get("A_MODEL2_FALLBACK_BATCH_SIZE", "5")
+                _first_env(
+                    source,
+                    "A_LLM_BATCH_SIZE",
+                    "A_MODEL2_FALLBACK_BATCH_SIZE",
+                    default="5",
+                )
             ),
             llm_model=llm_model if llm_enabled else None,
             llm_endpoint=llm_endpoint,
@@ -1011,11 +1137,7 @@ def main(argv: list[str] | None = None) -> int:
         if write_to_database:
             if connection is None:
                 connection = open_postgres(_required(source, "A_DATABASE_URL"))
-            written = write_label_results(
-                connection,
-                labeled.to_dict(orient="records"),
-                processed_at=payload["processedAt"],
-            )
+            written = payload["checkpointUpdatedCount"]
             response = {"status": "DB_APPLIED", "updatedCount": written}
         elif not args.dry_run:
             response = post_label_results(
@@ -1033,6 +1155,7 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "status": "COMPLETED",
                     "rows": len(labeled),
+                    "deferredRows": payload.get("deferredRows", 0),
                     "labelingStatusCounts": status_counts,
                     "reviewCount": status_counts.get("REVIEW", 0),
                     "output": str(args.output),

@@ -7,6 +7,7 @@ Only ``demand.label`` and ``demand.processed_at`` are written here.
 from __future__ import annotations
 
 import math
+import json
 import re
 from collections.abc import Iterable, Mapping
 from datetime import datetime
@@ -21,6 +22,22 @@ WHERE id = %(demand_id)s
   AND status = 'UNASSIGNED'
   AND processed_at IS NULL
 """.strip()
+
+# Runtime rows retain their read snapshot. Never attach an old interpretation
+# to a changed catalog or consumer requirement while it is still unprocessed.
+UPDATE_SNAPSHOT_LABEL_SQL = UPDATE_LABEL_SQL + """
+  AND catalog_id::text = %(snapshot_catalog_id)s
+  AND COALESCE(extra_requirement, '') = %(snapshot_extra_requirement)s
+"""
+
+UPDATE_CATEGORY_SNAPSHOT_LABEL_SQL = UPDATE_SNAPSHOT_LABEL_SQL + """
+  AND EXISTS (
+    SELECT 1 FROM product_catalog pc JOIN category c ON c.id = pc.category_id
+    WHERE pc.id = demand.catalog_id
+      AND pc.category_id::text = %(snapshot_category_id)s
+      AND c.facet::jsonb = %(snapshot_category_facet)s::jsonb
+  )
+"""
 
 
 class Cursor(Protocol):
@@ -78,17 +95,31 @@ def write_label_results(
             raise ValueError(f"label is required for demand_id: {demand_key}")
         if not re.fullmatch(r"\d+(?:-\d+)*", label):
             raise ValueError(f"label must be a numeric Facet vector: {demand_key}")
-        updates.append({
+        params = {
             "demand_id": demand_key,
             "label": label,
             "processed_at": timestamp,
-        })
+        }
+        if "catalog_id" in row and "extra_requirement" in row:
+            params["snapshot_catalog_id"] = str(row["catalog_id"])
+            params["snapshot_extra_requirement"] = str(row["extra_requirement"] or "")
+            if row.get("category_snapshot_from_db") is True:
+                params["snapshot_category_id"] = str(row["category_db_id"])
+                facet = row["category_facet"]
+                params["snapshot_category_facet"] = (
+                    json.dumps(facet, ensure_ascii=False) if isinstance(facet, (dict, list)) else str(facet)
+                )
+        updates.append(params)
 
     updated_count = 0
     try:
         with connection.cursor() as cursor:
             for params in updates:
-                cursor.execute(UPDATE_LABEL_SQL, params)
+                cursor.execute(
+                    UPDATE_CATEGORY_SNAPSHOT_LABEL_SQL if "snapshot_category_id" in params else
+                    UPDATE_SNAPSHOT_LABEL_SQL if "snapshot_catalog_id" in params else UPDATE_LABEL_SQL,
+                    params,
+                )
                 # psycopg exposes the number of rows affected by the guarded
                 # UPDATE. Keep a fallback for lightweight test doubles that
                 # do not implement rowcount.

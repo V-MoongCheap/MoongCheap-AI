@@ -6,15 +6,19 @@ import argparse
 import json
 import os
 import re
-from collections import Counter
-from math import ceil
 import time
+from contextlib import contextmanager
 from html import unescape
 from pathlib import Path
 
 import pandas as pd
 
-from moongcheap_ai.data_foundation.model1 import OllamaAdapter, ModelCallError, parse_model_output
+from moongcheap_ai.data_foundation.model1 import (
+    ModelCallError,
+    OllamaAdapter,
+    parse_model_output,
+)
+from moongcheap_ai.data_foundation.model1_consensus import gate_observed_candidates, select_consensus
 
 
 def _clean_text(value: object) -> str:
@@ -41,22 +45,12 @@ def _apply_value_evidence_gate(
     candidates: pd.DataFrame, rows: list[dict]
 ) -> pd.DataFrame:
     """Reject values that do not literally occur in the category input."""
-    if candidates.empty:
-        return candidates
-    evidence_blob = " ".join(
-        str(value)
-        for row in rows
-        for key, value in row.items()
-        if key not in {"source_product_id", "source_type"} and str(value).strip()
-    ).casefold()
-    return candidates[
-        candidates["value"].astype(str).map(
-            lambda value: bool(value.strip()) and value.casefold() in evidence_blob
-        )
-    ].copy()
+    return gate_observed_candidates(candidates, rows)
 
 
-def make_rows(frame: pd.DataFrame, min_category_products: int, max_per_category: int) -> dict[str, list[dict]]:
+def make_rows(
+    frame: pd.DataFrame, min_category_products: int, max_per_category: int
+) -> dict[str, list[dict]]:
     result: dict[str, list[dict]] = {}
     for category, group in frame.groupby("category_path", sort=True):
         if len(group) < min_category_products:
@@ -64,36 +58,62 @@ def make_rows(frame: pd.DataFrame, min_category_products: int, max_per_category:
         group = group.sort_values("source_product_id").head(max_per_category)
         rows = []
         for item in group.to_dict(orient="records"):
-            rows.append({
-                "source_product_id": item.get("source_product_id", ""),
-                "source_type": "DOMEGGOOK_API_PRODUCT",
-                # Measurements, model IDs and legal boilerplate are excluded
-                # from the Model 1 evidence prompt. They are retained in the
-                # raw source and audit artifacts, but are not facet evidence.
-                "product_form": "",
-                "functional_ingredients": "",
-                "intake_method": "",
-                "evidence_text": " | ".join(
-                    f"{label}={value}"
-                    for label, value in (
-                        ("상품명", item.get("name", "")),
-                        ("카테고리", item.get("category_path", "")),
-                        ("상품설명", _clean_text(item.get("description_item", ""))),
-                        ("제조사", item.get("manufacturer", "")),
-                    )
-                    if str(value).strip()
-                )[:120],
-                "consumer_search_text": "",
-            })
+            rows.append(
+                {
+                    "source_product_id": item.get("source_product_id", ""),
+                    "source_type": "DOMEGGOOK_API_PRODUCT",
+                    # Measurements, model IDs and legal boilerplate are excluded
+                    # from the Model 1 evidence prompt. They are retained in the
+                    # raw source and audit artifacts, but are not facet evidence.
+                    "product_form": "",
+                    "functional_ingredients": "",
+                    "intake_method": "",
+                    "evidence_text": " | ".join(
+                        f"{label}={value}"
+                        for label, value in (
+                            ("상품명", item.get("name", "")),
+                            ("카테고리", item.get("category_path", "")),
+                            ("상품설명", _clean_text(item.get("description_item", ""))),
+                            ("제조사", item.get("manufacturer", "")),
+                        )
+                        if str(value).strip()
+                    )[:120],
+                    "consumer_search_text": "",
+                }
+            )
         result[f"domeggook:{category}"] = rows
     return result
 
 
+@contextmanager
+def _experiment_environment():
+    defaults = {
+        "MODEL1_COMPACT_PROMPT": "false",
+        "MODEL1_CATEGORY_SUMMARY": "true",
+        "MODEL1_MAX_NEW_TOKENS": "256",
+    }
+    keys = (*defaults, "MODEL1_TEMPERATURE")
+    previous = {key: os.environ.get(key) for key in keys}
+    try:
+        for key, value in defaults.items():
+            os.environ.setdefault(key, value)
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+@_experiment_environment()
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--models", default="qwen3:1.7b,qwen2.5:3b,gemma3:1b,exaone3.5:2.4b")
+    parser.add_argument(
+        "--models", default="qwen3:1.7b,qwen2.5:3b,gemma3:1b,exaone3.5:2.4b"
+    )
     parser.add_argument("--min-category-products", type=int, default=10)
     parser.add_argument("--max-per-category", type=int, default=12)
     parser.add_argument("--retries", type=int, default=1)
@@ -109,18 +129,27 @@ def main() -> None:
         default=0.2,
         help="Temperature used when consistency-attempts is greater than one.",
     )
-    parser.add_argument("--prompt", type=Path, default=Path("prompts/facet_discovery_general_v1_few_shot.txt"))
+    parser.add_argument(
+        "--prompt",
+        type=Path,
+        default=Path("prompts/facet_discovery_general_v1_few_shot.txt"),
+    )
     args = parser.parse_args()
     # Use the versioned Few-shot prompt by default.  Small-context compact mode
     # remains available explicitly via MODEL1_COMPACT_PROMPT=true.
-    os.environ.setdefault("MODEL1_COMPACT_PROMPT", "false")
-    os.environ.setdefault("MODEL1_CATEGORY_SUMMARY", "true")
-    os.environ.setdefault("MODEL1_MAX_NEW_TOKENS", "256")
+    if args.consistency_attempts < 1 or args.retries < 0:
+        parser.error("consistency-attempts must be positive and retries non-negative")
+    if args.min_category_products < 1 or args.max_per_category < 1:
+        parser.error("category sample sizes must be positive")
     frame = pd.read_csv(args.input, dtype=str).fillna("")
     groups = make_rows(frame, args.min_category_products, args.max_per_category)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "model_input_v1.jsonl").write_text(
-        "\n".join(json.dumps({"category_key": key, "products": rows}, ensure_ascii=False) for key, rows in groups.items()) + "\n",
+        "\n".join(
+            json.dumps({"category_key": key, "products": rows}, ensure_ascii=False)
+            for key, rows in groups.items()
+        )
+        + "\n",
         encoding="utf-8",
     )
     all_raw: list[dict] = []
@@ -137,7 +166,11 @@ def main() -> None:
         for category_key, rows in groups.items():
             best = pd.DataFrame()
             category_failures: list[dict] = []
-            attempt_count = max(args.retries + 1, args.consistency_attempts)
+            attempt_count = (
+                args.consistency_attempts
+                if args.consistency_attempts > 1
+                else max(args.retries + 1, 1)
+            )
             parsed_attempts: list[pd.DataFrame] = []
             for attempt in range(attempt_count):
                 calls += 1
@@ -145,51 +178,96 @@ def main() -> None:
                     args.consistency_temperature if args.consistency_attempts > 1 else 0
                 )
                 try:
-                    payload = adapter.generate_facet_candidates(category_key, rows, "domeggook_facet_comparison_v1")
-                    all_raw.append({"model": model, "category_key": category_key, "attempt": attempt + 1, "response": payload})
-                    parsed, parse_failures = parse_model_output(payload, pd.DataFrame(rows))
+                    payload = adapter.generate_facet_candidates(
+                        category_key, rows, "domeggook_facet_comparison_v1"
+                    )
+                    all_raw.append(
+                        {
+                            "model": model,
+                            "category_key": category_key,
+                            "attempt": attempt + 1,
+                            "response": payload,
+                        }
+                    )
+                    parsed, parse_failures = parse_model_output(
+                        payload, pd.DataFrame(rows)
+                    )
                     parsed = parsed[
-                        parsed.apply(lambda item: _valid_general_candidate(item.to_dict()), axis=1)
+                        parsed.apply(
+                            lambda item: _valid_general_candidate(item.to_dict()),
+                            axis=1,
+                        )
                     ].copy()
                     parsed = _apply_value_evidence_gate(parsed, rows)
                     parsed_attempts.append(parsed)
-                    category_failures = parse_failures
+                    category_failures.extend(parse_failures)
                 except ModelCallError as exc:
-                    category_failures = [{"failure_type": "MODEL_CALL_FAILED", "detail": str(exc)}]
-            if parsed_attempts:
-                required_votes = ceil(args.consistency_attempts / 2) if args.consistency_attempts > 1 else 1
-                votes = Counter(
-                    (
-                        str(row.get("name", "")).casefold().strip(),
-                        str(row.get("value", "")).casefold().strip(),
+                    category_failures.extend(
+                        [{"failure_type": "MODEL_CALL_FAILED", "detail": str(exc)}]
                     )
-                    for parsed in parsed_attempts
-                    for row in parsed.to_dict(orient="records")
-                )
-                accepted_keys = {key for key, count in votes.items() if count >= required_votes}
-                for parsed in parsed_attempts:
-                    if not parsed.empty:
-                        keys = [
-                            (str(row.get("name", "")).casefold().strip(), str(row.get("value", "")).casefold().strip())
-                            for row in parsed.to_dict(orient="records")
-                        ]
-                        candidate = parsed.loc[[key in accepted_keys for key in keys]]
-                        if not candidate.empty:
-                            best = candidate
-                            break
+            if parsed_attempts:
+                best = select_consensus(parsed_attempts, args.consistency_attempts)
             if not best.empty:
                 successful += 1
                 candidates += len(best)
-                all_candidates.extend([{**row, "model": model} for row in best.to_dict(orient="records")])
+                all_candidates.extend(
+                    [{**row, "model": model} for row in best.to_dict(orient="records")]
+                )
             if category_failures:
                 failures += len(category_failures)
-                all_failures.extend([{**row, "model": model, "category_key": category_key} for row in category_failures])
-        reports.append({"model": model, "calls": calls, "categories": len(groups), "successful_categories": successful, "candidate_rows": candidates, "failure_rows": failures, "runtime_seconds": round(time.perf_counter() - started, 3), "consistency_attempts": args.consistency_attempts, "consistency_required_votes": ceil(args.consistency_attempts / 2) if args.consistency_attempts > 1 else 1})
-    pd.DataFrame(all_candidates).to_csv(args.output_dir / "model_candidates_v1.csv", index=False, encoding="utf-8-sig")
-    pd.DataFrame(all_failures).to_csv(args.output_dir / "model_failures_v1.csv", index=False, encoding="utf-8-sig")
-    (args.output_dir / "model_raw_responses_v1.jsonl").write_text("\n".join(json.dumps(x, ensure_ascii=False) for x in all_raw) + "\n", encoding="utf-8")
-    (args.output_dir / "comparison_report_v1.json").write_text(json.dumps({"input_rows": len(frame), "eligible_categories": len(groups), "models": reports}, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({"input_rows": len(frame), "eligible_categories": len(groups), "models": reports}, ensure_ascii=False))
+                all_failures.extend(
+                    [
+                        {**row, "model": model, "category_key": category_key}
+                        for row in category_failures
+                    ]
+                )
+        reports.append(
+            {
+                "model": model,
+                "calls": calls,
+                "categories": len(groups),
+                "successful_categories": successful,
+                "candidate_rows": candidates,
+                "failure_rows": failures,
+                "runtime_seconds": round(time.perf_counter() - started, 3),
+                "consistency_attempts": args.consistency_attempts,
+                "consistency_required_votes": args.consistency_attempts // 2 + 1
+                if args.consistency_attempts > 1
+                else 1,
+            }
+        )
+    pd.DataFrame(all_candidates).to_csv(
+        args.output_dir / "model_candidates_v1.csv", index=False, encoding="utf-8-sig"
+    )
+    pd.DataFrame(all_failures).to_csv(
+        args.output_dir / "model_failures_v1.csv", index=False, encoding="utf-8-sig"
+    )
+    (args.output_dir / "model_raw_responses_v1.jsonl").write_text(
+        "\n".join(json.dumps(x, ensure_ascii=False) for x in all_raw) + "\n",
+        encoding="utf-8",
+    )
+    (args.output_dir / "comparison_report_v1.json").write_text(
+        json.dumps(
+            {
+                "input_rows": len(frame),
+                "eligible_categories": len(groups),
+                "models": reports,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    print(
+        json.dumps(
+            {
+                "input_rows": len(frame),
+                "eligible_categories": len(groups),
+                "models": reports,
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -7,13 +7,13 @@ import json
 import os
 import time
 import urllib.request
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from moongcheap_ai.data_foundation.model1 import ModelCallError, parse_model_output
+from moongcheap_ai.data_foundation.model1_consensus import select_consensus
 
 
 BASE_INSTRUCTION = """You are a facet-discovery assistant for a general e-commerce catalog.
@@ -60,11 +60,18 @@ def _call_ollama(endpoint: str, model: str, prompt: str, temperature: float) -> 
             payload = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
         raise ModelCallError(str(exc)) from exc
+    if not isinstance(payload, dict):
+        raise ModelCallError("invalid Ollama response envelope")
     raw = payload.get("response", "")
+    if not isinstance(raw, str):
+        raise ModelCallError("invalid Ollama response text")
     if not raw:
         raise ModelCallError("empty Ollama response")
     try:
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            raise ModelCallError("model output must be a JSON object")
+        return parsed
     except json.JSONDecodeError as exc:
         raise ModelCallError("invalid JSON response") from exc
 
@@ -128,6 +135,8 @@ def main() -> None:
     parser.add_argument("--max-categories", type=int, default=30)
     parser.add_argument("--consistency-attempts", type=int, default=3)
     args = parser.parse_args()
+    if args.consistency_attempts < 1 or args.max_categories < 1:
+        parser.error("consistency-attempts and max-categories must be positive")
     source = [json.loads(line) for line in args.input.read_text(encoding="utf-8").splitlines() if line.strip()]
     source = source[: args.max_categories]
     techniques = {
@@ -169,15 +178,11 @@ def main() -> None:
             if not parsed_attempts:
                 continue
             if technique == "self_consistency":
-                votes = Counter(
-                    (str(row.get("name", "")).casefold(), str(row.get("value", "")).casefold())
-                    for parsed in parsed_attempts
-                    for row in parsed.to_dict("records")
-                )
-                accepted = {key for key, count in votes.items() if count >= 2}
-                selected = next((frame for frame in parsed_attempts if any((str(row.get("name", "")).casefold(), str(row.get("value", "")).casefold()) in accepted for row in frame.to_dict("records"))), parsed_attempts[0])
+                selected = select_consensus(parsed_attempts, attempts)
             else:
                 selected = parsed_attempts[0]
+            if selected.empty:
+                continue
             successes += 1
             quality_rows.append({"category_key": category, **_quality(selected, prompt_rows)})
         summary_quality = pd.DataFrame(quality_rows)

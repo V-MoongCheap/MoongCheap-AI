@@ -179,6 +179,28 @@ pipeline {
 
                         env.BUILD_LABELING = files.any { file ->
 
+                            file.startsWith('tests/data_foundation/') ||
+                            file.startsWith('tests/model1/') ||
+                            file.startsWith('tests/evaluation/') ||
+                            file.startsWith('tests/test_model1') ||
+                            file.startsWith('tests/test_model2') ||
+                            file.startsWith('tests/test_part_a') ||
+                            file.startsWith('tests/deployment/test_a_') ||
+                            file == 'tests/test_labeling.py' ||
+                            file == 'tests/test_mvp_pipeline.py' ||
+                            file.startsWith('scripts/model1/') ||
+                            file.startsWith('scripts/labeling/') ||
+                            file.startsWith('scripts/demand/') ||
+                            file.startsWith('scripts/evaluation/evaluate_part_a') ||
+                            file.startsWith('scripts/evaluation/evaluate_model2') ||
+                            file.startsWith('scripts/evaluation/run_model1') ||
+                            file.startsWith('scripts/evaluation/build_model1') ||
+                            file.startsWith('scripts/evaluation/prepare_model1') ||
+                            file.startsWith('scripts/evaluation/build_part_a') ||
+                            file.startsWith('scripts/evaluation/finalize_part_a') ||
+                            file.startsWith('scripts/evaluation/compare_demand_labeling') ||
+                            file.startsWith('scripts/evaluation/report_demand_labeling') ||
+
                             file.startsWith('src/') ||
 
                             file.startsWith(
@@ -810,6 +832,19 @@ pipeline {
 
                                 if [ "$IMAGE_COUNT" = '1' ]; then
                                     echo "ECR에 동일한 태그가 존재합니다."
+                                    EXPECTED_PROFILE_SHA="508ba2d9b49a48dfad06342ff29384dfc0d8f9d7c6d1974e26a3b57a2c3bef9f"
+                                    EXPECTED_TAXONOMY_SHA="807a9e8055286812ec2b4350070af8a750d81eb0be573701f83e80c9fad30b6f"
+                                    EXISTING_PROFILE_SHA="$(skopeo inspect --authfile "$AUTH_FILE" \
+                                      --format '{{ index .Labels "io.moongcheap.a.product-facets-sha256" }}' \
+                                      "docker://$ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG")"
+                                    EXISTING_TAXONOMY_SHA="$(skopeo inspect --authfile "$AUTH_FILE" \
+                                      --format '{{ index .Labels "io.moongcheap.a.taxonomy-sha256" }}' \
+                                      "docker://$ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG")"
+                                    if [ "$EXISTING_PROFILE_SHA" != "$EXPECTED_PROFILE_SHA" ] || \
+                                       [ "$EXISTING_TAXONOMY_SHA" != "$EXPECTED_TAXONOMY_SHA" ]; then
+                                        echo "ERROR: 기존 A 이미지의 release 지문이 다릅니다. 새 commit/tag로 빌드해야 합니다."
+                                        exit 1
+                                    fi
                                     echo "기존 ECR 이미지를 검사합니다."
 
                                     skopeo copy \
