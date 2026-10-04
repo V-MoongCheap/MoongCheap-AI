@@ -109,7 +109,10 @@ Current behavior supersedes the historical REVIEW persistence statements below:
   첫 fallback이 보류한 배송 요구를 두 번째 호출이 제형으로 채택하는 사례도 발견했다.
   이미 fallback이 검증한 행은 중복 호출하지 않으며, 호출/채택/실패 요약은 첫 경로까지 합산한다.
 - 모델이 Taxonomy Value를 선택했지만 원문에 해당 Value/alias 근거가 없으면 `REVIEW`로 보류한다.
-  모델이 고른 각 Value에 대해 그 Value 또는 해당 Value의 alias가 원문에 있는지 확인한다.
+  모델이 **원상품에서 변경한** 각 Value에 대해 그 Value 또는 해당 Value의 alias가 원문에 있는지 확인한다.
+  변경하지 않은 상품 기본값에는 소비자의 반복 언급을 요구하지 않는다.
+  예문·번역·역할 지시문, 폐기 값 및 release 외 별칭은 구매 override로 승격하지 않는다.
+  [A 검증 정책](A_RUNTIME_VALIDATION_POLICY.md)의 회귀 사례를 함께 실행한다.
   배송 요구를 제형으로 잘못 반환한 실제 Ollama 응답과, 다른 Facet 값만 언급된 문장을 보류하는 것을 확인했다.
 - `EXCLUDE` 값은 typed constraints에 보존하지만 긍정 압축 `label`에는 넣지 않는다.
   부정·대조·대안 문장은 LLM 호출 후보에서 제외하고, 모델 결과의 중복/누락/예상 밖 Demand ID,

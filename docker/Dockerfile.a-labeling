@@ -20,6 +20,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --project packaging/a-labeling --locked --no-dev --no-editable
 
 FROM python:3.13.12-slim-trixie AS runtime
+ARG A_PRODUCT_FACETS_SHA256=508ba2d9b49a48dfad06342ff29384dfc0d8f9d7c6d1974e26a3b57a2c3bef9f
+ARG A_TAXONOMY_SHA256=807a9e8055286812ec2b4350070af8a750d81eb0be573701f83e80c9fad30b6f
+LABEL io.moongcheap.a.product-facets-sha256=$A_PRODUCT_FACETS_SHA256 \
+      io.moongcheap.a.taxonomy-sha256=$A_TAXONOMY_SHA256
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -41,7 +45,8 @@ COPY --from=builder /build/config/facet_taxonomy_v2_2.json ./config/facet_taxono
 COPY artifacts/ /artifacts/
 RUN test -s /artifacts/product_facets.csv \
     || (echo "ERROR: release input artifacts/product_facets.csv is required to build a deployable A Labeling image" >&2; exit 1) \
-    && sha256sum /artifacts/product_facets.csv \
+    && echo "$A_PRODUCT_FACETS_SHA256  /artifacts/product_facets.csv" | sha256sum -c - \
+    && echo "$A_TAXONOMY_SHA256  /app/config/facet_taxonomy_v2_2.json" | sha256sum -c - \
     && chown 65534:65534 /artifacts/product_facets.csv \
     && chmod 0400 /artifacts/product_facets.csv
 

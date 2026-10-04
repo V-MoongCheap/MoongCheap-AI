@@ -1,6 +1,6 @@
 """Print a reproducible local demo summary for the AI MVP pipeline.
 
-The default mode reuses verified local artifacts so a mentoring demo does not
+The default mode replays historical local artifacts so a mentoring demo does not
 need external APIs, a database account, Ollama, or cloud credentials.
 """
 
@@ -37,35 +37,39 @@ def main() -> None:
     gold = ROOT / "data/processed/model2_gold_v1/model2_demand_gold_final_v1.csv"
     supported = ROOT / "data/processed/model2_gold_v1/model2_gold_supported_v1.csv"
 
-    required = [a, b, c, analysis, gold, supported]
+    required = {"all": [a, b, c, analysis, gold, supported],
+                "a": [a, gold, supported], "b": [b], "c": [b, c, analysis]}[args.stage]
     missing = [str(path.relative_to(ROOT)) for path in required if not path.exists()]
     if missing:
         raise SystemExit("missing demo artifacts:\n- " + "\n- ".join(missing))
 
-    a_frame = _csv(a)
-    b_frame = _csv(b)
-    c_frame = _csv(c)
-    analysis_frame = _csv(analysis)
+    print("저장된 과거 산출물 재생입니다. 현행 A/B/C 재실행·운영 보드 정책 검증이 아닙니다.")
+    a_frame = _csv(a) if a in required else pd.DataFrame()
+    b_frame = _csv(b) if b in required else pd.DataFrame()
+    c_frame = _csv(c) if c in required else pd.DataFrame()
+    analysis_frame = _csv(analysis) if analysis in required else pd.DataFrame()
     summary = {
         "status": "COMPLETED",
+        "execution_mode": "HISTORICAL_ARTIFACT_REPLAY_NOT_RUNTIME_EVALUATION",
+        "production_board_policy_verified": False,
         "human_review_used_during_demo": False,
         "a_labeling": {
             "rows": len(a_frame),
-            "status_counts": a_frame["status"].value_counts().to_dict(),
+            "status_counts": a_frame.get("status", pd.Series(dtype=str)).value_counts().to_dict(),
         },
         "b_clustering": {
             "clusters": len(b_frame),
-            "total_quantity": int(pd.to_numeric(b_frame["total_quantity"], errors="coerce").fillna(0).sum()),
+            "total_quantity": int(pd.to_numeric(b_frame.get("total_quantity", pd.Series(dtype=str)), errors="coerce").fillna(0).sum()),
         },
         "c_matching": {
             "offer_comparisons": len(c_frame),
-            "candidate_matches": int(c_frame["match_status"].eq("CANDIDATE").sum()),
+            "candidate_matches": int(c_frame.get("match_status", pd.Series(dtype=str)).eq("CANDIDATE").sum()),
             "clusters_analyzed": len(analysis_frame),
         },
         "model2_gold": {
-            "final_rows": _count(gold),
-            "taxonomy_supported_rows": _count(supported),
-            "out_of_taxonomy_rows": _count(gold) - _count(supported),
+            "final_rows": _count(gold) if gold in required else None,
+            "taxonomy_supported_rows": _count(supported) if supported in required else None,
+            "out_of_taxonomy_rows": _count(gold) - _count(supported) if gold in required else None,
         },
     }
     if args.stage in {"all", "a"}:

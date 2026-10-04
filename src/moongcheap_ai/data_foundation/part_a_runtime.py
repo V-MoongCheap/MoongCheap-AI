@@ -17,6 +17,7 @@ import pandas as pd
 
 from ..demand_clustering.part_a_integration import build_part_b_parser
 from ..demand_constraints import DemandConstraintParser
+from ..demand_constraints.classifier import normalize
 from .labeling import TaxonomyLoader
 from .part_a_input_policy import PartAConstraintInputPolicy
 
@@ -58,18 +59,16 @@ def _category_map(frame: pd.DataFrame) -> dict[str, str]:
     if not id_column:
         return {}
     result: dict[str, str] = {}
-    for raw_catalog_id, raw_category_id in frame[
-        [id_column, "category_id"]
-    ].fillna("").itertuples(index=False, name=None):
+    for raw_catalog_id, raw_category_id in (
+        frame[[id_column, "category_id"]].fillna("").itertuples(index=False, name=None)
+    ):
         catalog_id = str(raw_catalog_id).strip()
         category_id = str(raw_category_id).strip()
         if not catalog_id or not category_id:
             continue
         previous = result.get(catalog_id)
         if previous is not None and previous != category_id:
-            raise ValueError(
-                f"catalog ID has conflicting category IDs: {catalog_id}"
-            )
+            raise ValueError(f"catalog ID has conflicting category IDs: {catalog_id}")
         result[catalog_id] = category_id
     return result
 
@@ -85,21 +84,85 @@ def _facet_index(loader: TaxonomyLoader, category_id: str) -> dict[str, dict[str
     }
 
 
-def _contract_constraints(loader: TaxonomyLoader, category_id: str, result: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _contract_constraints(
+    loader: TaxonomyLoader, category_id: str, result: Mapping[str, Any]
+) -> list[dict[str, Any]]:
     facets = _facet_index(loader, category_id)
     constraints: list[dict[str, Any]] = []
     for item in result.get("constraints", []):
         facet_key = str(item.get("facet_name", ""))
         facet = facets.get(facet_key, {})
-        constraints.append({
-            "facetKey": facet_key,
-            "canonicalValue": str(item.get("value", "")),
-            "facetCode": int(facet.get("facet_id", 0) or 0),
-            "valueCode": int(item.get("value_code", 0) or 0),
-            "constraintType": str(item.get("constraint_type", "PREFER")),
-            "evidence": str(item.get("evidence_clause", "")),
-        })
+        constraints.append(
+            {
+                "facetKey": facet_key,
+                "canonicalValue": str(item.get("value", "")),
+                "facetCode": int(facet.get("facet_id", 0) or 0),
+                "valueCode": int(item.get("value_code", 0) or 0),
+                "constraintType": str(item.get("constraint_type", "PREFER")),
+                "evidence": str(item.get("evidence_clause", "")),
+            }
+        )
     return constraints
+
+
+def _restrict_a_parser(parser, payload):
+    """Restrict the concrete A parser; preserve injected diagnostic adapters."""
+    if not isinstance(parser, DemandConstraintParser):
+        return parser
+    matcher = parser.input_policy.matcher
+    for category in payload.get("categories", []):
+        category_id = str(category["category_id"])
+        for facet in category.get("facets", []):
+            name = str(facet["name"])
+            retired = {
+                int(v["code"])
+                for v in facet["values"]
+                if str(v.get("status", "")).upper() == "DEPRECATED"
+            }
+            grouped = {}
+            for candidate in sorted(
+                matcher.values[category_id][name], key=lambda item: item.value_code
+            ):
+                if candidate.value_code in retired:
+                    continue
+                canonical = grouped.setdefault(normalize(candidate.value), candidate)
+                if canonical != candidate:
+                    matcher.aliases[(category_id, name, canonical.value_code)].extend(
+                        matcher.aliases[(category_id, name, candidate.value_code)]
+                    )
+            matcher.values[category_id][name] = list(grouped.values())
+    matcher.normalized_duplicate_groups = []
+    # Rebuild cached collision/equivalence maps against the restricted matcher.
+    return DemandConstraintParser(
+        parser.extractor, PartAConstraintInputPolicy(matcher, parser.extractor)
+    )
+
+
+def build_a_parser(
+    payload: Mapping[str, Any],
+    rules_path: Path,
+    alias_registry_path: Path | None,
+    compatibility_alias_registry_path: Path | None = None,
+) -> DemandConstraintParser:
+    """One version-bound parser configuration for runtime and A evaluations."""
+    if payload.get("version") != "v2.2":
+        alias_registry_path = None
+        compatibility_alias_registry_path = None
+    if compatibility_alias_registry_path is not None:
+        enriched, _ = build_part_b_parser(
+            payload, rules_path=rules_path, aliases_path=alias_registry_path,
+            compatibility_aliases_path=compatibility_alias_registry_path,
+        )
+        parser = DemandConstraintParser(
+            extractor=enriched.extractor,
+            input_policy=PartAConstraintInputPolicy(enriched.input_policy.matcher, enriched.extractor),
+        )
+    else:
+        parser = DemandConstraintParser.from_taxonomy(
+            payload, rules_path=rules_path, aliases_path=alias_registry_path,
+            policy_cls=PartAConstraintInputPolicy,
+        )
+    return _restrict_a_parser(parser, payload)
 
 
 def run_part_a_batch(
@@ -123,38 +186,10 @@ def run_part_a_batch(
         taxonomy = TaxonomyLoader.from_path(taxonomy_path)
     else:
         raise ValueError("taxonomy_path or taxonomy_payload is required")
+    # A must never generate new constraints from retired values. Keep the
+    # shared B matcher and the immutable release artifact unchanged.
     payload = taxonomy.taxonomy
-    parser = DemandConstraintParser.from_taxonomy(
-        payload,
-        rules_path=rules_path,
-        aliases_path=alias_registry_path,
-        policy_cls=PartAConstraintInputPolicy,
-    )
-    payload = taxonomy.taxonomy
-    if compatibility_alias_registry_path is not None:
-        # Keep the Part B integration helper backward-compatible: older B
-        # branches do not accept a Part A policy class, so apply the A policy
-        # after B has enriched the taxonomy aliases.
-        enriched_parser, _ = build_part_b_parser(
-            payload,
-            rules_path=rules_path,
-            aliases_path=alias_registry_path,
-            compatibility_aliases_path=compatibility_alias_registry_path,
-        )
-        parser = DemandConstraintParser(
-            extractor=enriched_parser.extractor,
-            input_policy=PartAConstraintInputPolicy(
-                enriched_parser.input_policy.matcher,
-                enriched_parser.extractor,
-            ),
-        )
-    else:
-        parser = DemandConstraintParser.from_taxonomy(
-            payload,
-            rules_path=rules_path,
-            aliases_path=alias_registry_path,
-            policy_cls=PartAConstraintInputPolicy,
-        )
+    parser = build_a_parser(payload, rules_path, alias_registry_path, compatibility_alias_registry_path)
     source = demands.fillna("").copy()
     if skip_processed and "processed_at" in source.columns:
         source = source[source["processed_at"].astype(str).str.strip().eq("")].copy()
@@ -177,31 +212,35 @@ def run_part_a_batch(
             elif category_id not in taxonomy.categories:
                 category_reason = "CATEGORY_NOT_IN_TAXONOMY"
             if category_reason:
-                row.update({
-                    "category_id": category_id,
-                    "demandId": raw.get("demand_id", ""),
-                    "catalogId": raw.get("catalog_id", ""),
-                    "categoryId": category_id,
-                    "taxonomyVersion": str(payload.get("version", "v2.2")),
-                    "status": "REVIEW",
-                    "effectiveRequirementMode": "NONE",
-                    "constraints": "[]",
-                    "warnings": "[]",
-                    "clauses": "[]",
-                    "interpretation_method": "CATEGORY_PREVALIDATION",
-                    "preferenceGroups": "[]",
-                    "passthroughText": None,
-                    "semantic_preferences": "[]",
-                    "diagnostic_code": category_reason,
-                    "taxonomy_equivalences": "[]",
-                    "reasonCodes": json.dumps([category_reason], ensure_ascii=False),
-                    "label": "",
-                    "facet_values": "{}",
-                    "parserVersion": RUNTIME_VERSION,
-                    # The demand was not parsed, so it must remain eligible
-                    # for a later retry after category data is repaired.
-                    "processed_at": "",
-                })
+                row.update(
+                    {
+                        "category_id": category_id,
+                        "demandId": raw.get("demand_id", ""),
+                        "catalogId": raw.get("catalog_id", ""),
+                        "categoryId": category_id,
+                        "taxonomyVersion": str(payload.get("version", "v2.2")),
+                        "status": "REVIEW",
+                        "effectiveRequirementMode": "NONE",
+                        "constraints": "[]",
+                        "warnings": "[]",
+                        "clauses": "[]",
+                        "interpretation_method": "CATEGORY_PREVALIDATION",
+                        "preferenceGroups": "[]",
+                        "passthroughText": None,
+                        "semantic_preferences": "[]",
+                        "diagnostic_code": category_reason,
+                        "taxonomy_equivalences": "[]",
+                        "reasonCodes": json.dumps(
+                            [category_reason], ensure_ascii=False
+                        ),
+                        "label": "",
+                        "facet_values": "{}",
+                        "parserVersion": RUNTIME_VERSION,
+                        # The demand was not parsed, so it must remain eligible
+                        # for a later retry after category data is repaired.
+                        "processed_at": "",
+                    }
+                )
                 rows.append(row)
                 continue
             has_substitution_consent = "is_substitutable" in source.columns
@@ -211,29 +250,33 @@ def run_part_a_batch(
                 else True
             )
             if is_substitutable is None:
-                row.update({
-                    "category_id": category_id,
-                    "demandId": raw.get("demand_id", ""),
-                    "catalogId": raw.get("catalog_id", ""),
-                    "categoryId": category_id,
-                    "taxonomyVersion": str(payload.get("version", "v2.2")),
-                    "status": "REVIEW",
-                    "effectiveRequirementMode": "NONE",
-                    "constraints": "[]",
-                    "warnings": "[]",
-                    "clauses": "[]",
-                    "interpretation_method": "INPUT_PREVALIDATION",
-                    "preferenceGroups": "[]",
-                    "passthroughText": None,
-                    "semantic_preferences": "[]",
-                    "diagnostic_code": "INVALID_IS_SUBSTITUTABLE",
-                    "taxonomy_equivalences": "[]",
-                    "reasonCodes": json.dumps(["INVALID_IS_SUBSTITUTABLE"], ensure_ascii=False),
-                    "label": "",
-                    "facet_values": "{}",
-                    "parserVersion": RUNTIME_VERSION,
-                    "processed_at": "",
-                })
+                row.update(
+                    {
+                        "category_id": category_id,
+                        "demandId": raw.get("demand_id", ""),
+                        "catalogId": raw.get("catalog_id", ""),
+                        "categoryId": category_id,
+                        "taxonomyVersion": str(payload.get("version", "v2.2")),
+                        "status": "REVIEW",
+                        "effectiveRequirementMode": "NONE",
+                        "constraints": "[]",
+                        "warnings": "[]",
+                        "clauses": "[]",
+                        "interpretation_method": "INPUT_PREVALIDATION",
+                        "preferenceGroups": "[]",
+                        "passthroughText": None,
+                        "semantic_preferences": "[]",
+                        "diagnostic_code": "INVALID_IS_SUBSTITUTABLE",
+                        "taxonomy_equivalences": "[]",
+                        "reasonCodes": json.dumps(
+                            ["INVALID_IS_SUBSTITUTABLE"], ensure_ascii=False
+                        ),
+                        "label": "",
+                        "facet_values": "{}",
+                        "parserVersion": RUNTIME_VERSION,
+                        "processed_at": "",
+                    }
+                )
                 rows.append(row)
                 continue
             requirement = str(raw.get("extra_requirement", "") or "").strip()
@@ -256,43 +299,57 @@ def run_part_a_batch(
                 reason_codes.insert(0, str(result["diagnostic_code"]))
             if result.get("interpretation_method"):
                 reason_codes.append(str(result["interpretation_method"]))
-            row.update({
-                "category_id": category_id,
-                "demandId": raw.get("demand_id", ""),
-                "catalogId": raw.get("catalog_id", ""),
-                "categoryId": category_id,
-                "taxonomyVersion": str(payload.get("version", "v2.2")),
-                "status": status,
-                "effectiveRequirementMode": str(result["effective_requirement_mode"]),
-                "constraints": json.dumps(constraints, ensure_ascii=False, separators=(",", ":")),
-                "preferenceGroups": json.dumps(result.get("preference_groups", []), ensure_ascii=False, separators=(",", ":")),
-                "passthroughText": requirement if status == "PASSTHROUGH" else None,
-                "reasonCodes": json.dumps(reason_codes, ensure_ascii=False, separators=(",", ":")),
-                # This stage only interprets consumer text. A final numeric
-                # label requires the selected product's category-matched Facet
-                # evidence; unconfirmed positions become ALL(0) in the final
-                # vector. The labeling runtime creates it after joining profile.
-                "label": "",
-                "facet_values": "{}",
-                "parserVersion": RUNTIME_VERSION,
-                # Parsing success is not final Demand labeling completion.
-                "processed_at": "",
-            })
+            row.update(
+                {
+                    "category_id": category_id,
+                    "demandId": raw.get("demand_id", ""),
+                    "catalogId": raw.get("catalog_id", ""),
+                    "categoryId": category_id,
+                    "taxonomyVersion": str(payload.get("version", "v2.2")),
+                    "status": status,
+                    "effectiveRequirementMode": str(
+                        result["effective_requirement_mode"]
+                    ),
+                    "constraints": json.dumps(
+                        constraints, ensure_ascii=False, separators=(",", ":")
+                    ),
+                    "preferenceGroups": json.dumps(
+                        result.get("preference_groups", []),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                    "passthroughText": requirement if status == "PASSTHROUGH" else None,
+                    "reasonCodes": json.dumps(
+                        reason_codes, ensure_ascii=False, separators=(",", ":")
+                    ),
+                    # This stage only interprets consumer text. A final numeric
+                    # label requires the selected product's category-matched Facet
+                    # evidence; unconfirmed positions become ALL(0) in the final
+                    # vector. The labeling runtime creates it after joining profile.
+                    "label": "",
+                    "facet_values": "{}",
+                    "parserVersion": RUNTIME_VERSION,
+                    # Parsing success is not final Demand labeling completion.
+                    "processed_at": "",
+                }
+            )
         except (KeyError, TypeError, ValueError, IndexError) as error:
-            row.update({
-                "taxonomyVersion": str(payload.get("version", "v2.2")),
-                "status": "REVIEW",
-                "effectiveRequirementMode": "NONE",
-                "constraints": "[]",
-                "preferenceGroups": "[]",
-                "passthroughText": None,
-                "reasonCodes": json.dumps(["PARSER_EXCEPTION"], ensure_ascii=False),
-                "label": "",
-                "facet_values": "{}",
-                "parserVersion": RUNTIME_VERSION,
-                "processed_at": "",
-                "errorType": type(error).__name__,
-            })
+            row.update(
+                {
+                    "taxonomyVersion": str(payload.get("version", "v2.2")),
+                    "status": "REVIEW",
+                    "effectiveRequirementMode": "NONE",
+                    "constraints": "[]",
+                    "preferenceGroups": "[]",
+                    "passthroughText": None,
+                    "reasonCodes": json.dumps(["PARSER_EXCEPTION"], ensure_ascii=False),
+                    "label": "",
+                    "facet_values": "{}",
+                    "parserVersion": RUNTIME_VERSION,
+                    "processed_at": "",
+                    "errorType": type(error).__name__,
+                }
+            )
         rows.append(row)
     output = pd.DataFrame(rows)
     counts = output["status"].value_counts().to_dict() if not output.empty else {}
@@ -303,11 +360,16 @@ def run_part_a_batch(
         "rows": len(output),
         "statusCounts": {key: int(counts.get(key, 0)) for key in sorted(STATUSES)},
         "externalLlmCalls": 0,
-        "parserExceptionCount": int(sum(row.get("reasonCodes") == '["PARSER_EXCEPTION"]' for row in rows)),
-        "categoryPrevalidationFailureCount": int(sum(
-            row.get("diagnostic_code") in {"CATEGORY_MISSING", "CATEGORY_NOT_IN_TAXONOMY"}
-            for row in rows
-        )),
+        "parserExceptionCount": int(
+            sum(row.get("reasonCodes") == '["PARSER_EXCEPTION"]' for row in rows)
+        ),
+        "categoryPrevalidationFailureCount": int(
+            sum(
+                row.get("diagnostic_code")
+                in {"CATEGORY_MISSING", "CATEGORY_NOT_IN_TAXONOMY"}
+                for row in rows
+            )
+        ),
         "clustering": "NOT_PERFORMED",
         "sellerMatching": "NOT_PERFORMED",
     }

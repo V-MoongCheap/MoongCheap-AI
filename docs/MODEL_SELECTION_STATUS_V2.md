@@ -148,6 +148,10 @@ PYTHONPATH=src .venv/bin/python scripts/model1/audit_multisource_quality.py \
 
 ### Model 1 최종 모델 확정 보충
 
+> 아래 수치는 과거 실행 기록이다. 2026-10-04의 prompt Schema 및 생성별 투표 집계
+> 수정 이후 성능으로 간주하지 않는다. 모델 선정 자체와 신규 코드의 재평가는 별개이며
+> 현행 검증 계약은 [A 검증 정책](A_RUNTIME_VALIDATION_POLICY.md)을 따른다.
+
 기존 Kanana 실행 결과와 동일 조건의 Qwen3 4B 결과를 비교했다.
 
 | 모델 | 호출 | 후보 | 실패 | 실행시간 | 판정 |

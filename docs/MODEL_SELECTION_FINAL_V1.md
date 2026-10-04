@@ -3,6 +3,9 @@
 > 이 문서는 모델/방식 선택 근거의 기록이다. 아래 Section 4의 체크리스트는
 > 초기 시점의 역사 기록이며 현재 blocker 목록이 아니다. 최신 A runtime·배포
 > 상태는 `docs/A_LABELING_SMOKE_TEST.md`와 현재 Cloud/QA 확인을 기준으로 한다.
+> 2026-10-04에 Model 1 출력 Schema와 self-consistency 투표 집계를 수정했다.
+> 아래 과거 기록은 수정 후 성능이 아니며, 현행 계약은
+> [A 검증 정책](A_RUNTIME_VALIDATION_POLICY.md)을 따른다.
 
 ## 1. 결론
 

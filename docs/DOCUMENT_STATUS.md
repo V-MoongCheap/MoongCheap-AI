@@ -29,6 +29,10 @@
 
 ## 공통 상태 규칙
 
+A의 현재 입력·모델·release 검증 계약은 `A_RUNTIME_VALIDATION_POLICY.md`를 따른다.
+2026-10-04 전체 점검 후 A 실행 경로 통합, checkpoint, 평가 코드·Model 1 투표 및 CI 기준은 `A_AUDIT_FIXES_20261004.md`를 따른다. 과거 200건 parser 점수와 현재 운영 Label/LLM 정확도는 다른 지표다.
+Model 1 과거 prompt/self-consistency 비교는 수정 후 결과로 재인용하지 않는다.
+
 - `candidate`, `draft`, `pending`, `review`는 자동 확정이 아님을 뜻한다.
 - `config/facet_taxonomy_v2_2.json`은 현재 기준 Taxonomy 계약이지만, 신규/변경 Facet은 Human Review 없이 승인하지 않는다.
 - `data/processed/backend_seed_v5/`의 Category/Catalog ID는 Backend 실DB ID가 아닌 Seed ID다.

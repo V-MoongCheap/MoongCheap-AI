@@ -477,7 +477,7 @@ def test_runtime_job_uses_qwen_only_for_unresolved_rows(tmp_path, monkeypatch):
     assert result.set_index("demand_id").loc["102", "status"] == "REVIEW"
     assert result.set_index("demand_id").loc["102", "fallback_status"] == "REVIEW"
     assert (
-        "lacks matching text evidence"
+        "MODEL_RESULT_NOT_INFORMATIVE"
         in result.set_index("demand_id").loc["102", "fallback_warning"]
     )
 

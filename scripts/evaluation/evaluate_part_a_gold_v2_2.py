@@ -154,11 +154,12 @@ def _evaluate_row(parser: DemandConstraintParser, row: pd.Series) -> dict[str, A
 
 
 def _load_parser() -> DemandConstraintParser:
+    from moongcheap_ai.data_foundation.part_a_runtime import build_a_parser
     taxonomy = json.loads((ROOT / "config/facet_taxonomy_v2_2.json").read_text(encoding="utf-8"))
-    return DemandConstraintParser.from_taxonomy(
+    return build_a_parser(
         taxonomy,
         rules_path=ROOT / "config/demand_constraint_rules.json",
-        aliases_path=ROOT / "config/model1_aliases_reviewed_v2.json",
+        alias_registry_path=ROOT / "config/model1_aliases_reviewed_v2.json",
     )
 
 
@@ -211,7 +212,11 @@ def evaluate(gold_dir: Path, output_dir: Path, partition: str = "ALL") -> dict[s
         "passthrough_match",
         "row_pass",
     ]
-    summary: dict[str, Any] = {"total_rows": len(result_frame), "result_path": str(result_path)}
+    summary: dict[str, Any] = {
+        "evaluation_scope": "A_TYPED_PARSER_COMPONENT_NOT_FINAL_LABEL_OR_LIVE_LLM",
+        "input_policy": "PartAConstraintInputPolicy",
+        "total_rows": len(result_frame), "result_path": str(result_path),
+    }
     for name, group in result_frame.groupby("partition", sort=False):
         summary[name] = {
             "rows": len(group),
@@ -237,6 +242,7 @@ def evaluate(gold_dir: Path, output_dir: Path, partition: str = "ALL") -> dict[s
         "# Part A V2.2 Gold 평가 결과",
         "",
         "이 평가는 finalized Gold의 기대값과 현재 수요 조건 파서의 결과를 비교한다.",
+        "A 전용 정책을 사용한 parser 구성요소 평가이며, 원상품 기본값 적용 후 최종 Label이나 실제 LLM 성능 평가가 아니다.",
         "각 행은 status, parser-level mode, effective mode, constraints, preference groups, passthrough를 독립적으로 비교한다.",
         "",
         f"- 전체 행: {len(result_frame)}",

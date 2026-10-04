@@ -1,5 +1,7 @@
 # A파트 연결 실행 계약
 
+> 2026-10-04: A 실행 경로 통합, DB chunk checkpoint/시간 예산, Gold 숫자 코드 검증 및 이미지 지문은 [전체 점검 후 A 기준](A_AUDIT_FIXES_20261004.md)을 따른다. DB 쓰기는 이제 전체 배치가 아니라 chunk 단위 원자성이다.
+
 ## 흐름
 
 ```text
@@ -87,6 +89,8 @@ python -m moongcheap_ai.data_foundation.runtime_job `
   방식은 달라질 수 있다.
 - Cloud develop의 기존 `A_MODEL2_FALLBACK_*`, `A_MODEL2_OLLAMA_BASE_URL` 이름도
   과도기 호환용으로 읽지만, 새 설정의 표준 이름은 `A_LLM_*`다.
+  둘 다 설정하면 `A_LLM_*`가 우선하며, 모델 preflight와 generate는 동일한
+  endpoint/model을 사용한다. 명시적으로 비활성화한 alias는 다시 로드하지 않는다.
 - `A_LLM_TIMEOUT_SECONDS`: LLM 요청 timeout. 기본 300초
 - `A_LLM_PREFLIGHT_TIMEOUT_SECONDS`: 배치 시작 시 `/api/tags` 모델 존재 확인 timeout. 기본 10초.
   `A_LLM_ENABLED=true` 또는 `A_MODEL2_FALLBACK_ENABLED=true`일 때 확인한다. 모델이
@@ -108,6 +112,11 @@ B 호환 Alias 파일(`config/demand_constraint_aliases.json`)을 함께 포함�
 CSV dry-run 또는 고정 Artifact 검증에서는 `A_TAXONOMY_PATH`를 사용한다.
 
 Model 2 통신 계약은 현재 Ollama HTTP API를 기준으로 한다.
+
+원상품과 동일한 모델 반환값은 변경이 아니므로 요구 원문에 근거를 재요구하지 않는다.
+변경 값만 원문 근거 검증을 통과해야 한다. 예문·번역·역할 지시문은 구매 요구로
+승격하지 않는다. 상세 release/원자 값/폐기 값 정책은
+[A 검증 정책](A_RUNTIME_VALIDATION_POLICY.md)을 따른다.
 
 - Method: `POST`
 - Path: `/api/generate`

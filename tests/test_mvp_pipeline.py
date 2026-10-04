@@ -21,21 +21,21 @@ def _write_fixture(tmp_path):
     registry_path.write_text(json.dumps({"version": "aliases-v2", "aliases": [{"facet_name": "product_form", "canonical_value": "tablet", "surfaces": ["알약", "정제"], "category_local_values": {"c1": {"code": 1, "value": "tablet"}}}, {"facet_name": "product_form", "canonical_value": "powder", "surfaces": ["분말"], "category_local_values": {"c1": {"code": 2, "value": "powder"}}}]}, ensure_ascii=False), encoding="utf-8")
     demand_path = tmp_path / "demands.csv"
     pd.DataFrame([
-        {"demand_id": "1", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "알약", "quantity": "2", "is_substitutable": "false", "processed_at": ""},
-        {"demand_id": "2", "catalog_id": "p1", "category_id": "c1", "extra_requirement": "", "quantity": "1", "is_substitutable": "true", "processed_at": "2026-01-01T00:00:00+00:00"},
+        {"demand_id": "1", "catalog_id": "1", "category_id": "c1", "extra_requirement": "알약", "quantity": "2", "is_substitutable": "false", "processed_at": ""},
+        {"demand_id": "2", "catalog_id": "1", "category_id": "c1", "extra_requirement": "", "quantity": "1", "is_substitutable": "true", "processed_at": "2026-01-01T00:00:00+00:00"},
     ]).to_csv(demand_path, index=False)
     product_facets_path = tmp_path / "product_facets.csv"
     pd.DataFrame(
         [
             {
-                "catalog_id": "p1",
+                "backend_catalog_id": "1",
                 "category_id": "c1",
                 "facet_name": "product_form",
                 "mapping_status": "MAPPED",
                 "value": "tablet",
             },
             {
-                "catalog_id": "p1",
+                "backend_catalog_id": "1",
                 "category_id": "c1",
                 "facet_name": "daily_frequency",
                 "mapping_status": "MAPPED",
@@ -57,7 +57,9 @@ def test_local_e2e_uses_v22_alias_and_skips_processed_rows(tmp_path):
     )
     assert result["taxonomy_version"] == "v2.2"
     assert result["labeling"]["skipped"] == 1
-    assert result["labeling"]["alias_hits"] == 1
+    assert result["labeling"]["alias_hits"] == 0
+    assert result["clustering"]["created_new"] == 0
+    assert result["production_board_validation"] == "NOT_PERFORMED"
     assert result["clustering"]["processed"] == 1
     labeled = pd.read_csv(
         tmp_path / "out/demand_labeled_v2_2.csv", dtype=str
@@ -85,7 +87,7 @@ def test_local_e2e_does_not_alias_or_process_without_product_profile(tmp_path):
     assert labeled.loc[0, "processed_at"] == ""
 
 
-def test_conflicting_aliases_keep_product_baseline_and_remain_unprocessed(tmp_path):
+def test_conflicting_aliases_keep_product_baseline_using_current_runtime(tmp_path):
     taxonomy, registry, demands, product_facets = _write_fixture(tmp_path)
     frame = pd.read_csv(demands, dtype=str).fillna("")
     frame.loc[0, "extra_requirement"] = "정제와 분말"
@@ -102,7 +104,7 @@ def test_conflicting_aliases_keep_product_baseline_and_remain_unprocessed(tmp_pa
     labeled = pd.read_csv(
         tmp_path / "out/demand_labeled_v2_2.csv", dtype=str
     ).fillna("")
-    assert result["labeling"]["conflicts"] == 1
+    assert result["labeling"]["unresolved"] == 0
     assert labeled.loc[0, "label"] == "1-1"
-    assert labeled.loc[0, "pipeline_status"] == "CONFLICT"
-    assert labeled.loc[0, "processed_at"] == ""
+    assert labeled.loc[0, "label_status"] == "LABELED"
+    assert labeled.loc[0, "processed_at"] != ""

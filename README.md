@@ -32,6 +32,7 @@
 - Consumer RAG 챗봇은 현재 MVP에서 제외합니다.
 - Model 1은 Rule/통계 Evidence를 주 경로로 하고 `qwen3:4b`를 후보 생성 보조로 사용합니다. Model 2는 실제 Backend ID로 조회하는 명시적 원상품 Facet profile + Rule-first Hybrid를 사용하며 `qwen2.5:7b-instruct`는 미해결 양성 요구에 대한 선택적 fallback입니다. 프로필이 없거나 잘못되면 추정하지 않고 저장을 보류합니다. 모델 분석 실패·모호·부정·충돌 시에는 검증된 원상품 기본값을 유지합니다.
 - Model 1/2에 Embedding이나 Vector DB를 필수로 요구하지 않습니다. B의 운영 E5 선호 점수화와 별도 오프라인 상품 검색 실험은 구분합니다.
+- A의 구매 문맥·원자 값·폐기 값·모델 override·Release 별칭 검증과 Model 1의 생성별 투표 기준은 [A 검증 정책](docs/A_RUNTIME_VALIDATION_POLICY.md)을 참고하세요. 과거 실험 수치를 수정 후 모델 성능으로 간주하지 않습니다.
 
 수요 클러스터링(B파트)은 Demand·DemandBoard·거절 이력을 읽기 전용으로 조회하고,
 생성·편입·대체 제안 계획을 Backend 내부 API로 전달합니다. 이 경로의 DB 반영,
@@ -47,7 +48,7 @@
 
 ## 개발 작업 흐름
 
-공통 설치 설정은 루트의 `pyproject.toml`(Python 3.11 이상)과 `requirements.txt`입니다.
+공통 개발 설치 설정은 루트의 `pyproject.toml`(Python 3.11 이상)과 `requirements.txt`입니다. **A 배포·CI 재현은 `packaging/a-labeling/uv.lock`을 사용한 전용 설치가 기준**이며, 루트 API/data extra를 A 배포 환경으로 간주하지 않습니다.
 B파트 개발·CI는 [전용 패키징 안내](packaging/demand-clustering/README.md)의
 Python 3.12 이상 환경과 lockfile을 사용합니다. 저장소 루트에서 실행합니다.
 
